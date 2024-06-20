@@ -178,4 +178,4 @@ logs/
 ctre_sim/
 
 # AdvantageKit git metadata file
-src/main/java/frc/robot/BuildConstants.java
+src/main/java/frc/cotc/BuildConstants.java
