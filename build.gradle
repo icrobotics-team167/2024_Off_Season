@@ -41,6 +41,7 @@ deploy {
 
                 // Static files artifact
                 frcStaticFileDeploy(getArtifactTypeClass('FileTreeArtifact')) {
+                    predeploy << { execute 'rm -rf /home/lvuser/deploy' }
                     files = project.fileTree('src/main/deploy')
                     directory = '/home/lvuser/deploy'
                 }
@@ -84,7 +85,7 @@ gversion {
     classPackage = "frc.cotc"
     className    = "BuildConstants"
     dateFormat   = "yyyy-MM-dd HH:mm:ss z"
-    timeZone     = "America/Chicago" // Use preferred time zone
+    timeZone     = "UTC" // Use preferred time zone
     indent       = "  "
 }
 
