@@ -33,7 +33,7 @@ public interface SwerveIO {
 
     // Reductions
     double DRIVE_GEAR_RATIO = 6.75;
-    double STEER_GEAR_RATIO = 150.0 / 70.0;
+    double STEER_GEAR_RATIO = 150.0 / 7.0;
 
     // Rad/sec
     double MAX_ROTOR_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
