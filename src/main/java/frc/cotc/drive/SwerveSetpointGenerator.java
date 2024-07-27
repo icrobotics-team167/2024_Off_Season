@@ -357,10 +357,25 @@ public class SwerveSetpointGenerator {
         retStates[i].speedMetersPerSecond *= -1.0;
       }
     }
-    return new SwerveSetpoint(retSpeeds, retStates);
+
+    double[] retFeedforward = new double[modulePositions.length];
+    for (int i = 0; i < modulePositions.length; i++) {
+      retFeedforward[i] =
+          (retStates[i].angle.getRadians() - prevSetpoint.moduleStates()[i].angle.getRadians())
+              / dt;
+    }
+    return new SwerveSetpoint(retSpeeds, retStates, retFeedforward);
   }
 
-  public record SwerveSetpoint(ChassisSpeeds chassisSpeeds, SwerveModuleState[] moduleStates) {}
+  /**
+   * A setpoint.
+   *
+   * @param chassisSpeeds The setpoint's resulting ChassisSpeeds.
+   * @param moduleStates The setpoint's module states.
+   * @param steerFeedforward The setpoint's steering feedforwards. In rad/sec.
+   */
+  public record SwerveSetpoint(
+      ChassisSpeeds chassisSpeeds, SwerveModuleState[] moduleStates, double[] steerFeedforward) {}
 
   public record ModuleLimits(
       double maxDriveVelocity, double maxDriveAcceleration, double maxSteeringVelocity) {}

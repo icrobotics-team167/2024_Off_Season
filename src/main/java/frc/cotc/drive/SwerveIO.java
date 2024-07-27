@@ -7,6 +7,7 @@
 
 package frc.cotc.drive;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import org.littletonrobotics.junction.AutoLog;
@@ -21,6 +22,11 @@ public interface SwerveIO {
           new SwerveModuleState(),
           new SwerveModuleState()
         };
+    Rotation2d gyroYaw = new Rotation2d();
+
+    double[] odometryTimestamps = new double[0];
+    double[] odometryPositions = new double[0];
+    Rotation2d[] odometryYaws = new Rotation2d[0];
   }
 
   @AutoLog
@@ -35,12 +41,15 @@ public interface SwerveIO {
     double DRIVE_GEAR_RATIO = 6.75;
     double STEER_GEAR_RATIO = 150.0 / 7.0;
 
+    // Inversions
+    boolean DRIVE_MOTOR_INVERTED = false;
+    boolean STEER_MOTOR_INVERTED = true;
+
     // Rad/sec
-    double MAX_ROTOR_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
+    double MAX_ROTOR_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
     // Meters/sec^2
     double MAX_ACCEL = 8;
-    double MIN_ACCEL = 4;
   }
 
   /**
@@ -62,7 +71,20 @@ public interface SwerveIO {
   /**
    * Drives the drivebase.
    *
-   * @param setpoint The drive setpoint. Meters per second.
+   * @param setpoint The drive setpoint.
+   * @param steerFeedforward The feedforward for the steering. Rad/sec.
    */
-  default void drive(SwerveModuleState[] setpoint) {}
+  default void drive(SwerveModuleState[] setpoint, double[] steerFeedforward) {
+    drive(setpoint, steerFeedforward, new double[] {0, 0, 0, 0});
+  }
+
+  /**
+   * Drives the drivebase.
+   *
+   * @param setpoint The drive setpoint.
+   * @param steerFeedforward The feedforward for the steering. Rad/sec.
+   * @param torqueFeedforward The feedforward for the drive motor. Newtons.
+   */
+  default void drive(
+      SwerveModuleState[] setpoint, double[] steerFeedforward, double[] torqueFeedforward) {}
 }
