@@ -63,11 +63,11 @@ public class Swerve extends SubsystemBase {
   }
 
   public void drive(ChassisSpeeds speed) {
-    SwerveSetpointGenerator.ModuleLimits limits =
+    var limits =
         new SwerveSetpointGenerator.ModuleLimits(
             TOP_SPEED, CONSTANTS.MAX_ACCEL, CONSTANTS.MAX_ROTOR_SPEED / CONSTANTS.STEER_GEAR_RATIO);
 
-    SwerveSetpointGenerator.SwerveSetpoint setpoint =
+    var setpoint =
         setpointGenerator.generateSetpoint(limits, lastSetpoint, speed, Robot.defaultPeriodSecs);
 
     Logger.recordOutput("Swerve/Drive Setpoint", setpoint.moduleStates());
@@ -77,7 +77,7 @@ public class Swerve extends SubsystemBase {
   }
 
   public void stopInX() {
-    SwerveModuleState[] setpoint =
+    var setpoint =
         new SwerveModuleState[] {
           new SwerveModuleState(
               0, new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2)),
