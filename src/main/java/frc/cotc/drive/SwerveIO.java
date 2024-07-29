@@ -46,7 +46,7 @@ public interface SwerveIO {
     boolean STEER_MOTOR_INVERTED = true;
 
     // Rad/sec
-    double MAX_ROTOR_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
+    double MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
     // Meters/sec^2
     double MAX_ACCEL = 8;
@@ -87,4 +87,8 @@ public interface SwerveIO {
    */
   default void drive(
       SwerveModuleState[] setpoint, double[] steerFeedforward, double[] torqueFeedforward) {}
+
+  default void stop() {}
+
+  default void stopWithAngles(Rotation2d[] angles) {}
 }

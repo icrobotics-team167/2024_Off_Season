@@ -10,11 +10,14 @@ package frc.cotc.drive;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.controls.StaticBrake;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import frc.cotc.RobotConstants;
@@ -23,14 +26,14 @@ public class SwerveIOPhoenix implements SwerveIO {
   private final SwerveIOConstantsAutoLogged CONSTANTS;
   private final Module[] modules;
 
-  protected SwerveIOPhoenix() {
+  public SwerveIOPhoenix() {
     CONSTANTS = new SwerveIOConstantsAutoLogged();
     CONSTANTS.DRIVE_GEAR_RATIO = 6.75;
     CONSTANTS.STEER_GEAR_RATIO = 150.0 / 7.0;
     CONSTANTS.WHEEL_DIAMETER = Units.inchesToMeters(4);
     CONSTANTS.TRACK_WIDTH = Units.inchesToMeters(22.75);
     CONSTANTS.TRACK_LENGTH = Units.inchesToMeters(22.75);
-    CONSTANTS.MAX_ROTOR_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
+    CONSTANTS.MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(5800);
     CONSTANTS.DRIVE_MOTOR_INVERTED = false;
     CONSTANTS.STEER_MOTOR_INVERTED = true;
     CONSTANTS.MAX_ACCEL = 8;
@@ -57,7 +60,23 @@ public class SwerveIOPhoenix implements SwerveIO {
   @Override
   public void drive(
       SwerveModuleState[] setpoint, double[] steerFeedforward, double[] forceFeedforward) {
-    SwerveIO.super.drive(setpoint, steerFeedforward, forceFeedforward);
+    for (int i = 0; i < 4; i++) {
+      modules[i].drive(setpoint[i], steerFeedforward[i], forceFeedforward[i]);
+    }
+  }
+
+  @Override
+  public void stop() {
+    for (Module module : modules) {
+      module.stop();
+    }
+  }
+
+  @Override
+  public void stopWithAngles(Rotation2d[] angles) {
+    for (int i = 0; i < 4; i++) {
+      modules[i].stopWithAngle(angles[i]);
+    }
   }
 
   private class Module {
@@ -66,6 +85,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     final CANcoder steerEncoder;
 
     final double wheelDiameter;
+    final double maxRotorVelocity;
     final double driveGearRatio;
     final double steerGearRatio;
 
@@ -111,6 +131,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerMotor.getConfigurator().apply(steerConfig);
 
       wheelDiameter = constants.WHEEL_DIAMETER;
+      maxRotorVelocity = constants.MAX_ROTOR_VELOCITY;
       driveGearRatio = constants.DRIVE_GEAR_RATIO;
       steerGearRatio = constants.STEER_GEAR_RATIO;
     }
@@ -121,6 +142,13 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     protected void drive(
         SwerveModuleState setpoint, double steerFeedforward, double forceFeedforward) {
+      if (MathUtil.isNear(0, setpoint.speedMetersPerSecond, 1e-3)
+          && MathUtil.isNear(0, steerFeedforward, 1e-3)
+          && MathUtil.isNear(0, forceFeedforward, 1e-3)) {
+        stop();
+        return;
+      }
+
       driveMotor.setControl(
           driveControlRequest
               .withVelocity(
@@ -131,10 +159,20 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerMotor.setControl(
           steerControlRequest
               .withPosition(setpoint.angle.getRotations())
-              .withFeedForward(
-                  12.0
-                      / (steerFeedforward
-                          / (Units.rotationsPerMinuteToRadiansPerSecond(5800) / steerGearRatio))));
+              .withFeedForward(12.0 * (steerFeedforward / (maxRotorVelocity / steerGearRatio))));
+    }
+
+    private final StaticBrake brakeControlRequest = new StaticBrake();
+
+    private void stop() {
+      driveMotor.setControl(brakeControlRequest);
+      steerMotor.setControl(brakeControlRequest);
+    }
+
+    protected void stopWithAngle(Rotation2d angle) {
+      driveMotor.setControl(brakeControlRequest);
+      steerMotor.setControl(
+          steerControlRequest.withPosition(angle.getRotations()).withFeedForward(0));
     }
   }
 }

@@ -51,7 +51,8 @@ public class Swerve extends SubsystemBase {
             new ChassisSpeeds(), inputs.moduleStates, new double[] {0, 0, 0, 0});
 
     TOP_SPEED =
-        (CONSTANTS.MAX_ROTOR_SPEED / CONSTANTS.DRIVE_GEAR_RATIO) * (CONSTANTS.WHEEL_DIAMETER / 2.0);
+        (CONSTANTS.MAX_ROTOR_VELOCITY / CONSTANTS.DRIVE_GEAR_RATIO)
+            * (CONSTANTS.WHEEL_DIAMETER / 2.0);
 
     MAX_OMEGA = TOP_SPEED / Math.hypot(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2);
   }
@@ -65,7 +66,9 @@ public class Swerve extends SubsystemBase {
   public void drive(ChassisSpeeds speed) {
     var limits =
         new SwerveSetpointGenerator.ModuleLimits(
-            TOP_SPEED, CONSTANTS.MAX_ACCEL, CONSTANTS.MAX_ROTOR_SPEED / CONSTANTS.STEER_GEAR_RATIO);
+            TOP_SPEED,
+            CONSTANTS.MAX_ACCEL,
+            CONSTANTS.MAX_ROTOR_VELOCITY / CONSTANTS.STEER_GEAR_RATIO);
 
     var setpoint =
         setpointGenerator.generateSetpoint(limits, lastSetpoint, speed, Robot.defaultPeriodSecs);
@@ -78,20 +81,24 @@ public class Swerve extends SubsystemBase {
 
   public void stopInX() {
     var setpoint =
-        new SwerveModuleState[] {
-          new SwerveModuleState(
-              0, new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2)),
-          new SwerveModuleState(
-              0, new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2)),
-          new SwerveModuleState(
-              0, new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2)),
-          new SwerveModuleState(
-              0, new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2)),
+        new Rotation2d[] {
+          new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
+          new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
+          new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
+          new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
         };
-    io.drive(setpoint, new double[4]);
+    io.stopWithAngles(setpoint);
 
     lastSetpoint =
-        new SwerveSetpointGenerator.SwerveSetpoint(new ChassisSpeeds(), setpoint, new double[4]);
+        new SwerveSetpointGenerator.SwerveSetpoint(
+            new ChassisSpeeds(),
+            new SwerveModuleState[] {
+              new SwerveModuleState(0, setpoint[0]),
+              new SwerveModuleState(0, setpoint[1]),
+              new SwerveModuleState(0, setpoint[2]),
+              new SwerveModuleState(0, setpoint[3]),
+            },
+            new double[4]);
   }
 
   /** Command for controlling the drivebase from driver controls. */

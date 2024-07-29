@@ -7,11 +7,14 @@
 
 package frc.cotc;
 
+import static edu.wpi.first.wpilibj2.command.Commands.runEnd;
+
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
+import frc.cotc.drive.SwerveIOPhoenix;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -57,8 +60,7 @@ public class Robot extends LoggedRobot {
     SwerveIO io;
 
     switch (mode) {
-      case "REAL" -> io = new SwerveIO() {};
-      case "SIM" -> io = new SwerveIO() {};
+      case "REAL","SIM" -> io = new SwerveIOPhoenix();
       default -> io = new SwerveIO() {};
     }
 
@@ -73,6 +75,7 @@ public class Robot extends LoggedRobot {
             () -> -primaryController.getLeftY(),
             () -> -primaryController.getLeftX(),
             () -> -primaryController.getRightX()));
+    primaryController.povDown().whileTrue(runEnd(swerve::stopInX, () -> {}, swerve));
   }
 
   @Override
