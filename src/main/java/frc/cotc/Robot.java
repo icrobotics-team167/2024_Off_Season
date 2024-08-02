@@ -15,6 +15,8 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
+import frc.cotc.vision.VisionPoseEstimatorIO;
+import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -57,14 +59,7 @@ public class Robot extends LoggedRobot {
 
     Logger.start();
 
-    SwerveIO io;
-
-    switch (mode) {
-      case "REAL","SIM" -> io = new SwerveIOPhoenix();
-      default -> io = new SwerveIO() {};
-    }
-
-    Swerve swerve = new Swerve(io);
+    Swerve swerve = getSwerve(mode);
 
     CommandXboxController primaryController = new CommandXboxController(0);
 
@@ -76,6 +71,28 @@ public class Robot extends LoggedRobot {
             () -> -primaryController.getLeftX(),
             () -> -primaryController.getRightX()));
     primaryController.povDown().whileTrue(runEnd(swerve::stopInX, () -> {}, swerve));
+  }
+
+  private Swerve getSwerve(String mode) {
+    SwerveIO swerveIO;
+    VisionPoseEstimatorIO poseEstimatorIO;
+
+    switch (mode) {
+      case "REAL", "SIM" -> {
+        swerveIO = new SwerveIOPhoenix();
+        try {
+          poseEstimatorIO = new VisionPoseEstimatorIOPhoton();
+        } catch (Exception e) {
+          poseEstimatorIO = new VisionPoseEstimatorIO() {};
+        }
+      }
+      default -> {
+        swerveIO = new SwerveIO() {};
+        poseEstimatorIO = new VisionPoseEstimatorIO() {};
+      }
+    }
+
+    return new Swerve(swerveIO, poseEstimatorIO);
   }
 
   @Override

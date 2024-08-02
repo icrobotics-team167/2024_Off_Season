@@ -7,13 +7,19 @@
 
 package frc.cotc.drive;
 
+import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
+import frc.cotc.vision.VisionPoseEstimator;
+import frc.cotc.vision.VisionPoseEstimatorIO;
 import java.util.function.DoubleSupplier;
 import org.littletonrobotics.junction.Logger;
 
@@ -28,13 +34,16 @@ public class Swerve extends SubsystemBase {
   private final double TOP_SPEED;
   private final double MAX_OMEGA;
 
-  public Swerve(SwerveIO io) {
-    this.io = io;
+  private final SwerveDrivePoseEstimator odometry;
+  private final VisionPoseEstimator visionPoseEstimator;
+
+  public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO visionIO) {
+    this.io = driveIO;
     inputs = new SwerveIOInputsAutoLogged();
-    io.updateInputs(inputs);
+    driveIO.updateInputs(inputs);
 
     // Slightly cursed way to get stats specific to each hardware implementation
-    CONSTANTS = io.getConstants();
+    CONSTANTS = driveIO.getConstants();
     Logger.processInputs("Swerve/Constants", CONSTANTS);
 
     setpointGenerator =
@@ -55,12 +64,46 @@ public class Swerve extends SubsystemBase {
             * (CONSTANTS.WHEEL_DIAMETER / 2.0);
 
     MAX_OMEGA = TOP_SPEED / Math.hypot(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2);
+
+    odometry =
+        new SwerveDrivePoseEstimator(
+            setpointGenerator.getKinematics(),
+            inputs.gyroYaw,
+            new SwerveModulePosition[] {
+              inputs.odometryPositions[inputs.odometryPositions.length - 4],
+              inputs.odometryPositions[inputs.odometryPositions.length - 3],
+              inputs.odometryPositions[inputs.odometryPositions.length - 2],
+              inputs.odometryPositions[inputs.odometryPositions.length - 1],
+            },
+            new Pose2d());
+    visionPoseEstimator = new VisionPoseEstimator(visionIO, this::getVelocity);
   }
 
   @Override
   public void periodic() {
     io.updateInputs(inputs);
     Logger.processInputs("Swerve", inputs);
+
+    // Update odometry
+    // Parse data from odometry thread
+    for (int i = 0; i < inputs.odometryTimestamps.length; i++) {
+      odometry.updateWithTime(
+          inputs.odometryTimestamps[i],
+          inputs.odometryYaws[i],
+          new SwerveModulePosition[] {
+            inputs.odometryPositions[i],
+            inputs.odometryPositions[i + 1],
+            inputs.odometryPositions[i + 2],
+            inputs.odometryPositions[i + 3],
+          });
+    }
+    // Parse data from vision coprocessor
+    visionPoseEstimator.poll(
+        (Pose2d pose, double timestamp, double translationalStDevs, double rotationalStDevs) ->
+            odometry.addVisionMeasurement(
+                pose,
+                timestamp,
+                VecBuilder.fill(translationalStDevs, translationalStDevs, rotationalStDevs)));
   }
 
   public void drive(ChassisSpeeds speed) {
@@ -99,6 +142,10 @@ public class Swerve extends SubsystemBase {
               new SwerveModuleState(0, setpoint[3]),
             },
             new double[4]);
+  }
+
+  public ChassisSpeeds getVelocity() {
+    return setpointGenerator.getKinematics().toChassisSpeeds(inputs.moduleStates);
   }
 
   /** Command for controlling the drivebase from driver controls. */

@@ -367,6 +367,10 @@ public class SwerveSetpointGenerator {
     return new SwerveSetpoint(retSpeeds, retStates, retFeedforward);
   }
 
+  public SwerveDriveKinematics getKinematics() {
+    return kinematics;
+  }
+
   /**
    * A setpoint.
    *
