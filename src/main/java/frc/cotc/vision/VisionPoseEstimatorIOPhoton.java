@@ -114,6 +114,9 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
     // TODO: Also tune these weights
     double overallScore = minScore * .1 + maxScore * .25 + avgScore;
 
+    // Scale overall score inversely with tag count
+    overallScore /= Math.pow(.8, tags.size());
+
     // Return standard deviations based on the overall score.
     return new double[] {overallScore, overallScore * 2};
   }
