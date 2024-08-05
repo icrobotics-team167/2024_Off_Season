@@ -11,7 +11,6 @@ import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -24,10 +23,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
   private final PhotonPoseEstimator[] poseEstimators;
   private Supplier<ChassisSpeeds> velocities;
 
-  private double MAX_LINEAR_VEL;
-  private double MAX_OMEGA;
-
-  public VisionPoseEstimatorIOPhoton() throws IOException {
+  public VisionPoseEstimatorIOPhoton() {
     String[] cameras = new String[] {"LeftCam", "RightCam"};
 
     poseEstimators = new PhotonPoseEstimator[cameras.length];
@@ -90,7 +86,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
       double angularRelativeMovement = tagDistance * velocities.omegaRadiansPerSecond;
 
       // Reliability score is based on 3 things:
-      // 1) The inverse square of distance. The farther it is, the smaller it appear, and thus
+      // 1) The inverse square of distance. The farther it is, the smaller it appears, and thus
       // there's less pixels to work with
       // 2) The relative linear movement. The farther it is, the slower it appears, and thus there's
       // less motion

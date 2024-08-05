@@ -80,11 +80,7 @@ public class Robot extends LoggedRobot {
     switch (mode) {
       case "REAL", "SIM" -> {
         swerveIO = new SwerveIOPhoenix();
-        try {
-          poseEstimatorIO = new VisionPoseEstimatorIOPhoton();
-        } catch (Exception e) {
-          poseEstimatorIO = new VisionPoseEstimatorIO() {};
-        }
+        poseEstimatorIO = new VisionPoseEstimatorIOPhoton();
       }
       default -> {
         swerveIO = new SwerveIO() {};
