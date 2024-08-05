@@ -15,6 +15,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
@@ -31,7 +32,7 @@ public class Swerve extends SubsystemBase {
   private SwerveSetpointGenerator.SwerveSetpoint lastSetpoint;
   private final SwerveSetpointGenerator setpointGenerator;
 
-  private final double TOP_SPEED;
+  private final double MAX_LINEAR_VEL;
   private final double MAX_OMEGA;
 
   private final SwerveDrivePoseEstimator odometry;
@@ -59,11 +60,10 @@ public class Swerve extends SubsystemBase {
         new SwerveSetpointGenerator.SwerveSetpoint(
             new ChassisSpeeds(), inputs.moduleStates, new double[] {0, 0, 0, 0});
 
-    TOP_SPEED =
-        (CONSTANTS.MAX_ROTOR_VELOCITY / CONSTANTS.DRIVE_GEAR_RATIO)
-            * (CONSTANTS.WHEEL_DIAMETER / 2.0);
-
-    MAX_OMEGA = TOP_SPEED / Math.hypot(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2);
+    MAX_LINEAR_VEL =
+        (Units.radiansToRotations(CONSTANTS.MAX_ROTOR_VELOCITY) / CONSTANTS.DRIVE_GEAR_RATIO)
+            * (CONSTANTS.WHEEL_DIAMETER * Math.PI);
+    MAX_OMEGA = MAX_LINEAR_VEL / Math.hypot(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2);
 
     odometry =
         new SwerveDrivePoseEstimator(
@@ -76,6 +76,7 @@ public class Swerve extends SubsystemBase {
               inputs.odometryPositions[inputs.odometryPositions.length - 1],
             },
             new Pose2d());
+
     visionPoseEstimator = new VisionPoseEstimator(visionIO, this::getVelocity);
   }
 
@@ -109,7 +110,7 @@ public class Swerve extends SubsystemBase {
   public void drive(ChassisSpeeds speed) {
     var limits =
         new SwerveSetpointGenerator.ModuleLimits(
-            TOP_SPEED,
+            MAX_LINEAR_VEL,
             CONSTANTS.MAX_ACCEL,
             CONSTANTS.MAX_ROTOR_VELOCITY / CONSTANTS.STEER_GEAR_RATIO);
 
@@ -152,14 +153,14 @@ public class Swerve extends SubsystemBase {
   public Command teleopDrive(
       DoubleSupplier xInput, DoubleSupplier yInput, DoubleSupplier rotInput) {
     return run(() -> {
-          double xVel = xInput.getAsDouble() * TOP_SPEED;
-          double yVel = yInput.getAsDouble() * TOP_SPEED;
+          double xVel = xInput.getAsDouble() * MAX_LINEAR_VEL;
+          double yVel = yInput.getAsDouble() * MAX_LINEAR_VEL;
           double omega = rotInput.getAsDouble() * MAX_OMEGA;
 
           double translationalVel = Math.hypot(xVel, yVel);
-          if (translationalVel > TOP_SPEED) {
-            xVel /= (translationalVel / TOP_SPEED);
-            yVel /= (translationalVel / TOP_SPEED);
+          if (translationalVel > MAX_LINEAR_VEL) {
+            xVel /= (translationalVel / MAX_LINEAR_VEL);
+            yVel /= (translationalVel / MAX_LINEAR_VEL);
           }
 
           drive(
