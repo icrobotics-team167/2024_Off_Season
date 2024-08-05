@@ -9,9 +9,8 @@ package frc.cotc.vision;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import org.littletonrobotics.junction.Logger;
-
 import java.util.function.Supplier;
+import org.littletonrobotics.junction.Logger;
 
 public class VisionPoseEstimator {
   private final VisionPoseEstimatorIO io;
