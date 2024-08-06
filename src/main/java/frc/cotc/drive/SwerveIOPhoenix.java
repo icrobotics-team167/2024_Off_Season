@@ -7,13 +7,16 @@
 
 package frc.cotc.drive;
 
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.StaticBrake;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
+import com.ctre.phoenix6.hardware.Pigeon2;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.FeedbackSensorSourceValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.MathUtil;
@@ -25,6 +28,10 @@ import frc.cotc.RobotConstants;
 public class SwerveIOPhoenix implements SwerveIO {
   private final SwerveIOConstantsAutoLogged CONSTANTS;
   private final Module[] modules;
+
+  private final BaseStatusSignal[] signals = new BaseStatusSignal[9];
+
+  private final PhoenixOdometryThread odometryThread;
 
   public SwerveIOPhoenix() {
     CONSTANTS = new SwerveIOConstantsAutoLogged();
@@ -45,6 +52,25 @@ public class SwerveIOPhoenix implements SwerveIO {
           new Module(2, CONSTANTS),
           new Module(3, CONSTANTS)
         };
+
+    Pigeon2 gyro = new Pigeon2(13);
+
+    for (int i = 0; i < 4; i++) {
+      signals[i * 2] = modules[i].driveMotor.getVelocity();
+      signals[i * 2 + 1] = modules[i].steerEncoder.getAbsolutePosition();
+    }
+    signals[8] = gyro.getYaw();
+
+    odometryThread =
+        new PhoenixOdometryThread(
+            new PhoenixOdometryThread.ModuleSignals[] {
+              modules[0].getModuleSignals(),
+              modules[1].getModuleSignals(),
+              modules[2].getModuleSignals(),
+              modules[3].getModuleSignals()
+            },
+            gyro,
+            CONSTANTS.WHEEL_DIAMETER);
   }
 
   @Override
@@ -54,7 +80,29 @@ public class SwerveIOPhoenix implements SwerveIO {
 
   @Override
   public void updateInputs(SwerveIOInputs inputs) {
-    SwerveIO.super.updateInputs(inputs);
+    BaseStatusSignal.refreshAll(signals);
+    inputs.gyroYaw = Rotation2d.fromDegrees(signals[8].getValueAsDouble());
+    inputs.moduleStates =
+        new SwerveModuleState[] {
+          new SwerveModuleState(
+              signals[0].getValueAsDouble() * CONSTANTS.WHEEL_DIAMETER * Math.PI,
+              Rotation2d.fromRotations(signals[1].getValueAsDouble())),
+          new SwerveModuleState(
+              signals[2].getValueAsDouble() * CONSTANTS.WHEEL_DIAMETER * Math.PI,
+              Rotation2d.fromRotations(signals[3].getValueAsDouble())),
+          new SwerveModuleState(
+              signals[4].getValueAsDouble() * CONSTANTS.WHEEL_DIAMETER * Math.PI,
+              Rotation2d.fromRotations(signals[5].getValueAsDouble())),
+          new SwerveModuleState(
+              signals[6].getValueAsDouble() * CONSTANTS.WHEEL_DIAMETER * Math.PI,
+              Rotation2d.fromRotations(signals[7].getValueAsDouble())),
+        };
+
+    PhoenixOdometryThread.OdometryFrame data = odometryThread.getData();
+
+    inputs.odometryTimestamps = data.timestamps();
+    inputs.odometryPositions = data.modulePositions();
+    inputs.odometryYaws = data.yaws();
   }
 
   @Override
@@ -117,7 +165,10 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerEncoder.getConfigurator().apply(encoderConfig);
 
       var steerConfig = new TalonFXConfiguration();
-      steerConfig.Feedback.SensorToMechanismRatio = CONSTANTS.STEER_GEAR_RATIO;
+      steerConfig.Feedback.SensorToMechanismRatio = 1;
+      steerConfig.Feedback.RotorToSensorRatio = CONSTANTS.STEER_GEAR_RATIO;
+      steerConfig.Feedback.FeedbackSensorSource = FeedbackSensorSourceValue.RemoteCANcoder;
+      steerConfig.Feedback.FeedbackRemoteSensorID = steerEncoder.getDeviceID();
       steerConfig.ClosedLoopGeneral.ContinuousWrap = true;
       steerConfig.MotorOutput.Inverted =
           constants.STEER_MOTOR_INVERTED
@@ -173,6 +224,14 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveMotor.setControl(brakeControlRequest);
       steerMotor.setControl(
           steerControlRequest.withPosition(angle.getRotations()).withFeedForward(0));
+    }
+
+    protected PhoenixOdometryThread.ModuleSignals getModuleSignals() {
+      return new PhoenixOdometryThread.ModuleSignals(
+          driveMotor.getPosition(),
+          driveMotor.getVelocity(),
+          steerEncoder.getAbsolutePosition(),
+          steerMotor.getVelocity());
     }
   }
 }
