@@ -205,8 +205,12 @@ public class SwerveIOPhoenix implements SwerveIO {
               .withVelocity(
                   (setpoint.speedMetersPerSecond / (wheelDiameter * Math.PI)) * driveGearRatio)
               .withFeedForward(
-                  // ((Force (N) * radius (m)) / gear ratio (dimensionless)) / kT (Nm/amp) = amps
-                  ((forceFeedforward * (wheelDiameter / 2)) / driveGearRatio) / 9.81));
+                  Math.signum(setpoint.speedMetersPerSecond)
+                      *
+                      // ((Force (N) * radius (m)) / gear ratio (dimensionless)) / kT (Nm/amp) =
+                      // amps
+                      ((forceFeedforward * (wheelDiameter / 2)) / driveGearRatio)
+                      / 9.81));
       steerMotor.setControl(
           steerControlRequest
               .withPosition(setpoint.angle.getRotations())

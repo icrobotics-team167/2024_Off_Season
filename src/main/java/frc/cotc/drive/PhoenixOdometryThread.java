@@ -15,7 +15,6 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.util.CircularBuffer;
 import edu.wpi.first.util.DoubleCircularBuffer;
 import frc.cotc.Robot;
-
 import java.util.concurrent.locks.ReentrantLock;
 
 public class PhoenixOdometryThread extends Thread {
@@ -90,21 +89,21 @@ public class PhoenixOdometryThread extends Thread {
       BaseStatusSignal.waitForAll(2.0 / FREQUENCY, allSignals);
 
       lock.lock();
-      try{
+      try {
         double avgTimestamp = 0;
 
         for (int i = 0; i < 4; i++) {
           double rawDrivePosition =
-            BaseStatusSignal.getLatencyCompensatedValue(
-              moduleSignals[i].drivePosition, moduleSignals[i].driveVelocity);
+              BaseStatusSignal.getLatencyCompensatedValue(
+                  moduleSignals[i].drivePosition, moduleSignals[i].driveVelocity);
           double rawSteerPosition =
-            BaseStatusSignal.getLatencyCompensatedValue(
-              moduleSignals[i].steerPosition, moduleSignals[i].steerVelocity);
+              BaseStatusSignal.getLatencyCompensatedValue(
+                  moduleSignals[i].steerPosition, moduleSignals[i].steerVelocity);
 
           positionsBuffer.addLast(
-            new SwerveModulePosition(
-              rawDrivePosition * WHEEL_CIRCUMFERENCE,
-              Rotation2d.fromRotations(rawSteerPosition)));
+              new SwerveModulePosition(
+                  rawDrivePosition * WHEEL_CIRCUMFERENCE,
+                  Rotation2d.fromRotations(rawSteerPosition)));
 
           avgTimestamp += moduleSignals[i].drivePosition.getTimestamp().getTime();
           avgTimestamp += moduleSignals[i].driveVelocity.getTimestamp().getTime();
@@ -112,7 +111,9 @@ public class PhoenixOdometryThread extends Thread {
           avgTimestamp += moduleSignals[i].steerVelocity.getTimestamp().getTime();
         }
 
-        yawsBuffer.addLast(Rotation2d.fromDegrees(BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocity)));
+        yawsBuffer.addLast(
+            Rotation2d.fromDegrees(
+                BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocity)));
 
         avgTimestamp += yawSignal.getTimestamp().getTime();
         avgTimestamp += yawVelocity.getTimestamp().getTime();
@@ -131,5 +132,6 @@ public class PhoenixOdometryThread extends Thread {
       StatusSignal<Double> steerPosition,
       StatusSignal<Double> steerVelocity) {}
 
-  protected record OdometryFrame(double[] timestamps, SwerveModulePosition[] modulePositions, Rotation2d[] yaws) {}
+  protected record OdometryFrame(
+      double[] timestamps, SwerveModulePosition[] modulePositions, Rotation2d[] yaws) {}
 }

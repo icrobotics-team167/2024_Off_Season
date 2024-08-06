@@ -7,11 +7,10 @@
 
 package frc.cotc;
 
-import static edu.wpi.first.wpilibj2.command.Commands.runEnd;
-
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
@@ -70,7 +69,8 @@ public class Robot extends LoggedRobot {
             () -> -primaryController.getLeftY(),
             () -> -primaryController.getLeftX(),
             () -> -primaryController.getRightX()));
-    primaryController.povDown().whileTrue(runEnd(swerve::stopInX, () -> {}, swerve));
+    RobotModeTriggers.disabled().whileTrue(swerve.stop());
+    primaryController.povDown().whileTrue(swerve.stopInX());
   }
 
   private Swerve getSwerve(String mode) {

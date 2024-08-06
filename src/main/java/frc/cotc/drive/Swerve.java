@@ -7,6 +7,8 @@
 
 package frc.cotc.drive;
 
+import com.choreo.lib.ChoreoTrajectory;
+import com.choreo.lib.ChoreoTrajectoryState;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -16,6 +18,8 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
@@ -31,6 +35,7 @@ public class Swerve extends SubsystemBase {
 
   private SwerveSetpointGenerator.SwerveSetpoint lastSetpoint;
   private final SwerveSetpointGenerator setpointGenerator;
+  private final SwerveSetpointGenerator.ModuleLimits limits;
 
   private final double MAX_LINEAR_VEL;
   private final double MAX_OMEGA;
@@ -55,7 +60,6 @@ public class Swerve extends SubsystemBase {
               new Translation2d(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
               new Translation2d(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2)
             });
-
     lastSetpoint =
         new SwerveSetpointGenerator.SwerveSetpoint(
             new ChassisSpeeds(), inputs.moduleStates, new double[] {0, 0, 0, 0});
@@ -76,6 +80,12 @@ public class Swerve extends SubsystemBase {
               inputs.odometryPositions[inputs.odometryPositions.length - 1],
             },
             new Pose2d());
+
+    limits =
+        new SwerveSetpointGenerator.ModuleLimits(
+            MAX_LINEAR_VEL,
+            CONSTANTS.MAX_ACCEL,
+            CONSTANTS.MAX_ROTOR_VELOCITY / CONSTANTS.STEER_GEAR_RATIO);
 
     visionPoseEstimator = new VisionPoseEstimator(visionIO, this::getVelocity);
   }
@@ -108,12 +118,6 @@ public class Swerve extends SubsystemBase {
   }
 
   public void drive(ChassisSpeeds speed) {
-    var limits =
-        new SwerveSetpointGenerator.ModuleLimits(
-            MAX_LINEAR_VEL,
-            CONSTANTS.MAX_ACCEL,
-            CONSTANTS.MAX_ROTOR_VELOCITY / CONSTANTS.STEER_GEAR_RATIO);
-
     var setpoint =
         setpointGenerator.generateSetpoint(limits, lastSetpoint, speed, Robot.defaultPeriodSecs);
 
@@ -123,26 +127,29 @@ public class Swerve extends SubsystemBase {
     lastSetpoint = setpoint;
   }
 
-  public void stopInX() {
-    var setpoint =
-        new Rotation2d[] {
-          new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
-          new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
-          new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
-          new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
-        };
-    io.stopWithAngles(setpoint);
+  public Command stopInX() {
+    return run(
+        () -> {
+          var setpoint =
+              new Rotation2d[] {
+                new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
+                new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
+                new Rotation2d(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
+                new Rotation2d(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
+              };
+          io.stopWithAngles(setpoint);
 
-    lastSetpoint =
-        new SwerveSetpointGenerator.SwerveSetpoint(
-            new ChassisSpeeds(),
-            new SwerveModuleState[] {
-              new SwerveModuleState(0, setpoint[0]),
-              new SwerveModuleState(0, setpoint[1]),
-              new SwerveModuleState(0, setpoint[2]),
-              new SwerveModuleState(0, setpoint[3]),
-            },
-            new double[4]);
+          lastSetpoint =
+              new SwerveSetpointGenerator.SwerveSetpoint(
+                  new ChassisSpeeds(),
+                  new SwerveModuleState[] {
+                    new SwerveModuleState(0, setpoint[0]),
+                    new SwerveModuleState(0, setpoint[1]),
+                    new SwerveModuleState(0, setpoint[2]),
+                    new SwerveModuleState(0, setpoint[3]),
+                  },
+                  new double[4]);
+        });
   }
 
   public ChassisSpeeds getVelocity() {
@@ -170,5 +177,43 @@ public class Swerve extends SubsystemBase {
                   Robot.defaultPeriodSecs));
         })
         .withName("Swerve teleop drive");
+  }
+
+  public Command choreoPathFollower(ChoreoTrajectory trajectory) {
+    Timer timer = new Timer();
+    return runOnce(timer::start)
+        .andThen(
+            run(() -> {
+                  ChoreoTrajectoryState sample =
+                      trajectory.sample(
+                          timer.get(),
+                          DriverStation.getAlliance().isPresent()
+                              && DriverStation.getAlliance().get() == DriverStation.Alliance.Red);
+
+                  SwerveSetpointGenerator.SwerveSetpoint setpoint =
+                      setpointGenerator.generateSetpoint(
+                          limits, lastSetpoint, sample.getChassisSpeeds(), Robot.defaultPeriodSecs);
+
+                  double[] forceFeedforwards = new double[4];
+                  for (int i = 0; i < 4; i++) {
+                    Translation2d force =
+                        new Translation2d(sample.moduleForcesX[i], sample.moduleForcesY[i])
+                            .rotateBy(Rotation2d.fromRadians(sample.heading));
+                    forceFeedforwards[i] = force.getNorm();
+                  }
+
+                  io.drive(setpoint.moduleStates(), setpoint.steerFeedforward(), forceFeedforwards);
+                })
+                .until(() -> timer.hasElapsed(trajectory.getTotalTime())));
+  }
+
+  public Command stop() {
+    return run(
+        () -> {
+          io.stop();
+          lastSetpoint =
+              new SwerveSetpointGenerator.SwerveSetpoint(
+                  new ChassisSpeeds(), inputs.moduleStates, new double[] {0, 0, 0, 0});
+        });
   }
 }

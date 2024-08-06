@@ -58,6 +58,12 @@ public interface SwerveIO {
     // Rad/sec
     double MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
+    /*
+     * Acceleration limits shouldn't be used to limit current draw, that's the purpose of current
+     * limits and linear accel limits feel terrible on controls
+     *
+     * Instead, use this to prevent wheel slip, and limit acceleration using current limits
+     */
     // Meters/sec^2
     double MAX_ACCEL = 8;
   }
