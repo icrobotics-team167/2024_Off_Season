@@ -23,11 +23,12 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
+import frc.cotc.Robot;
 import frc.cotc.RobotConstants;
 
 public class SwerveIOPhoenix implements SwerveIO {
   private final SwerveIOConstantsAutoLogged CONSTANTS;
-  private final Module[] modules;
+  private final PhoenixModule[] modules;
 
   private final BaseStatusSignal[] signals = new BaseStatusSignal[9];
 
@@ -41,16 +42,14 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.TRACK_WIDTH = Units.inchesToMeters(22.75);
     CONSTANTS.TRACK_LENGTH = Units.inchesToMeters(22.75);
     CONSTANTS.MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(5800);
-    CONSTANTS.DRIVE_MOTOR_INVERTED = false;
-    CONSTANTS.STEER_MOTOR_INVERTED = true;
     CONSTANTS.MAX_ACCEL = 8;
 
     modules =
-        new Module[] {
-          new Module(0, CONSTANTS),
-          new Module(1, CONSTANTS),
-          new Module(2, CONSTANTS),
-          new Module(3, CONSTANTS)
+        new PhoenixModule[] {
+          new PhoenixModule(0, CONSTANTS),
+          new PhoenixModule(1, CONSTANTS),
+          new PhoenixModule(2, CONSTANTS),
+          new PhoenixModule(3, CONSTANTS)
         };
 
     Pigeon2 gyro = new Pigeon2(13);
@@ -71,6 +70,33 @@ public class SwerveIOPhoenix implements SwerveIO {
             },
             gyro,
             CONSTANTS.WHEEL_DIAMETER);
+
+    if (Robot.isSimulation()) {
+      new PhoenixSimThread(
+              new TalonFX[] {
+                modules[0].driveMotor,
+                modules[1].driveMotor,
+                modules[2].driveMotor,
+                modules[3].driveMotor
+              },
+              new TalonFX[] {
+                modules[0].steerMotor,
+                modules[1].steerMotor,
+                modules[2].steerMotor,
+                modules[3].steerMotor
+              },
+              new CANcoder[] {
+                modules[0].steerEncoder,
+                modules[1].steerEncoder,
+                modules[2].steerEncoder,
+                modules[3].steerEncoder
+              },
+              CONSTANTS.DRIVE_GEAR_RATIO,
+              CONSTANTS.STEER_GEAR_RATIO,
+              CONSTANTS.DRIVE_MOTOR_INVERSIONS,
+              CONSTANTS.STEER_MOTOR_INVERTED)
+          .start(500);
+    }
   }
 
   @Override
@@ -115,7 +141,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
   @Override
   public void stop() {
-    for (Module module : modules) {
+    for (PhoenixModule module : modules) {
       module.stop();
     }
   }
@@ -127,7 +153,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
   }
 
-  private class Module {
+  private class PhoenixModule {
     final TalonFX driveMotor;
     final TalonFX steerMotor;
     final CANcoder steerEncoder;
@@ -137,7 +163,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     final double driveGearRatio;
     final double steerGearRatio;
 
-    protected Module(int id, SwerveIOConstantsAutoLogged constants) {
+    protected PhoenixModule(int id, SwerveIOConstantsAutoLogged constants) {
       driveMotor = new TalonFX(id * 3, RobotConstants.CANIVORE_NAME);
       steerMotor = new TalonFX(id * 3 + 1, RobotConstants.CANIVORE_NAME);
       steerEncoder = new CANcoder(id * 3 + 2, RobotConstants.CANIVORE_NAME);
@@ -145,7 +171,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
       driveConfig.MotorOutput.Inverted =
-          constants.DRIVE_MOTOR_INVERTED
+          constants.DRIVE_MOTOR_INVERSIONS[id]
               ? InvertedValue.Clockwise_Positive
               : InvertedValue.CounterClockwise_Positive;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;

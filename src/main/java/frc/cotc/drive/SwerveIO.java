@@ -52,7 +52,7 @@ public interface SwerveIO {
     double STEER_GEAR_RATIO = 150.0 / 7.0;
 
     // Inversions
-    boolean DRIVE_MOTOR_INVERTED = false;
+    boolean[] DRIVE_MOTOR_INVERSIONS = new boolean[] {false, false, false, false};
     boolean STEER_MOTOR_INVERTED = true;
 
     // Rad/sec

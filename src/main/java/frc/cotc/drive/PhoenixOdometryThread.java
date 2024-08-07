@@ -14,6 +14,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.util.CircularBuffer;
 import edu.wpi.first.util.DoubleCircularBuffer;
+import edu.wpi.first.wpilibj.Threads;
 import frc.cotc.Robot;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -51,6 +52,8 @@ public class PhoenixOdometryThread extends Thread {
     allSignals[17] = yawVelocity;
 
     WHEEL_CIRCUMFERENCE = wheelDiameter * Math.PI;
+
+    Threads.setCurrentThreadPriority(true, 10);
   }
 
   private final ReentrantLock lock = new ReentrantLock();
