@@ -100,6 +100,13 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
     }
 
     // Calculate min, avg, and max scores
+    double overallScore = getOverallScore(tags, reliabilityScores);
+
+    // Return standard deviations based on the overall score.
+    return new double[] {overallScore, overallScore * 2};
+  }
+
+  private double getOverallScore(List<PhotonTrackedTarget> tags, double[] reliabilityScores) {
     double minScore = Double.POSITIVE_INFINITY;
     double avgScore = 0;
     double maxScore = Double.NEGATIVE_INFINITY;
@@ -116,8 +123,6 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
 
     // Scale overall score inversely with tag count
     overallScore /= Math.pow(.8, tags.size());
-
-    // Return standard deviations based on the overall score.
-    return new double[] {overallScore, overallScore * 2};
+    return overallScore;
   }
 }

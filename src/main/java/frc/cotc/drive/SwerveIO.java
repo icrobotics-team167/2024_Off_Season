@@ -39,6 +39,7 @@ public interface SwerveIO {
     Rotation2d[] odometryYaws = new Rotation2d[0];
   }
 
+  @SuppressWarnings("CanBeFinal")
   @AutoLog
   class SwerveIOConstants {
     // Choreo defaults
