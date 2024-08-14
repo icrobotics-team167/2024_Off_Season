@@ -15,10 +15,10 @@ import org.littletonrobotics.junction.AutoLog;
 public interface VisionPoseEstimatorIO {
   @AutoLog
   class VisionPoseEstimatorInputs {
-    double[] timestamps;
-    Pose2d[] poses;
-    double[] translationalStDevs;
-    double[] rotationalStDevs;
+    double[] timestamps = new double[0];
+    Pose2d[] poses = new Pose2d[0];
+    double[] translationalStDevs = new double[0];
+    double[] rotationalStDevs = new double[0];
   }
 
   default void updateInputs(VisionPoseEstimatorInputs inputs) {}

@@ -43,10 +43,10 @@ public class PhoenixOdometryThread extends Thread {
 
     allSignals = new BaseStatusSignal[18];
     for (int i = 0; i < 4; i++) {
-      allSignals[i] = moduleSignals[i].drivePosition;
-      allSignals[i + 1] = moduleSignals[i].driveVelocity;
-      allSignals[i + 2] = moduleSignals[i].steerPosition;
-      allSignals[i + 3] = moduleSignals[i].steerVelocity;
+      allSignals[i * 4] = moduleSignals[i].drivePosition;
+      allSignals[i * 4 + 1] = moduleSignals[i].driveVelocity;
+      allSignals[i * 4 + 2] = moduleSignals[i].steerPosition;
+      allSignals[i * 4 + 3] = moduleSignals[i].steerVelocity;
     }
     allSignals[16] = yawSignal;
     allSignals[17] = yawVelocity;
@@ -54,6 +54,7 @@ public class PhoenixOdometryThread extends Thread {
     WHEEL_CIRCUMFERENCE = wheelDiameter * Math.PI;
 
     Threads.setCurrentThreadPriority(true, 10);
+    setDaemon(true);
   }
 
   private final ReentrantLock lock = new ReentrantLock();

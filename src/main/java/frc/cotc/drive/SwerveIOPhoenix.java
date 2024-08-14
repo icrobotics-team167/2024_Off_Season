@@ -21,16 +21,19 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import frc.cotc.Robot;
 import frc.cotc.RobotConstants;
+import org.littletonrobotics.junction.Logger;
 
 public class SwerveIOPhoenix implements SwerveIO {
   private final SwerveIOConstantsAutoLogged CONSTANTS;
   private final PhoenixModule[] modules;
 
   private final BaseStatusSignal[] signals = new BaseStatusSignal[9];
+  private final Pigeon2 gyro;
 
   private final PhoenixOdometryThread odometryThread;
 
@@ -52,7 +55,7 @@ public class SwerveIOPhoenix implements SwerveIO {
           new PhoenixModule(3, CONSTANTS)
         };
 
-    Pigeon2 gyro = new Pigeon2(13);
+    gyro = new Pigeon2(17, RobotConstants.CANIVORE_NAME);
 
     for (int i = 0; i < 4; i++) {
       signals[i * 2] = modules[i].driveMotor.getVelocity();
@@ -97,6 +100,7 @@ public class SwerveIOPhoenix implements SwerveIO {
               CONSTANTS.STEER_MOTOR_INVERTED)
           .start(500);
     }
+    odometryThread.start();
   }
 
   @Override
@@ -126,9 +130,42 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     PhoenixOdometryThread.OdometryFrame data = odometryThread.getData();
 
-    inputs.odometryTimestamps = data.timestamps();
-    inputs.odometryPositions = data.modulePositions();
-    inputs.odometryYaws = data.yaws();
+    if (data.timestamps().length > 0) {
+      inputs.odometryTimestamps = data.timestamps();
+      inputs.odometryPositions = data.modulePositions();
+      inputs.odometryYaws = data.yaws();
+    } else {
+      inputs.odometryTimestamps = new double[] {Logger.getTimestamp() * 1e-6};
+      inputs.odometryPositions =
+          new SwerveModulePosition[] {
+            new SwerveModulePosition(
+                modules[0].driveMotor.getPosition().getValueAsDouble()
+                    * CONSTANTS.WHEEL_DIAMETER
+                    * Math.PI,
+                Rotation2d.fromRotations(
+                    modules[0].steerEncoder.getAbsolutePosition().getValueAsDouble())),
+            new SwerveModulePosition(
+                modules[1].driveMotor.getPosition().getValueAsDouble()
+                    * CONSTANTS.WHEEL_DIAMETER
+                    * Math.PI,
+                Rotation2d.fromRotations(
+                    modules[1].steerEncoder.getAbsolutePosition().getValueAsDouble())),
+            new SwerveModulePosition(
+                modules[2].driveMotor.getPosition().getValueAsDouble()
+                    * CONSTANTS.WHEEL_DIAMETER
+                    * Math.PI,
+                Rotation2d.fromRotations(
+                    modules[2].steerEncoder.getAbsolutePosition().getValueAsDouble())),
+            new SwerveModulePosition(
+                modules[3].driveMotor.getPosition().getValueAsDouble()
+                    * CONSTANTS.WHEEL_DIAMETER
+                    * Math.PI,
+                Rotation2d.fromRotations(
+                    modules[3].steerEncoder.getAbsolutePosition().getValueAsDouble())),
+          };
+      inputs.odometryYaws =
+          new Rotation2d[] {Rotation2d.fromDegrees(gyro.getYaw().getValueAsDouble())};
+    }
   }
 
   @Override
@@ -164,9 +201,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     final double steerGearRatio;
 
     protected PhoenixModule(int id, SwerveIOConstantsAutoLogged constants) {
-      driveMotor = new TalonFX(id * 3, RobotConstants.CANIVORE_NAME);
-      steerMotor = new TalonFX(id * 3 + 1, RobotConstants.CANIVORE_NAME);
-      steerEncoder = new CANcoder(id * 3 + 2, RobotConstants.CANIVORE_NAME);
+      driveMotor = new TalonFX(id * 3 + 2, RobotConstants.CANIVORE_NAME);
+      steerMotor = new TalonFX(id * 3 + 3, RobotConstants.CANIVORE_NAME);
+      steerEncoder = new CANcoder(id * 3 + 4, RobotConstants.CANIVORE_NAME);
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
