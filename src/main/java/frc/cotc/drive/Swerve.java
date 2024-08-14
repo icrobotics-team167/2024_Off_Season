@@ -20,6 +20,7 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.Watchdog;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
@@ -42,6 +43,17 @@ public class Swerve extends SubsystemBase {
 
   private final SwerveDrivePoseEstimator odometry;
   private final VisionPoseEstimator visionPoseEstimator;
+
+  // Is 10 ms good for a timing limit? We need a limit < 20 ms to let the other parts of the bot
+  // run whilst keeping the entire robot code under 20 ms loop time.
+  // 50% seems fine since swerve drive is the most computationally intensive part of the bot.
+  private final double timeLimit = 10; // ms
+  private final Watchdog watchdog =
+      new Watchdog(
+          timeLimit / 1000.0,
+          () ->
+              DriverStation.reportWarning(
+                  "Swerve.java: Loop timing limit of " + timeLimit + " ms overrun!", false));
 
   public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO visionIO) {
     this.io = driveIO;
@@ -92,8 +104,11 @@ public class Swerve extends SubsystemBase {
 
   @Override
   public void periodic() {
+    watchdog.reset();
+
     io.updateInputs(inputs);
     Logger.processInputs("Swerve", inputs);
+    watchdog.addEpoch("Periodic/updating IO inputs");
 
     // Update odometry
     // Parse data from odometry thread
@@ -108,6 +123,7 @@ public class Swerve extends SubsystemBase {
             inputs.odometryPositions[i + 3],
           });
     }
+    watchdog.addEpoch("Periodic/parsing odometry thread data");
     // Parse data from vision coprocessor
     visionPoseEstimator.poll(
         (Pose2d pose, double timestamp, double translationalStDevs, double rotationalStDevs) ->
@@ -115,6 +131,13 @@ public class Swerve extends SubsystemBase {
                 pose,
                 timestamp,
                 VecBuilder.fill(translationalStDevs, translationalStDevs, rotationalStDevs)));
+    watchdog.addEpoch("Periodic/parsing vision data");
+
+    watchdog.disable();
+
+    if (watchdog.isExpired()) {
+      watchdog.printEpochs();
+    }
   }
 
   public void drive(ChassisSpeeds speed) {
