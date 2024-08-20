@@ -7,6 +7,7 @@
 
 package frc.cotc;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -66,9 +67,9 @@ public class Robot extends LoggedRobot {
     // Sticks are +X right +Y back
     swerve.setDefaultCommand(
         swerve.teleopDrive(
-            () -> -primaryController.getLeftY(),
-            () -> -primaryController.getLeftX(),
-            () -> -primaryController.getRightX()));
+            () -> MathUtil.applyDeadband(-primaryController.getLeftY(), .01),
+            () -> MathUtil.applyDeadband(-primaryController.getLeftX(), .01),
+            () -> MathUtil.applyDeadband(-primaryController.getRightX(), .01)));
     RobotModeTriggers.disabled().whileTrue(swerve.stop());
     primaryController.povDown().whileTrue(swerve.stopInX());
   }
