@@ -74,7 +74,8 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
 
     // Calculate a reliability score for each tag.
     // Lower is better.
-    double[] reliabilityScores = new double[tags.size()];
+    double[] translationalReliabilityScores = new double[tags.size()];
+    double[] rotationalReliabilityScores = new double[tags.size()];
     for (int i = 0; i < tags.size(); i++) {
       PhotonTrackedTarget tag = tags.get(i);
 
@@ -92,18 +93,26 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
       // less motion
       // 3) The relative angular movement. The farther it is, the faster it appears, and thus
       // there's more motion
+      // Reliability score is separated into translational and rotational components, as rotational
+      // tracking is not only dramatically less reliable than translational tracking when using
+      // SolvePnP, it also tends to scale worse with movement and distance.
       // TODO: Tune weights
-      reliabilityScores[i] =
-          .2 / Math.pow(tagDistance, 2)
+      translationalReliabilityScores[i] =
+          .2 * Math.pow(tagDistance, 2)
               + linearRelativeMovement * .25
               + angularRelativeMovement * .3;
+      rotationalReliabilityScores[i] =
+          .4 * Math.pow(tagDistance, 2)
+              + linearRelativeMovement * .3
+              + angularRelativeMovement * .6;
     }
 
-    // Calculate min, avg, and max scores
-    double overallScore = getOverallScore(tags, reliabilityScores);
+    // Calculate an overall score for the camera based on the individual tags.
+    double translationalOverallScore = getOverallScore(tags, translationalReliabilityScores);
+    double rotationalOverallScore = getOverallScore(tags, rotationalReliabilityScores);
 
-    // Return standard deviations based on the overall score.
-    return new double[] {overallScore, overallScore * 2};
+    // Return standard deviations based on the overall scores.
+    return new double[] {translationalOverallScore, rotationalOverallScore};
   }
 
   private double getOverallScore(List<PhotonTrackedTarget> tags, double[] reliabilityScores) {
@@ -122,7 +131,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
     double overallScore = minScore * .1 + maxScore * .25 + avgScore;
 
     // Scale overall score inversely with tag count
-    overallScore /= Math.pow(.8, tags.size());
+    overallScore *= Math.pow(.9, tags.size());
     return overallScore;
   }
 }
