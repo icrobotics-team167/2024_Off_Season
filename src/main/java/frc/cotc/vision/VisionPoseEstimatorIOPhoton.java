@@ -67,9 +67,16 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
     this.velocities = velocities;
   }
 
+  /**
+   * Estimates the standard deviations of a measured robot position.
+   *
+   * @param velocities A ChassisSpeeds representing the robot's current speeds. Can be null.
+   * @param tags The tracked tags used to calculate the position.
+   * @return A double array of length 2. Index 0 is translational standard dev, 1 is rotational.
+   */
   private double[] calculateStDevs(ChassisSpeeds velocities, List<PhotonTrackedTarget> tags) {
     if (velocities == null) {
-      return new double[] {.9, .9};
+      return calculateStDevs(new ChassisSpeeds(2, 0, 2), tags);
     }
 
     // Calculate a reliability score for each tag.
@@ -107,12 +114,11 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
               + angularRelativeMovement * .6;
     }
 
-    // Calculate an overall score for the camera based on the individual tags.
-    double translationalOverallScore = getOverallScore(tags, translationalReliabilityScores);
-    double rotationalOverallScore = getOverallScore(tags, rotationalReliabilityScores);
-
-    // Return standard deviations based on the overall scores.
-    return new double[] {translationalOverallScore, rotationalOverallScore};
+    // Return standard deviations based on calculated overall scores.
+    return new double[] {
+      getOverallScore(tags, translationalReliabilityScores),
+      getOverallScore(tags, rotationalReliabilityScores)
+    };
   }
 
   private double getOverallScore(List<PhotonTrackedTarget> tags, double[] reliabilityScores) {
