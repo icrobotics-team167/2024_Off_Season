@@ -7,8 +7,12 @@
 
 package frc.cotc.drive;
 
+import static edu.wpi.first.units.Units.Volts;
+import static edu.wpi.first.wpilibj2.command.Commands.sequence;
+
 import com.choreo.lib.ChoreoTrajectory;
 import com.choreo.lib.ChoreoTrajectoryState;
+import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -23,6 +27,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.Watchdog;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.cotc.Robot;
 import frc.cotc.vision.VisionPoseEstimator;
 import frc.cotc.vision.VisionPoseEstimatorIO;
@@ -133,6 +138,8 @@ public class Swerve extends SubsystemBase {
                 VecBuilder.fill(translationalStDevs, translationalStDevs, rotationalStDevs)));
     watchdog.addEpoch("Periodic/parsing vision data");
 
+    Logger.recordOutput("Swerve/Odometry position", odometry.getEstimatedPosition());
+
     watchdog.disable();
 
     if (watchdog.isExpired()) {
@@ -200,6 +207,26 @@ public class Swerve extends SubsystemBase {
                   Robot.defaultPeriodSecs));
         })
         .withName("Swerve teleop drive");
+  }
+
+  public Command getSteerCharacterization() {
+    SysIdRoutine characterizationRoutine =
+        new SysIdRoutine(
+            new SysIdRoutine.Config(
+                null,
+                null,
+                null,
+                (state) -> SignalLogger.writeString("SysIdState", state.toString())),
+            new SysIdRoutine.Mechanism(
+                (voltage) -> io.steerCharacterization(voltage.in(Volts)), null, this));
+    return sequence(
+        characterizationRoutine.dynamic(SysIdRoutine.Direction.kForward),
+        stop().withTimeout(1),
+        characterizationRoutine.dynamic(SysIdRoutine.Direction.kReverse),
+        stop().withTimeout(1),
+        characterizationRoutine.quasistatic(SysIdRoutine.Direction.kForward),
+        stop().withTimeout(1),
+        characterizationRoutine.quasistatic(SysIdRoutine.Direction.kReverse));
   }
 
   public Command choreoPathFollower(ChoreoTrajectory trajectory) {

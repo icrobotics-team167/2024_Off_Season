@@ -105,6 +105,8 @@ public interface SwerveIO {
   default void drive(
       SwerveModuleState[] setpoint, double[] steerFeedforward, double[] torqueFeedforward) {}
 
+  default void steerCharacterization(double volts) {}
+
   default void stop() {}
 
   default void stopWithAngles(Rotation2d[] angles) {}

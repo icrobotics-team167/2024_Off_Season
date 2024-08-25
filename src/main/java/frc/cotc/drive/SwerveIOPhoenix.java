@@ -176,6 +176,37 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
   }
 
+  boolean characterizationInitialized = false;
+
+  @Override
+  public void steerCharacterization(double volts) {
+    if (!characterizationInitialized) {
+      BaseStatusSignal.setUpdateFrequencyForAll(
+          500,
+          modules[0].getModuleSignals().drivePosition(),
+          modules[0].getModuleSignals().driveVelocity(),
+          modules[0].getModuleSignals().steerPosition(),
+          modules[0].getModuleSignals().steerVelocity(),
+          modules[1].getModuleSignals().drivePosition(),
+          modules[1].getModuleSignals().driveVelocity(),
+          modules[1].getModuleSignals().steerPosition(),
+          modules[1].getModuleSignals().steerVelocity(),
+          modules[2].getModuleSignals().drivePosition(),
+          modules[2].getModuleSignals().driveVelocity(),
+          modules[2].getModuleSignals().steerPosition(),
+          modules[2].getModuleSignals().steerVelocity(),
+          modules[3].getModuleSignals().drivePosition(),
+          modules[3].getModuleSignals().driveVelocity(),
+          modules[3].getModuleSignals().steerPosition(),
+          modules[3].getModuleSignals().steerVelocity());
+      characterizationInitialized = true;
+    }
+    for (int i = 0; i < 4; i++) {
+      modules[i].steerMotor.setVoltage(volts);
+      modules[i].driveMotor.stopMotor();
+    }
+  }
+
   @Override
   public void stop() {
     for (PhoenixModule module : modules) {
@@ -239,7 +270,7 @@ public class SwerveIOPhoenix implements SwerveIO {
               : InvertedValue.CounterClockwise_Positive;
       steerConfig.CurrentLimits.StatorCurrentLimit = 40;
       steerConfig.Slot0.kS = 0;
-      steerConfig.Slot0.kP = 0; // TODO: SysID these values
+      steerConfig.Slot0.kP = 24; // TODO: SysID these values
       steerConfig.Slot0.kD = 0;
       steerConfig.Audio.AllowMusicDurDisable = true;
       steerMotor.getConfigurator().apply(steerConfig);

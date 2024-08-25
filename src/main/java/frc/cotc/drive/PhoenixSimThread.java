@@ -7,6 +7,7 @@
 
 package frc.cotc.drive;
 
+import com.ctre.phoenix6.SignalLogger;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.sim.CANcoderSimState;
@@ -65,6 +66,7 @@ public class PhoenixSimThread {
               steerGearRatio)
         };
     simNotifier = new Notifier(this::run);
+    simNotifier.setName("Phoenix Sim Thread");
   }
 
   protected void start(@SuppressWarnings("SameParameterValue") double frequency) {
@@ -72,9 +74,12 @@ public class PhoenixSimThread {
   }
 
   private void run() {
+    double startTime = Logger.getRealTimestamp();
     for (PhoenixSimModule module : simModules) {
       module.run();
     }
+    double endTime = Logger.getRealTimestamp();
+    SignalLogger.writeDouble("SimThread/Time", endTime - startTime, "Microseconds");
   }
 
   private static class PhoenixSimModule {
@@ -103,8 +108,8 @@ public class PhoenixSimThread {
       this.driveGearRatio = driveGearRatio;
       this.steerGearRatio = steerGearRatio;
 
-      driveSim = new DCMotorSim(DCMotor.getKrakenX60Foc(1), driveGearRatio, .01);
-      steerSim = new DCMotorSim(DCMotor.getKrakenX60Foc(1), steerGearRatio, .01);
+      driveSim = new DCMotorSim(DCMotor.getKrakenX60Foc(1), driveGearRatio, .05);
+      steerSim = new DCMotorSim(DCMotor.getKrakenX60Foc(1), steerGearRatio, .005);
 
       driveMotorSim.Orientation =
           driveMotorInverted
