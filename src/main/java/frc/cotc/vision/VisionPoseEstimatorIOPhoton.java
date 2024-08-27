@@ -86,20 +86,20 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
     for (int i = 0; i < tags.size(); i++) {
       PhotonTrackedTarget tag = tags.get(i);
 
+      // Reliability score is based on 3 things:
+      // 1) The square of distance. The farther it is, the smaller it appears, and thus there's
+      // fewer pixels to work with
       double tagDistance = tag.getBestCameraToTarget().getTranslation().getNorm();
-
+      // 2) The relative linear movement. The farther it is, the slower it appears when moving
+      // laterally, so motion blur is less of a factor.
+      // (m/s) / atan(m)
       double linearRelativeMovement =
           Math.hypot(velocities.vxMetersPerSecond, velocities.vyMetersPerSecond)
               / Math.atan(tagDistance);
+      // 3) The relative angular movement. The farther it is, the faster it appears when rotating,
+      // so motion blur is more of a factor.
+      // m * rad/sec
       double angularRelativeMovement = tagDistance * velocities.omegaRadiansPerSecond;
-
-      // Reliability score is based on 3 things:
-      // 1) The inverse square of distance. The farther it is, the smaller it appears, and thus
-      // there's less pixels to work with
-      // 2) The relative linear movement. The farther it is, the slower it appears, and thus there's
-      // less motion
-      // 3) The relative angular movement. The farther it is, the faster it appears, and thus
-      // there's more motion
       // Reliability score is separated into translational and rotational components, as rotational
       // tracking is not only dramatically less reliable than translational tracking when using
       // SolvePnP, it also tends to scale worse with movement and distance.
@@ -116,25 +116,31 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
 
     // Return standard deviations based on calculated overall scores.
     return new double[] {
-      getOverallScore(translationalReliabilityScores),
-      getOverallScore(rotationalReliabilityScores)
+      getOverallScore(translationalReliabilityScores), getOverallScore(rotationalReliabilityScores)
     };
   }
 
+  /**
+   * Estimate the standard deviations of a measured robot pose based on a weighted sum of the min,
+   * mean, and max reliability scores.
+   *
+   * @param reliabilityScores The scores for each tag
+   * @return The standard deviations.
+   */
   private double getOverallScore(double[] reliabilityScores) {
     double minScore = Double.POSITIVE_INFINITY;
-    double avgScore = 0;
+    double meanScore = 0;
     double maxScore = Double.NEGATIVE_INFINITY;
     for (double score : reliabilityScores) {
       minScore = Math.min(minScore, score);
-      avgScore += score;
+      meanScore += score;
       maxScore = Math.max(maxScore, score);
     }
-    avgScore /= reliabilityScores.length;
+    meanScore /= reliabilityScores.length;
 
-    // Make an overall score based on a weighted sum of the min, max, and avg
+    // Make an overall score based on a weighted sum of the min, max, and avg scores.
     // TODO: Also tune these weights
-    double overallScore = minScore * .1 + maxScore * .25 + avgScore;
+    double overallScore = minScore * .1 + maxScore * .25 + meanScore * .65;
 
     // Scale overall score inversely with tag count
     overallScore *= Math.pow(.8, reliabilityScores.length - 1);
