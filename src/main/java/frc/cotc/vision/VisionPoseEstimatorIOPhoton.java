@@ -7,6 +7,7 @@
 
 package frc.cotc.vision;
 
+import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Transform3d;
@@ -25,15 +26,17 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
 
   public VisionPoseEstimatorIOPhoton() {
     String[] cameras = new String[] {"LeftCam", "RightCam"};
+    Transform3d[] cameraLocations = new Transform3d[] {new Transform3d(), new Transform3d()};
 
     poseEstimators = new PhotonPoseEstimator[cameras.length];
+    AprilTagFieldLayout fieldLayout = AprilTagFields.k2024Crescendo.loadAprilTagLayoutField();
     for (int i = 0; i < cameras.length; i++) {
       poseEstimators[i] =
           new PhotonPoseEstimator(
-              AprilTagFields.k2024Crescendo.loadAprilTagLayoutField(),
+              fieldLayout,
               PhotonPoseEstimator.PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR,
               new PhotonCamera(cameras[i]),
-              new Transform3d());
+              cameraLocations[i]);
       poseEstimators[i].setMultiTagFallbackStrategy(
           PhotonPoseEstimator.PoseStrategy.LOWEST_AMBIGUITY);
     }
