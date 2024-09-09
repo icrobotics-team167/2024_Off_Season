@@ -15,6 +15,7 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
+import frc.cotc.sim.SimThread;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.LogFileUtil;
@@ -76,6 +77,8 @@ public class Robot extends LoggedRobot {
 
     //    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
     //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());
+
+    SimThread.start(500);
   }
 
   private Swerve getSwerve(String mode) {

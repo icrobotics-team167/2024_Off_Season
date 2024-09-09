@@ -14,15 +14,13 @@ import com.ctre.phoenix6.sim.CANcoderSimState;
 import com.ctre.phoenix6.sim.ChassisReference;
 import com.ctre.phoenix6.sim.TalonFXSimState;
 import edu.wpi.first.math.system.plant.DCMotor;
-import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import org.littletonrobotics.junction.Logger;
 
-public class PhoenixSimThread {
-  private final Notifier simNotifier;
+public class PhoenixDriveSim {
   private final PhoenixSimModule[] simModules;
 
-  protected PhoenixSimThread(
+  protected PhoenixDriveSim(
       TalonFX[] driveMotors,
       TalonFX[] steerMotors,
       CANcoder[] steerEncoders,
@@ -65,15 +63,9 @@ public class PhoenixSimThread {
               driveGearRatio,
               steerGearRatio)
         };
-    simNotifier = new Notifier(this::run);
-    simNotifier.setName("Phoenix Sim Thread");
   }
 
-  protected void start(@SuppressWarnings("SameParameterValue") double frequency) {
-    simNotifier.startPeriodic(1.0 / frequency);
-  }
-
-  private void run() {
+  public void run() {
     double startTime = Logger.getRealTimestamp();
     for (PhoenixSimModule module : simModules) {
       module.run();
