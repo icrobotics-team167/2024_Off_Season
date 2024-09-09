@@ -107,6 +107,8 @@ public interface SwerveIO {
 
   default void steerCharacterization(double volts) {}
 
+  default void driveCharacterization(double volts) {}
+
   default void stop() {}
 
   default void stopWithAngles(Rotation2d[] angles) {}

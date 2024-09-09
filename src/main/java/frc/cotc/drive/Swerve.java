@@ -229,6 +229,26 @@ public class Swerve extends SubsystemBase {
         characterizationRoutine.quasistatic(SysIdRoutine.Direction.kReverse));
   }
 
+  public Command getDriveCharacterization() {
+    SysIdRoutine characterizationRoutine =
+        new SysIdRoutine(
+            new SysIdRoutine.Config(
+                null,
+                null,
+                null,
+                (state) -> SignalLogger.writeString("SysIdState", state.toString())),
+            new SysIdRoutine.Mechanism(
+                (voltage) -> io.driveCharacterization(voltage.in(Volts)), null, this));
+    return sequence(
+        characterizationRoutine.dynamic(SysIdRoutine.Direction.kForward),
+        stop().withTimeout(1),
+        characterizationRoutine.dynamic(SysIdRoutine.Direction.kReverse),
+        stop().withTimeout(1),
+        characterizationRoutine.quasistatic(SysIdRoutine.Direction.kForward),
+        stop().withTimeout(1),
+        characterizationRoutine.quasistatic(SysIdRoutine.Direction.kReverse));
+  }
+
   public Command choreoPathFollower(ChoreoTrajectory trajectory) {
     Timer timer = new Timer();
     return runOnce(timer::start)

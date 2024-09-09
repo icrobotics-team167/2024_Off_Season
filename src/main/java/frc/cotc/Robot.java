@@ -7,7 +7,6 @@
 
 package frc.cotc;
 
-import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -58,7 +57,7 @@ public class Robot extends LoggedRobot {
       }
     }
 
-    SignalLogger.start();
+    //    SignalLogger.start();
     Logger.start();
 
     Swerve swerve = getSwerve(mode);
@@ -75,7 +74,8 @@ public class Robot extends LoggedRobot {
     RobotModeTriggers.disabled().whileTrue(swerve.stop());
     primaryController.povDown().whileTrue(swerve.stopInX());
 
-    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
+    //    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
+    //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());
   }
 
   private Swerve getSwerve(String mode) {

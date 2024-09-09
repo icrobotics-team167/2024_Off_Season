@@ -8,10 +8,12 @@
 package frc.cotc.drive;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.SignalLogger;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.StaticBrake;
+import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.Pigeon2;
@@ -207,6 +209,43 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
   }
 
+  PositionVoltage characterizationPos = new PositionVoltage(0);
+  TorqueCurrentFOC foc = new TorqueCurrentFOC(0);
+
+  @Override
+  public void driveCharacterization(double volts) {
+    if (!characterizationInitialized) {
+      BaseStatusSignal.setUpdateFrequencyForAll(
+          500,
+          modules[0].getModuleSignals().drivePosition(),
+          modules[0].getModuleSignals().driveVelocity(),
+          modules[0].getModuleSignals().steerPosition(),
+          modules[0].getModuleSignals().steerVelocity(),
+          modules[1].getModuleSignals().drivePosition(),
+          modules[1].getModuleSignals().driveVelocity(),
+          modules[1].getModuleSignals().steerPosition(),
+          modules[1].getModuleSignals().steerVelocity(),
+          modules[2].getModuleSignals().drivePosition(),
+          modules[2].getModuleSignals().driveVelocity(),
+          modules[2].getModuleSignals().steerPosition(),
+          modules[2].getModuleSignals().steerVelocity(),
+          modules[3].getModuleSignals().drivePosition(),
+          modules[3].getModuleSignals().driveVelocity(),
+          modules[3].getModuleSignals().steerPosition(),
+          modules[3].getModuleSignals().steerVelocity());
+      modules[0].driveMotor.optimizeBusUtilization(50, 1);
+      modules[1].driveMotor.optimizeBusUtilization(50, 1);
+      modules[2].driveMotor.optimizeBusUtilization(50, 1);
+      modules[3].driveMotor.optimizeBusUtilization(50, 1);
+      characterizationInitialized = true;
+    }
+    SignalLogger.writeDouble("SysIdInput", volts);
+    for (int i = 0; i < 4; i++) {
+      modules[i].steerMotor.setControl(characterizationPos);
+      modules[i].driveMotor.setControl(foc.withOutput(volts));
+    }
+  }
+
   @Override
   public void stop() {
     for (PhoenixModule module : modules) {
@@ -247,8 +286,8 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = 80;
       driveConfig.Slot0.kS = 0;
       driveConfig.Slot0.kV = 0;
-      driveConfig.Slot0.kA = 0; // TODO: SysID these values
-      driveConfig.Slot0.kP = 0;
+      driveConfig.Slot0.kA = 1.8;
+      driveConfig.Slot0.kP = 6;
       driveConfig.Slot0.kD = 0;
       driveConfig.Audio.AllowMusicDurDisable = true;
       driveConfig.MotionMagic.MotionMagicAcceleration =
