@@ -78,7 +78,9 @@ public class Robot extends LoggedRobot {
     //    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
     //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());
 
-    SimThread.start(500);
+    if (mode.equals("SIM")) {
+      SimThread.start(500);
+    }
   }
 
   private Swerve getSwerve(String mode) {
