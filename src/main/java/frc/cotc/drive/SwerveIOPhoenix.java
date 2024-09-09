@@ -100,7 +100,7 @@ public class SwerveIOPhoenix implements SwerveIO {
               CONSTANTS.STEER_GEAR_RATIO,
               CONSTANTS.DRIVE_MOTOR_INVERSIONS,
               CONSTANTS.STEER_MOTOR_INVERTED)
-          .start(200);
+          .start(1000);
     }
     odometryThread.start();
   }

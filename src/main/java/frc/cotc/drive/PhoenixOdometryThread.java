@@ -19,7 +19,7 @@ import frc.cotc.Robot;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class PhoenixOdometryThread extends Thread {
-  private final int FREQUENCY = 100;
+  private final int FREQUENCY = 250;
   private final int BUFFER_SIZE = (int) Math.ceil(2 * (FREQUENCY * Robot.defaultPeriodSecs));
 
   private final ModuleSignals[] moduleSignals;
