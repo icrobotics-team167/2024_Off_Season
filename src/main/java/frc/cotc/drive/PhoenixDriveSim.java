@@ -14,6 +14,7 @@ import com.ctre.phoenix6.sim.CANcoderSimState;
 import com.ctre.phoenix6.sim.ChassisReference;
 import com.ctre.phoenix6.sim.TalonFXSimState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import org.littletonrobotics.junction.Logger;
 
@@ -65,13 +66,19 @@ public class PhoenixDriveSim {
         };
   }
 
-  public void run() {
+  private void run() {
     double startTime = Logger.getRealTimestamp();
     for (PhoenixSimModule module : simModules) {
       module.run();
     }
     double endTime = Logger.getRealTimestamp();
     SignalLogger.writeDouble("SimThread/Time", endTime - startTime, "Microseconds");
+  }
+
+  private final Notifier notifier = new Notifier(this::run);
+
+  public void start(double frequency) {
+    notifier.startPeriodic(1.0 / frequency);
   }
 
   private static class PhoenixSimModule {

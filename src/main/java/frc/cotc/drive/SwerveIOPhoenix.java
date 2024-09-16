@@ -28,7 +28,6 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import frc.cotc.Robot;
 import frc.cotc.RobotConstants;
-import frc.cotc.sim.SimThread;
 import org.littletonrobotics.junction.Logger;
 
 public class SwerveIOPhoenix implements SwerveIO {
@@ -78,8 +77,7 @@ public class SwerveIOPhoenix implements SwerveIO {
             CONSTANTS.WHEEL_DIAMETER);
 
     if (Robot.isSimulation()) {
-      var driveSim =
-          new PhoenixDriveSim(
+      new PhoenixDriveSim(
               new TalonFX[] {
                 modules[0].driveMotor,
                 modules[1].driveMotor,
@@ -101,8 +99,7 @@ public class SwerveIOPhoenix implements SwerveIO {
               CONSTANTS.DRIVE_GEAR_RATIO,
               CONSTANTS.STEER_GEAR_RATIO,
               CONSTANTS.DRIVE_MOTOR_INVERSIONS,
-              CONSTANTS.STEER_MOTOR_INVERTED);
-      SimThread.addSim(driveSim::run);
+              CONSTANTS.STEER_MOTOR_INVERTED).start(500);
     }
     odometryThread.start();
   }
