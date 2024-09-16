@@ -16,6 +16,7 @@ import com.ctre.phoenix6.controls.StaticBrake;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
+import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.Pigeon2;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.FeedbackSensorSourceValue;
@@ -65,6 +66,8 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
     signals[8] = gyro.getYaw();
 
+    BaseStatusSignal.setUpdateFrequencyForAll(100, signals);
+
     odometryThread =
         new PhoenixOdometryThread(
             new PhoenixOdometryThread.ModuleSignals[] {
@@ -75,6 +78,15 @@ public class SwerveIOPhoenix implements SwerveIO {
             },
             gyro,
             CONSTANTS.WHEEL_DIAMETER);
+
+    ParentDevice[] devices = new ParentDevice[13];
+    for (int i = 0; i < 4; i++) {
+      devices[i * 3] = modules[i].driveMotor;
+      devices[i * 3 + 1] = modules[i].steerMotor;
+      devices[i * 3 + 2] = modules[i].steerEncoder;
+    }
+    devices[12] = gyro;
+    ParentDevice.optimizeBusUtilizationForAll(devices);
 
     if (Robot.isSimulation()) {
       new PhoenixDriveSim(
@@ -99,7 +111,8 @@ public class SwerveIOPhoenix implements SwerveIO {
               CONSTANTS.DRIVE_GEAR_RATIO,
               CONSTANTS.STEER_GEAR_RATIO,
               CONSTANTS.DRIVE_MOTOR_INVERSIONS,
-              CONSTANTS.STEER_MOTOR_INVERTED).start(500);
+              CONSTANTS.STEER_MOTOR_INVERTED)
+          .start(500);
     }
     odometryThread.start();
   }
@@ -308,7 +321,7 @@ public class SwerveIOPhoenix implements SwerveIO {
               : InvertedValue.CounterClockwise_Positive;
       steerConfig.CurrentLimits.StatorCurrentLimit = 40;
       steerConfig.Slot0.kS = 0;
-      steerConfig.Slot0.kP = 24; // TODO: SysID these values
+      steerConfig.Slot0.kP = 24;
       steerConfig.Slot0.kD = 0;
       steerConfig.Audio.AllowMusicDurDisable = true;
       steerMotor.getConfigurator().apply(steerConfig);
