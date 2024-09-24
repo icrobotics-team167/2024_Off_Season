@@ -9,9 +9,8 @@ package frc.cotc.shooter;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import org.littletonrobotics.junction.Logger;
-
 import java.util.function.DoubleSupplier;
+import org.littletonrobotics.junction.Logger;
 
 public class Arm extends SubsystemBase {
   private final ArmIO io;
@@ -28,9 +27,10 @@ public class Arm extends SubsystemBase {
     Logger.processInputs("Arm", inputs);
   }
 
-  public Command teleopPivotControl(DoubleSupplier control){
-    return run(() -> {
-      io.pivot(control.getAsDouble());
-    });
+  public Command teleopPivotControl(DoubleSupplier control) {
+    return run(
+        () -> {
+          io.pivot(control.getAsDouble());
+        });
   }
 }
