@@ -15,6 +15,8 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
+import frc.cotc.shooter.Arm;
+import frc.cotc.shooter.ArmIO;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.LogFileUtil;
@@ -61,6 +63,10 @@ public class Robot extends LoggedRobot {
     Logger.start();
 
     Swerve swerve = getSwerve(mode);
+
+    ArmIO io = new ArmIO() {};
+
+    Arm arm = new Arm(io);
 
     CommandXboxController primaryController = new CommandXboxController(0);
 
