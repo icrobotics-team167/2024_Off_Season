@@ -295,11 +295,19 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = 80;
       driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = 80;
-      driveConfig.Slot0.kS = 0;
-      driveConfig.Slot0.kV = 0;
-      driveConfig.Slot0.kA = 1.8;
-      driveConfig.Slot0.kP = 6;
-      driveConfig.Slot0.kD = 0;
+      if (Robot.isReal()) {
+        driveConfig.Slot0.kS = 0;
+        driveConfig.Slot0.kV = 0;
+        driveConfig.Slot0.kA = 0; // TODO: SysID these values
+        driveConfig.Slot0.kP = 0;
+        driveConfig.Slot0.kD = 0;
+      } else {
+        driveConfig.Slot0.kS = 0;
+        driveConfig.Slot0.kV = 0;
+        driveConfig.Slot0.kA = 1.8;
+        driveConfig.Slot0.kP = 6;
+        driveConfig.Slot0.kD = 0;
+      }
       driveConfig.Audio.AllowMusicDurDisable = true;
       driveConfig.MotionMagic.MotionMagicAcceleration =
           CONSTANTS.MAX_ACCEL * CONSTANTS.DRIVE_GEAR_RATIO;
@@ -319,9 +327,15 @@ public class SwerveIOPhoenix implements SwerveIO {
               ? InvertedValue.Clockwise_Positive
               : InvertedValue.CounterClockwise_Positive;
       steerConfig.CurrentLimits.StatorCurrentLimit = 40;
-      steerConfig.Slot0.kS = 0;
-      steerConfig.Slot0.kP = 24;
-      steerConfig.Slot0.kD = 0;
+      if (Robot.isReal()) {
+        steerConfig.Slot0.kS = 0;
+        steerConfig.Slot0.kP = 24; // These are probably fine? SysID just in case
+        steerConfig.Slot0.kD = 0;
+      } else {
+        steerConfig.Slot0.kS = 0;
+        steerConfig.Slot0.kP = 24;
+        steerConfig.Slot0.kD = 0;
+      }
       steerConfig.Audio.AllowMusicDurDisable = true;
       steerMotor.getConfigurator().apply(steerConfig);
 
