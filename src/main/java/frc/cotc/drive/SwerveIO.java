@@ -89,21 +89,18 @@ public interface SwerveIO {
    * Drives the drivebase.
    *
    * @param setpoint The drive setpoint.
-   * @param steerFeedforward The feedforward for the steering. Rad/sec.
    */
-  default void drive(SwerveModuleState[] setpoint, double[] steerFeedforward) {
-    drive(setpoint, steerFeedforward, new double[] {0, 0, 0, 0});
+  default void drive(SwerveModuleState[] setpoint) {
+    drive(setpoint, new double[4]);
   }
 
   /**
    * Drives the drivebase.
    *
    * @param setpoint The drive setpoint.
-   * @param steerFeedforward The feedforward for the steering. Rad/sec.
    * @param torqueFeedforward The feedforward for the drive motor. Newtons.
    */
-  default void drive(
-      SwerveModuleState[] setpoint, double[] steerFeedforward, double[] torqueFeedforward) {}
+  default void drive(SwerveModuleState[] setpoint, double[] torqueFeedforward) {}
 
   default void steerCharacterization(double volts) {}
 

@@ -183,10 +183,9 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
-  public void drive(
-      SwerveModuleState[] setpoint, double[] steerFeedforward, double[] forceFeedforward) {
+  public void drive(SwerveModuleState[] setpoint, double[] forceFeedforward) {
     for (int i = 0; i < 4; i++) {
-      modules[i].drive(setpoint[i], steerFeedforward[i], forceFeedforward[i]);
+      modules[i].drive(setpoint[i], forceFeedforward[i]);
     }
   }
 
@@ -221,8 +220,8 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
   }
 
-  PositionVoltage characterizationPos = new PositionVoltage(0);
-  TorqueCurrentFOC foc = new TorqueCurrentFOC(0);
+  private final PositionVoltage characterizationPos = new PositionVoltage(0);
+  private final TorqueCurrentFOC foc = new TorqueCurrentFOC(0);
 
   @Override
   public void driveCharacterization(double volts) {
@@ -336,10 +335,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         new VelocityTorqueCurrentFOC(0, 0, 0, 0, true, false, false);
     private final PositionVoltage steerControlRequest = new PositionVoltage(0);
 
-    protected void drive(
-        SwerveModuleState setpoint, double steerFeedforward, double forceFeedforward) {
+    protected void drive(SwerveModuleState setpoint, double forceFeedforward) {
       if (MathUtil.isNear(0, setpoint.speedMetersPerSecond, 1e-3)
-          && MathUtil.isNear(0, steerFeedforward, 1e-3)
           && MathUtil.isNear(0, forceFeedforward, 1e-3)) {
         stop();
         return;
@@ -356,10 +353,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                       // amps
                       ((forceFeedforward * (wheelDiameter / 2)) / driveGearRatio)
                       / 9.81));
-      steerMotor.setControl(
-          steerControlRequest
-              .withPosition(setpoint.angle.getRotations())
-              .withFeedForward(12.0 * (steerFeedforward / (maxRotorVelocity / steerGearRatio))));
+      steerMotor.setControl(steerControlRequest.withPosition(setpoint.angle.getRotations()));
     }
 
     private final StaticBrake brakeControlRequest = new StaticBrake();
