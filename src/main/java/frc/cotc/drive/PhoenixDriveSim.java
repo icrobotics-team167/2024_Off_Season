@@ -14,8 +14,10 @@ import com.ctre.phoenix6.sim.CANcoderSimState;
 import com.ctre.phoenix6.sim.ChassisReference;
 import com.ctre.phoenix6.sim.TalonFXSimState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
+import frc.cotc.util.FOCMotorSim;
 import org.littletonrobotics.junction.Logger;
 
 public class PhoenixDriveSim {
@@ -86,7 +88,7 @@ public class PhoenixDriveSim {
     private final TalonFXSimState steerMotorSim;
     private final CANcoderSimState encoderSim;
 
-    private final DCMotorSim driveSim;
+    private final FOCMotorSim driveSim;
     private final DCMotorSim steerSim;
 
     private final double driveGearRatio;
@@ -107,7 +109,7 @@ public class PhoenixDriveSim {
       this.driveGearRatio = driveGearRatio;
       this.steerGearRatio = steerGearRatio;
 
-      driveSim = new DCMotorSim(DCMotor.getKrakenX60Foc(1), driveGearRatio, .05);
+      driveSim = new FOCMotorSim(DCMotor.getKrakenX60Foc(1), driveGearRatio, .05);
       steerSim = new DCMotorSim(DCMotor.getKrakenX60Foc(1), steerGearRatio, .005);
 
       driveMotorSim.Orientation =
@@ -121,7 +123,6 @@ public class PhoenixDriveSim {
     }
 
     private double lastTimestamp = -1;
-    private double lastDriveRotorVel = 0;
     private double lastSteerRotorVel = 0;
 
     protected void run() {
@@ -130,29 +131,33 @@ public class PhoenixDriveSim {
       if (lastTimestamp < 0) {
         steerSim.setState(2 * Math.PI * (Math.random() - .5), 0);
         steerMotorSim.setRawRotorPosition(steerSim.getAngularPositionRotations() * steerGearRatio);
+        encoderSim.setRawPosition(steerSim.getAngularPositionRotations());
       } else {
         double dt = timestamp - lastTimestamp;
 
-        driveSim.setInputVoltage(driveMotorSim.getMotorVoltage());
+        // Update drive sim
+        driveSim.tick(driveMotorSim.getTorqueCurrent(), dt);
+
+        driveMotorSim.setRawRotorPosition(
+            Units.radiansToRotations(driveSim.getPos()) * driveGearRatio);
+        driveMotorSim.setRotorVelocity(
+            Units.radiansToRotations(driveSim.getVel()) * driveGearRatio);
+        driveMotorSim.setRotorAcceleration(
+            Units.radiansToRotations(driveSim.getAccel()) * driveGearRatio);
+
+        // Update steer sim
         steerSim.setInputVoltage(steerMotorSim.getMotorVoltage());
+        steerSim.update(dt);
 
-        driveSim.update(timestamp - lastTimestamp);
-        steerSim.update(timestamp - lastTimestamp);
-
-        double driveRotorVel = driveSim.getAngularVelocityRPM() / 60.0 * driveGearRatio;
         double steerRotorVel = steerSim.getAngularVelocityRPM() / 60.0 * steerGearRatio;
 
-        driveMotorSim.setRawRotorPosition(driveSim.getAngularPositionRotations() * driveGearRatio);
-        driveMotorSim.setRotorVelocity(driveRotorVel);
         steerMotorSim.setRawRotorPosition(steerSim.getAngularPositionRotations() * steerGearRatio);
         steerMotorSim.setRotorVelocity(steerRotorVel);
         encoderSim.setRawPosition(steerSim.getAngularPositionRotations());
         encoderSim.setVelocity(steerSim.getAngularVelocityRPM() / 60.0);
 
-        driveMotorSim.setRotorAcceleration((lastDriveRotorVel - driveRotorVel) / dt);
         steerMotorSim.setRotorAcceleration((lastSteerRotorVel - steerRotorVel) / dt);
 
-        lastDriveRotorVel = driveRotorVel;
         lastSteerRotorVel = steerRotorVel;
       }
 

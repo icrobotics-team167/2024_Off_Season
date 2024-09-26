@@ -11,10 +11,7 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.SignalLogger;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.PositionVoltage;
-import com.ctre.phoenix6.controls.StaticBrake;
-import com.ctre.phoenix6.controls.TorqueCurrentFOC;
-import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
+import com.ctre.phoenix6.controls.*;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.Pigeon2;
@@ -48,14 +45,11 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.TRACK_WIDTH = Units.inchesToMeters(22.75);
     CONSTANTS.TRACK_LENGTH = Units.inchesToMeters(22.75);
     CONSTANTS.MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(5800);
-    CONSTANTS.MAX_ACCEL = 8;
+    CONSTANTS.MAX_ACCEL = 12;
 
     modules =
         new PhoenixModule[] {
-          new PhoenixModule(0, CONSTANTS),
-          new PhoenixModule(1, CONSTANTS),
-          new PhoenixModule(2, CONSTANTS),
-          new PhoenixModule(3, CONSTANTS)
+          new PhoenixModule(0), new PhoenixModule(1), new PhoenixModule(2), new PhoenixModule(3)
         };
 
     gyro = new Pigeon2(17, RobotConstants.CANIVORE_NAME);
@@ -276,12 +270,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     final TalonFX steerMotor;
     final CANcoder steerEncoder;
 
-    final double wheelDiameter;
-    final double maxRotorVelocity;
-    final double driveGearRatio;
-    final double steerGearRatio;
-
-    protected PhoenixModule(int id, SwerveIOConstantsAutoLogged constants) {
+    protected PhoenixModule(int id) {
       driveMotor = new TalonFX(id * 3 + 2, RobotConstants.CANIVORE_NAME);
       steerMotor = new TalonFX(id * 3 + 3, RobotConstants.CANIVORE_NAME);
       steerEncoder = new CANcoder(id * 3 + 4, RobotConstants.CANIVORE_NAME);
@@ -289,10 +278,10 @@ public class SwerveIOPhoenix implements SwerveIO {
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
       driveConfig.MotorOutput.Inverted =
-          constants.DRIVE_MOTOR_INVERSIONS[id]
+          CONSTANTS.DRIVE_MOTOR_INVERSIONS[id]
               ? InvertedValue.Clockwise_Positive
               : InvertedValue.CounterClockwise_Positive;
-      driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
+      driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
       driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = 80;
       driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = 80;
       if (Robot.isReal()) {
@@ -304,13 +293,13 @@ public class SwerveIOPhoenix implements SwerveIO {
       } else {
         driveConfig.Slot0.kS = 0;
         driveConfig.Slot0.kV = 0;
-        driveConfig.Slot0.kA = 1.8;
-        driveConfig.Slot0.kP = 6;
+        driveConfig.Slot0.kA = 2.5;
+        driveConfig.Slot0.kP = 40;
         driveConfig.Slot0.kD = 0;
       }
       driveConfig.Audio.AllowMusicDurDisable = true;
       driveConfig.MotionMagic.MotionMagicAcceleration =
-          CONSTANTS.MAX_ACCEL * CONSTANTS.DRIVE_GEAR_RATIO;
+          (CONSTANTS.MAX_ACCEL / (CONSTANTS.WHEEL_DIAMETER * Math.PI));
       driveMotor.getConfigurator().apply(driveConfig);
 
       var encoderConfig = new CANcoderConfiguration();
@@ -323,54 +312,49 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerConfig.Feedback.FeedbackRemoteSensorID = steerEncoder.getDeviceID();
       steerConfig.ClosedLoopGeneral.ContinuousWrap = true;
       steerConfig.MotorOutput.Inverted =
-          constants.STEER_MOTOR_INVERTED
+          CONSTANTS.STEER_MOTOR_INVERTED
               ? InvertedValue.Clockwise_Positive
               : InvertedValue.CounterClockwise_Positive;
       steerConfig.CurrentLimits.StatorCurrentLimit = 40;
       if (Robot.isReal()) {
         steerConfig.Slot0.kS = 0;
-        steerConfig.Slot0.kP = 24; // These are probably fine? SysID just in case
+        steerConfig.Slot0.kP = 48; // These are probably fine? SysID just in case
         steerConfig.Slot0.kD = 0;
       } else {
         steerConfig.Slot0.kS = 0;
-        steerConfig.Slot0.kP = 24;
+        steerConfig.Slot0.kP = 48;
         steerConfig.Slot0.kD = 0;
       }
       steerConfig.Audio.AllowMusicDurDisable = true;
       steerMotor.getConfigurator().apply(steerConfig);
-
-      wheelDiameter = constants.WHEEL_DIAMETER;
-      maxRotorVelocity = constants.MAX_ROTOR_VELOCITY;
-      driveGearRatio = constants.DRIVE_GEAR_RATIO;
-      steerGearRatio = constants.STEER_GEAR_RATIO;
     }
 
-    private final VelocityTorqueCurrentFOC driveControlRequest =
-        new VelocityTorqueCurrentFOC(0, 0, 0, 0, true, false, false);
+    private final MotionMagicVelocityTorqueCurrentFOC driveControlRequest =
+        new MotionMagicVelocityTorqueCurrentFOC(0);
     private final PositionVoltage steerControlRequest = new PositionVoltage(0);
+    private final StaticBrake brakeControlRequest = new StaticBrake();
 
     protected void drive(SwerveModuleState setpoint, double forceFeedforward) {
-      if (MathUtil.isNear(0, setpoint.speedMetersPerSecond, 1e-3)
-          && MathUtil.isNear(0, forceFeedforward, 1e-3)) {
-        stop();
-        return;
+      if (MathUtil.isNear(0, setpoint.speedMetersPerSecond, 1e-6)
+          && MathUtil.isNear(0, forceFeedforward, 1e-6)) {
+        driveMotor.setControl(new StaticBrake());
+      } else {
+        driveMotor.setControl(
+            driveControlRequest
+                .withVelocity(
+                    (setpoint.speedMetersPerSecond / (CONSTANTS.WHEEL_DIAMETER * Math.PI)))
+                .withFeedForward(
+                    Math.signum(setpoint.speedMetersPerSecond)
+                        *
+                        // ((Force (N) * radius (m)) / gear ratio (dimensionless)) / kT (Nm/amp) =
+                        // amps
+                        ((forceFeedforward * (CONSTANTS.WHEEL_DIAMETER / 2))
+                            / CONSTANTS.DRIVE_GEAR_RATIO)
+                        / 9.81));
       }
 
-      driveMotor.setControl(
-          driveControlRequest
-              .withVelocity(
-                  (setpoint.speedMetersPerSecond / (wheelDiameter * Math.PI)) * driveGearRatio)
-              .withFeedForward(
-                  Math.signum(setpoint.speedMetersPerSecond)
-                      *
-                      // ((Force (N) * radius (m)) / gear ratio (dimensionless)) / kT (Nm/amp) =
-                      // amps
-                      ((forceFeedforward * (wheelDiameter / 2)) / driveGearRatio)
-                      / 9.81));
       steerMotor.setControl(steerControlRequest.withPosition(setpoint.angle.getRotations()));
     }
-
-    private final StaticBrake brakeControlRequest = new StaticBrake();
 
     private void stop() {
       driveMotor.setControl(brakeControlRequest);
@@ -378,9 +362,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
 
     protected void stopWithAngle(Rotation2d angle) {
-      driveMotor.setControl(brakeControlRequest);
-      steerMotor.setControl(
-          steerControlRequest.withPosition(angle.getRotations()).withFeedForward(0));
+      drive(new SwerveModuleState(0, angle), 0);
     }
 
     protected PhoenixOdometryThread.ModuleSignals getModuleSignals() {

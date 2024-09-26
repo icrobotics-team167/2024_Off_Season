@@ -7,6 +7,7 @@
 
 package frc.cotc;
 
+import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -57,7 +58,7 @@ public class Robot extends LoggedRobot {
       }
     }
 
-    //    SignalLogger.start();
+    SignalLogger.start();
     Logger.start();
 
     Swerve swerve = getSwerve(mode);
