@@ -25,7 +25,6 @@ public interface SwerveIO {
         };
     Rotation2d gyroYaw = new Rotation2d();
 
-    double[] odometryTimestamps = new double[0];
     // I wanted this to be a 2D array, so that one of the dimensions can be data ID and the other
     // dimension can be the module ID, but AK doesn't support 2D arrays
     // So the data is packed into a 1D array
@@ -37,6 +36,7 @@ public interface SwerveIO {
           new SwerveModulePosition()
         };
     Rotation2d[] odometryYaws = new Rotation2d[0];
+    double[] odometryTimestamps = new double[0];
   }
 
   @SuppressWarnings("CanBeFinal")
@@ -105,8 +105,4 @@ public interface SwerveIO {
   default void steerCharacterization(double volts) {}
 
   default void driveCharacterization(double volts) {}
-
-  default void stop() {}
-
-  default void stopWithAngles(Rotation2d[] angles) {}
 }
