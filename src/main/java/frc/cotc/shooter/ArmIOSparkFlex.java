@@ -48,8 +48,6 @@ public class ArmIOSparkFlex implements ArmIO {
     configureSpark(() -> leftEncoder.setVelocityConversionFactor(Math.PI / 1200));
     configureSpark(() -> rightEncoder.setVelocityConversionFactor(Math.PI / 1200));
     Timer.delay(.1);
-
-
   }
 
   @Override

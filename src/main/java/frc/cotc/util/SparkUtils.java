@@ -13,7 +13,6 @@ import com.revrobotics.CANSparkBase;
 import com.revrobotics.CANSparkLowLevel.PeriodicFrame;
 import com.revrobotics.REVLibError;
 import edu.wpi.first.wpilibj.DriverStation;
-
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -55,7 +54,7 @@ public class SparkUtils {
    *     href="https://docs.revrobotics.com/brushless/spark-max/control-interfaces">https://docs.revrobotics.com/brushless/spark-max/control-interfaces</a>
    */
   public static void configureFrameStrategy(
-    CANSparkBase spark, Set<Data> data, Set<Sensor> sensors, boolean withFollower) {
+      CANSparkBase spark, Set<Data> data, Set<Sensor> sensors, boolean withFollower) {
     int status0 = FRAME_STRATEGY_SLOW; // output, faults
     int status1 = FRAME_STRATEGY_SLOW; // velocity, temperature, input voltage, current
     int status2 = FRAME_STRATEGY_SLOW; // position
