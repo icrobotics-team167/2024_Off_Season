@@ -53,6 +53,8 @@ public class PhoenixOdometryThread extends Thread {
 
     WHEEL_CIRCUMFERENCE = wheelDiameter * Math.PI;
 
+    BaseStatusSignal.setUpdateFrequencyForAll(FREQUENCY, allSignals);
+
     setName("Phoenix Odometry Thread");
     Threads.setCurrentThreadPriority(true, 10);
     setDaemon(true);

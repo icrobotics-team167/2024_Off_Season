@@ -9,19 +9,28 @@ package frc.cotc.shooter;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import java.util.function.DoubleSupplier;
+import org.littletonrobotics.junction.Logger;
 
 public class Arm extends SubsystemBase {
   private final ArmIO io;
+  private final ArmIOInputsAutoLogged inputs;
 
   public Arm(ArmIO io) {
     this.io = io;
+    inputs = new ArmIOInputsAutoLogged();
   }
 
-  public Command goToPosition(double angleRad) {
-    return run(() -> io.goToAngle(angleRad));
+  @Override
+  public void periodic() {
+    io.updateInputs(inputs);
+    Logger.processInputs("Arm", inputs);
   }
 
-  public Command setVelocity(double speed) {
-    return run(() -> io.setVelocity(speed));
+  public Command teleopPivotControl(DoubleSupplier control) {
+    return run(
+        () -> {
+          io.pivot(control.getAsDouble());
+        });
   }
 }

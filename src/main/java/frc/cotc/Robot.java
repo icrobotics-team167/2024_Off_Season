@@ -7,6 +7,7 @@
 
 package frc.cotc;
 
+import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -15,7 +16,8 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
-import frc.cotc.sim.SimThread;
+import frc.cotc.shooter.Arm;
+import frc.cotc.shooter.ArmIO;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.LogFileUtil;
@@ -58,10 +60,14 @@ public class Robot extends LoggedRobot {
       }
     }
 
-    //    SignalLogger.start();
+    SignalLogger.start();
     Logger.start();
 
     Swerve swerve = getSwerve(mode);
+
+    ArmIO io = new ArmIO() {};
+
+    Arm arm = new Arm(io);
 
     CommandXboxController primaryController = new CommandXboxController(0);
 
@@ -77,10 +83,6 @@ public class Robot extends LoggedRobot {
 
     //    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
     //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());
-
-    if (mode.equals("SIM")) {
-      SimThread.start(500);
-    }
   }
 
   private Swerve getSwerve(String mode) {

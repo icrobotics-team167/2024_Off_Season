@@ -7,8 +7,18 @@
 
 package frc.cotc.shooter;
 
-public interface ArmIO {
-  default void goToAngle(double angleRad) {}
+import org.littletonrobotics.junction.AutoLog;
 
-  default void setVelocity(double speed) {}
+public interface ArmIO {
+  @AutoLog
+  class ArmIOInputs {
+    double angleRad;
+    double velRadPerSec;
+  }
+
+  default void updateInputs(ArmIOInputs inputs) {}
+
+  default void pivot(double speed) {}
+
+  default void angleTo(double pos) {}
 }

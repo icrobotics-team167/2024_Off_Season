@@ -78,8 +78,7 @@ public class Swerve extends SubsystemBase {
               new Translation2d(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2)
             });
     lastSetpoint =
-        new SwerveSetpointGenerator.SwerveSetpoint(
-            new ChassisSpeeds(), inputs.moduleStates, new double[] {0, 0, 0, 0});
+        new SwerveSetpointGenerator.SwerveSetpoint(new ChassisSpeeds(), inputs.moduleStates);
 
     MAX_LINEAR_VEL =
         (Units.radiansToRotations(CONSTANTS.MAX_ROTOR_VELOCITY) / CONSTANTS.DRIVE_GEAR_RATIO)
@@ -152,7 +151,7 @@ public class Swerve extends SubsystemBase {
         setpointGenerator.generateSetpoint(limits, lastSetpoint, speed, Robot.defaultPeriodSecs);
 
     Logger.recordOutput("Swerve/Drive Setpoint", setpoint.moduleStates());
-    io.drive(setpoint.moduleStates(), setpoint.steerFeedforward());
+    io.drive(setpoint.moduleStates());
 
     lastSetpoint = setpoint;
   }
@@ -177,8 +176,7 @@ public class Swerve extends SubsystemBase {
                     new SwerveModuleState(0, setpoint[1]),
                     new SwerveModuleState(0, setpoint[2]),
                     new SwerveModuleState(0, setpoint[3]),
-                  },
-                  new double[4]);
+                  });
         });
   }
 
@@ -272,7 +270,7 @@ public class Swerve extends SubsystemBase {
                     forceFeedforwards[i] = force.getNorm();
                   }
 
-                  io.drive(setpoint.moduleStates(), setpoint.steerFeedforward(), forceFeedforwards);
+                  io.drive(setpoint.moduleStates(), forceFeedforwards);
                 })
                 .until(() -> timer.hasElapsed(trajectory.getTotalTime())));
   }
@@ -282,8 +280,7 @@ public class Swerve extends SubsystemBase {
         () -> {
           io.stop();
           lastSetpoint =
-              new SwerveSetpointGenerator.SwerveSetpoint(
-                  new ChassisSpeeds(), inputs.moduleStates, new double[] {0, 0, 0, 0});
+              new SwerveSetpointGenerator.SwerveSetpoint(new ChassisSpeeds(), inputs.moduleStates);
         });
   }
 }
