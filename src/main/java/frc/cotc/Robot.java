@@ -11,13 +11,14 @@ import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
 import frc.cotc.shooter.Arm;
 import frc.cotc.shooter.ArmIO;
+import frc.cotc.shooter.ArmIOSparkFlex;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.LogFileUtil;
@@ -65,21 +66,24 @@ public class Robot extends LoggedRobot {
 
     Swerve swerve = getSwerve(mode);
 
-    ArmIO io = new ArmIO() {};
+    ArmIO io = new ArmIOSparkFlex();
 
     Arm arm = new Arm(io);
 
-    CommandXboxController primaryController = new CommandXboxController(0);
+    CommandJoystick primaryLeftStick = new CommandJoystick(0);
+    CommandJoystick primaryRightStick = new CommandJoystick(1);
+    CommandJoystick secondaryLeftStick = new CommandJoystick(2);
+    CommandJoystick secondaryRightStick = new CommandJoystick(3);
 
     // Robot wants +X fwd, +Y left
     // Sticks are +X right +Y back
     swerve.setDefaultCommand(
         swerve.teleopDrive(
-            () -> MathUtil.applyDeadband(-primaryController.getLeftY(), .01),
-            () -> MathUtil.applyDeadband(-primaryController.getLeftX(), .01),
-            () -> MathUtil.applyDeadband(-primaryController.getRightX(), .01)));
+            () -> MathUtil.applyDeadband(-primaryLeftStick.getX(), .01),
+            () -> MathUtil.applyDeadband(-primaryLeftStick.getY(), .01),
+            () -> MathUtil.applyDeadband(-primaryRightStick.getX(), .01)));
     RobotModeTriggers.disabled().whileTrue(swerve.stop());
-    primaryController.povDown().whileTrue(swerve.stopInX());
+    // primaryController.povDown().whileTrue(swerve.stopInX());
 
     //    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
     //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());

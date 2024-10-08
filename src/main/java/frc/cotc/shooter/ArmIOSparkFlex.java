@@ -57,11 +57,19 @@ public class ArmIOSparkFlex implements ArmIO {
 
   @Override
   public void pivot(double speed) {
-    ArmIO.super.pivot(speed);
+    if ((speed < 0 && getAngle() >= ArmIO.MIN_ANGLE)
+        || (speed > 0 && getAngle() <= ArmIO.MAX_ANGLE)) {
+      left.set(speed);
+      right.set(speed);
+    }
   }
 
   @Override
   public void angleTo(double pos) {
     ArmIO.super.angleTo(pos);
+  }
+
+  private double getAngle() {
+    return leftEncoder.getPosition();
   }
 }

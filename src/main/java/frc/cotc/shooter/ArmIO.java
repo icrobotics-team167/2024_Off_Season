@@ -10,6 +10,9 @@ package frc.cotc.shooter;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface ArmIO {
+  public static final double MIN_ANGLE = 5;
+  public static final double MAX_ANGLE = 105;
+
   @AutoLog
   class ArmIOInputs {
     double angleRad;
