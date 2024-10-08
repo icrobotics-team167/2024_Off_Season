@@ -87,6 +87,13 @@ public class Robot extends LoggedRobot {
 
     //    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
     //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());
+
+    arm.setDefaultCommand(
+        arm.teleopPivotControl(
+            () -> MathUtil.applyDeadband(-secondaryLeftStick.getY(), .01);
+        )
+    )
+
   }
 
   private Swerve getSwerve(String mode) {
