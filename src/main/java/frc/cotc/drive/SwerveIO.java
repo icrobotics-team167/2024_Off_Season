@@ -57,7 +57,8 @@ public interface SwerveIO {
     boolean STEER_MOTOR_INVERTED = true;
 
     // Rad/sec
-    double MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(6000);
+    double DRIVE_MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(6000);
+    double STEER_MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
     /*
      * Acceleration limits shouldn't be used to limit current draw, that's the purpose of current

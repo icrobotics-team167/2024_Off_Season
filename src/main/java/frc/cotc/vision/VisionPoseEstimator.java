@@ -13,28 +13,27 @@ import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
 public class VisionPoseEstimator {
-  private final VisionPoseEstimatorIO io;
-  private final VisionPoseEstimatorInputsAutoLogged inputs =
-      new VisionPoseEstimatorInputsAutoLogged();
-
-  public VisionPoseEstimator(VisionPoseEstimatorIO io, Supplier<ChassisSpeeds> speedsSupplier) {
-    this.io = io;
-    this.io.addVelocityDataSource(speedsSupplier);
-  }
-
   @FunctionalInterface
   public interface EstimateConsumer {
     void useEstimate(
         Pose2d pose, double timestamp, double translationalStDevs, double angularStDevs);
   }
 
-  /**
-   * Poll the coprocessor(s) for the latest data
-   *
-   * @param estimateConsumer The consumer for handling that data. Takes in a pose, a timestamp, a
-   *     translational standard deviation, and a rotational standard deviation, in that order.
-   */
-  public void poll(EstimateConsumer estimateConsumer) {
+  private final VisionPoseEstimatorIO io;
+  private final VisionPoseEstimatorInputsAutoLogged inputs =
+      new VisionPoseEstimatorInputsAutoLogged();
+  private final EstimateConsumer estimateConsumer;
+
+  public VisionPoseEstimator(
+      VisionPoseEstimatorIO io,
+      Supplier<ChassisSpeeds> speedsSupplier,
+      EstimateConsumer estimateConsumer) {
+    this.io = io;
+    this.io.addVelocityDataSource(speedsSupplier);
+    this.estimateConsumer = estimateConsumer;
+  }
+
+  public void poll() {
     io.updateInputs(inputs);
     Logger.processInputs("Vision", inputs);
     for (int i = 0; i < inputs.timestamps.length; i++) {

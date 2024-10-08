@@ -28,11 +28,13 @@ import java.util.Optional;
  * kinematically infeasible (and can result in wheel slip or robot heading drift as a result).
  */
 public class SwerveSetpointGenerator {
-  private final Translation2d[] modulePositions;
+  private final int moduleCount;
+  private final ModuleLimits limits;
   private final SwerveDriveKinematics kinematics;
 
-  public SwerveSetpointGenerator(Translation2d[] modulePositions) {
-    this.modulePositions = modulePositions;
+  public SwerveSetpointGenerator(Translation2d[] modulePositions, ModuleLimits limits) {
+    this.moduleCount = modulePositions.length;
+    this.limits = limits;
     kinematics = new SwerveDriveKinematics(modulePositions);
   }
 
@@ -151,7 +153,6 @@ public class SwerveSetpointGenerator {
   /**
    * Generate a new setpoint.
    *
-   * @param limits The kinematic limits to respect for this setpoint.
    * @param prevSetpoint The previous setpoint motion. Normally, you'd pass in the previous
    *     iteration setpoint instead of the actual measured/estimated kinematic state.
    * @param desiredState The desired state of motion, such as from the driver sticks or a path
@@ -161,10 +162,7 @@ public class SwerveSetpointGenerator {
    *     desiredState quickly.
    */
   public SwerveSetpoint generateSetpoint(
-      final ModuleLimits limits,
-      final SwerveSetpoint prevSetpoint,
-      ChassisSpeeds desiredState,
-      double dt) {
+      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double dt) {
 
     SwerveModuleState[] desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
     // Make sure desiredState respects velocity limits.
@@ -178,21 +176,21 @@ public class SwerveSetpointGenerator {
     boolean need_to_steer = true;
     if (isNearZero(desiredState)) {
       need_to_steer = false;
-      for (int i = 0; i < modulePositions.length; ++i) {
+      for (int i = 0; i < moduleCount; ++i) {
         desiredModuleState[i].angle = prevSetpoint.moduleStates()[i].angle;
         desiredModuleState[i].speedMetersPerSecond = 0.0;
       }
     }
 
     // For each module, compute local Vx and Vy vectors.
-    double[] prev_vx = new double[modulePositions.length];
-    double[] prev_vy = new double[modulePositions.length];
-    Rotation2d[] prev_heading = new Rotation2d[modulePositions.length];
-    double[] desired_vx = new double[modulePositions.length];
-    double[] desired_vy = new double[modulePositions.length];
-    Rotation2d[] desired_heading = new Rotation2d[modulePositions.length];
+    double[] prev_vx = new double[moduleCount];
+    double[] prev_vy = new double[moduleCount];
+    Rotation2d[] prev_heading = new Rotation2d[moduleCount];
+    double[] desired_vx = new double[moduleCount];
+    double[] desired_vy = new double[moduleCount];
+    Rotation2d[] desired_heading = new Rotation2d[moduleCount];
     boolean all_modules_should_flip = true;
-    for (int i = 0; i < modulePositions.length; ++i) {
+    for (int i = 0; i < moduleCount; ++i) {
       prev_vx[i] =
           prevSetpoint.moduleStates()[i].angle.getCos()
               * prevSetpoint.moduleStates()[i].speedMetersPerSecond;
@@ -225,7 +223,7 @@ public class SwerveSetpointGenerator {
       // It will (likely) be faster to stop the robot, rotate the modules in place to the complement
       // of the desired
       // angle, and accelerate again.
-      return generateSetpoint(limits, prevSetpoint, new ChassisSpeeds(), dt);
+      return generateSetpoint(prevSetpoint, new ChassisSpeeds(), dt);
     }
 
     // Compute the deltas between start and goal. We can then interpolate from the start state to
@@ -244,14 +242,14 @@ public class SwerveSetpointGenerator {
     // In cases where an individual module is stopped, we want to remember the right steering angle
     // to command (since
     // inverse kinematics doesn't care about angle, we can be opportunistically lazy).
-    List<Optional<Rotation2d>> overrideSteering = new ArrayList<>(modulePositions.length);
+    List<Optional<Rotation2d>> overrideSteering = new ArrayList<>(moduleCount);
     // Enforce steering velocity limits. We do this by taking the derivative of steering angle at
     // the current angle,
     // and then backing out the maximum interpolant between start and goal states. We remember the
     // minimum across all modules, since
     // that is the active constraint.
     final double max_theta_step = dt * limits.maxSteeringVelocity();
-    for (int i = 0; i < modulePositions.length; ++i) {
+    for (int i = 0; i < moduleCount; ++i) {
       if (!need_to_steer) {
         overrideSteering.add(Optional.of(prevSetpoint.moduleStates()[i].angle));
         continue;
@@ -310,7 +308,7 @@ public class SwerveSetpointGenerator {
 
     // Enforce drive wheel acceleration limits.
     final double max_vel_step = dt * limits.maxDriveAcceleration();
-    for (int i = 0; i < modulePositions.length; ++i) {
+    for (int i = 0; i < moduleCount; ++i) {
       if (min_s == 0.0) {
         // No need to carry on.
         break;
@@ -341,7 +339,7 @@ public class SwerveSetpointGenerator {
             prevSetpoint.chassisSpeeds().vyMetersPerSecond + min_s * dy,
             prevSetpoint.chassisSpeeds().omegaRadiansPerSecond + min_s * dtheta);
     var retStates = kinematics.toSwerveModuleStates(retSpeeds);
-    for (int i = 0; i < modulePositions.length; ++i) {
+    for (int i = 0; i < moduleCount; ++i) {
       final var maybeOverride = overrideSteering.get(i);
       if (maybeOverride.isPresent()) {
         var override = maybeOverride.get();
