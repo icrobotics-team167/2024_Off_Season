@@ -58,10 +58,10 @@ public class Swerve extends SubsystemBase {
     setpointGenerator =
         new SwerveSetpointGenerator(
             new Translation2d[] {
-              new Translation2d(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
-              new Translation2d(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
-              new Translation2d(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2),
-              new Translation2d(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2),
+              new Translation2d(CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2),
+              new Translation2d(CONSTANTS.TRACK_LENGTH / 2, -CONSTANTS.TRACK_WIDTH / 2),
+              new Translation2d(-CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2),
+              new Translation2d(-CONSTANTS.TRACK_LENGTH / 2, -CONSTANTS.TRACK_WIDTH / 2),
             },
             new ModuleLimits(
                 maxLinearSpeedMetersPerSec,
@@ -75,18 +75,19 @@ public class Swerve extends SubsystemBase {
               new SwerveModuleState(
                   0,
                   new Rotation2d(
-                      Math.atan2(CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2))),
+                      Math.atan2(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2))),
               new SwerveModuleState(
                   0,
                   new Rotation2d(
-                      Math.atan2(CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2))),
+                      Math.atan2(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2))),
               new SwerveModuleState(
                   0,
                   new Rotation2d(
-                      Math.atan2(CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2))),
+                      Math.atan2(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2))),
               new SwerveModuleState(
                   0,
-                  new Rotation2d(Math.atan2(CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2)))
+                  new Rotation2d(
+                      Math.atan2(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2)))
             });
 
     poseEstimator =
