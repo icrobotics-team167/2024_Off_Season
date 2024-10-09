@@ -42,23 +42,22 @@ public interface SwerveIO {
   @SuppressWarnings("CanBeFinal")
   @AutoLog
   class SwerveIOConstants {
-    // Choreo defaults
     // Meters
-    double TRACK_LENGTH = Units.inchesToMeters(22.75);
-    double TRACK_WIDTH = Units.inchesToMeters(22.75);
-    double WHEEL_DIAMETER = Units.inchesToMeters(4);
+    double TRACK_WIDTH;
+    double TRACK_LENGTH;
+    double WHEEL_DIAMETER;
 
     // Reductions
-    double DRIVE_GEAR_RATIO = 6.75;
-    double STEER_GEAR_RATIO = 150.0 / 7.0;
+    double DRIVE_GEAR_RATIO;
+    double STEER_GEAR_RATIO;
 
     // Inversions
-    boolean[] DRIVE_MOTOR_INVERSIONS = new boolean[] {false, false, false, false};
-    boolean STEER_MOTOR_INVERTED = true;
+    boolean[] DRIVE_MOTOR_INVERSIONS;
+    boolean STEER_MOTOR_INVERTED;
 
     // Rad/sec
-    double DRIVE_MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(6000);
-    double STEER_MAX_ROTOR_VELOCITY = Units.rotationsPerMinuteToRadiansPerSecond(6000);
+    double DRIVE_MAX_ROTOR_VELOCITY;
+    double STEER_MAX_ROTOR_VELOCITY;
 
     /*
      * Acceleration limits shouldn't be used to limit current draw, that's the purpose of current
@@ -67,7 +66,7 @@ public interface SwerveIO {
      * Instead, use this to prevent wheel slip, and limit acceleration using current limits
      */
     // Meters/sec^2
-    double MAX_ACCEL = 8;
+    double MAX_ACCEL;
   }
 
   /**
