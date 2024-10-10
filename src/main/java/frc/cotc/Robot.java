@@ -20,7 +20,6 @@ import frc.cotc.shooter.Arm;
 import frc.cotc.shooter.ArmIO;
 import frc.cotc.shooter.ArmIOSparkFlex;
 import frc.cotc.vision.VisionPoseEstimatorIO;
-import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -89,21 +88,18 @@ public class Robot extends LoggedRobot {
     //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());
 
     arm.setDefaultCommand(
-        arm.teleopPivotControl(
-            () -> MathUtil.applyDeadband(-secondaryLeftStick.getY(), .01);
-        )
-    )
-
+        arm.teleopPivotControl(() -> MathUtil.applyDeadband(-secondaryLeftStick.getY(), .01)));
   }
 
+  @SuppressWarnings("DuplicateBranchesInSwitch")
   private Swerve getSwerve(String mode) {
     SwerveIO swerveIO;
     VisionPoseEstimatorIO poseEstimatorIO;
 
     switch (mode) {
       case "REAL" -> {
-        swerveIO = new SwerveIOPhoenix();
-        poseEstimatorIO = new VisionPoseEstimatorIOPhoton();
+        swerveIO = new SwerveIO() {};
+        poseEstimatorIO = new VisionPoseEstimatorIO() {};
       }
       case "SIM" -> {
         swerveIO = new SwerveIOPhoenix();
