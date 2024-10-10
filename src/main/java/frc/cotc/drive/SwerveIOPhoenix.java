@@ -271,32 +271,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     final CANcoder steerEncoder;
 
     protected PhoenixModule(int id) {
-      switch(id) {
-        case 0 -> {
-          driveMotor = new TalonFX(RobotConstants.DriveBase.FRONT_LEFT_DRIVE, RobotConstants.CANIVORE_NAME);
-          steerMotor = new TalonFX(RobotConstants.DriveBase.FRONT_LEFT_TURN, RobotConstants.CANIVORE_NAME);
-          steerEncoder = new CANcoder(RobotConstants.DriveBase.FRONT_LEFT_ENCODER, RobotConstants.CANIVORE_NAME);
-        }
-        case 1 -> {
-          driveMotor = new TalonFX(RobotConstants.DriveBase.FRONT_RIGHT_DRIVE, RobotConstants.CANIVORE_NAME);
-          steerMotor = new TalonFX(RobotConstants.DriveBase.FRONT_RIGHT_TURN, RobotConstants.CANIVORE_NAME);
-          steerEncoder = new CANcoder(RobotConstants.DriveBase.FRONT_RIGHT_ENCODER, RobotConstants.CANIVORE_NAME);
-        }
-        case 2 -> {
-          driveMotor = new TalonFX(RobotConstants.DriveBase.BACK_LEFT_DRIVE, RobotConstants.CANIVORE_NAME);
-          steerMotor = new TalonFX(RobotConstants.DriveBase.BACK_LEFT_TURN, RobotConstants.CANIVORE_NAME);
-          steerEncoder = new CANcoder(RobotConstants.DriveBase.BACK_LEFT_ENCODER, RobotConstants.CANIVORE_NAME);
-        }
-        case 3 -> {
-          driveMotor = new TalonFX(RobotConstants.DriveBase.BACK_RIGHT_DRIVE, RobotConstants.CANIVORE_NAME);
-          steerMotor = new TalonFX(RobotConstants.DriveBase.BACK_RIGHT_TURN, RobotConstants.CANIVORE_NAME);
-          steerEncoder = new CANcoder(RobotConstants.DriveBase.BACK_RIGHT_ENCODER, RobotConstants.CANIVORE_NAME);
-        }
-        default -> {
-          throw new IndexOutOfBoundsException();
-        }
-      }
-      
+      driveMotor = new TalonFX(id * 3 + 2, RobotConstants.CANIVORE_NAME);
+      steerMotor = new TalonFX(id * 3 + 3, RobotConstants.CANIVORE_NAME);
+      steerEncoder = new CANcoder(id * 3 + 4, RobotConstants.CANIVORE_NAME);
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
