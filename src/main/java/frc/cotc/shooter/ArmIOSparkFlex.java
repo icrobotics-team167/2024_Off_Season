@@ -12,6 +12,7 @@ import static frc.cotc.util.SparkUtils.configureSpark;
 import com.revrobotics.CANSparkFlex;
 import com.revrobotics.CANSparkLowLevel;
 import com.revrobotics.RelativeEncoder;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Timer;
 
 public class ArmIOSparkFlex implements ArmIO {
@@ -44,7 +45,7 @@ public class ArmIOSparkFlex implements ArmIO {
     configureSpark(() -> rightEncoder.setPositionConversionFactor(Math.PI / 200));
     Timer.delay(.1);
 
-    // radians per minute -> radians per second = / 60, pi / 200 / 60 = pi / 1200
+    // radians per minute -> radians per second / 60, pi / 200 / 60 = pi / 1200
     configureSpark(() -> leftEncoder.setVelocityConversionFactor(Math.PI / 1200));
     configureSpark(() -> rightEncoder.setVelocityConversionFactor(Math.PI / 1200));
     Timer.delay(.1);
@@ -57,6 +58,7 @@ public class ArmIOSparkFlex implements ArmIO {
 
   @Override
   public void pivot(double speed) {
+    speed = Units.radiansToDegrees(speed);
     if ((speed < 0 && getAngle() >= ArmIO.MIN_ANGLE)
         || (speed > 0 && getAngle() <= ArmIO.MAX_ANGLE)) {
       left.set(speed);
@@ -70,6 +72,6 @@ public class ArmIOSparkFlex implements ArmIO {
   }
 
   private double getAngle() {
-    return leftEncoder.getPosition();
+    return (leftEncoder.getPosition() + rightEncoder.getPosition()) / 2;
   }
 }
