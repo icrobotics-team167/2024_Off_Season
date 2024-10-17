@@ -10,7 +10,6 @@ package frc.cotc.drive;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.util.Units;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface SwerveIO {
@@ -41,7 +40,7 @@ public interface SwerveIO {
 
   @SuppressWarnings("CanBeFinal")
   @AutoLog
-  class SwerveIOConstants {
+  class SwerveModuleConstants {
     // Meters
     double TRACK_WIDTH;
     double TRACK_LENGTH;
@@ -49,24 +48,9 @@ public interface SwerveIO {
 
     // Reductions
     double DRIVE_GEAR_RATIO;
-    double STEER_GEAR_RATIO;
-
-    // Inversions
-    boolean[] DRIVE_MOTOR_INVERSIONS;
-    boolean STEER_MOTOR_INVERTED;
 
     // Rad/sec
-    double DRIVE_MAX_ROTOR_VELOCITY;
-    double STEER_MAX_ROTOR_VELOCITY;
-
-    /*
-     * Acceleration limits shouldn't be used to limit current draw, that's the purpose of current
-     * limits and linear accel limits feel terrible on controls
-     *
-     * Instead, use this to prevent wheel slip, and limit acceleration using current limits
-     */
-    // Meters/sec^2
-    double MAX_ACCEL;
+    double DRIVE_MOTOR_MAX_SPEED;
   }
 
   /**
@@ -74,8 +58,8 @@ public interface SwerveIO {
    *
    * @return A SwerveIOConstantsAutoLogged object that contains constants.
    */
-  default SwerveIOConstantsAutoLogged getConstants() {
-    return new SwerveIOConstantsAutoLogged();
+  default SwerveModuleConstantsAutoLogged getConstants() {
+    return new SwerveModuleConstantsAutoLogged();
   }
 
   /**

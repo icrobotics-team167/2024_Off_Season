@@ -45,7 +45,7 @@ public class Swerve extends SubsystemBase {
     Logger.processInputs("Swerve/Constants", CONSTANTS);
 
     maxLinearSpeedMetersPerSec =
-        (CONSTANTS.DRIVE_MAX_ROTOR_VELOCITY / CONSTANTS.DRIVE_GEAR_RATIO)
+        (CONSTANTS.DRIVE_MOTOR_MAX_SPEED / CONSTANTS.DRIVE_GEAR_RATIO)
             * (CONSTANTS.WHEEL_DIAMETER / 2);
     maxAngularSpeedRadiansPerSec =
         maxLinearSpeedMetersPerSec
@@ -118,8 +118,7 @@ public class Swerve extends SubsystemBase {
   }
 
   public Command stopInX() {
-    return run(
-        () -> swerveIO.drive(stopInXSetpoint));
+    return run(() -> swerveIO.drive(stopInXSetpoint));
   }
 
   private void drive(ChassisSpeeds speeds) {
