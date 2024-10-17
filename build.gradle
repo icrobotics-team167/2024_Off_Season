@@ -186,6 +186,7 @@ tasks.withType(JavaCompile) {
 // Spotless formatting
 project.compileJava.dependsOn(spotlessApply)
 spotless {
+    lineEndings "UNIX"
     java {
         target fileTree(".") {
             include "**/*.java"
