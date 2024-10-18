@@ -30,6 +30,7 @@ import edu.wpi.first.util.CircularBuffer;
 import edu.wpi.first.wpilibj.Threads;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.cotc.Robot;
+import frc.cotc.RobotConstants;
 import frc.cotc.util.FOCMotorSim;
 import org.littletonrobotics.junction.Logger;
 
@@ -50,27 +51,51 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   private final Module[] modules = new Module[4];
+  private final BaseStatusSignal[] signals = new BaseStatusSignal[9];
+
+  private final OdometryThread odometryThread;
 
   public SwerveIOPhoenix() {
     for (int i = 0; i < 4; i++) {
       modules[i] = new Module(i);
+      signals[i * 2] = modules[i].driveMotor.getVelocity();
+      signals[i * 2 + 1] = modules[i].encoder.getAbsolutePosition();
     }
+    var gyro = new Pigeon2(15, RobotConstants.CANIVORE_NAME);
+    signals[8] = gyro.getYaw();
+
+    odometryThread = new OdometryThread(modules, gyro, 100);
 
     if (Robot.isSimulation()) {
       new SimThread(modules).start();
     }
+    odometryThread.start();
   }
 
   @Override
   public void updateInputs(SwerveIOInputs inputs) {
+    BaseStatusSignal.refreshAll(signals);
     for (int i = 0; i < 4; i++) {
       inputs.moduleStates[i] = new SwerveModuleState();
+    }
+    inputs.gyroYaw = Rotation2d.fromDegrees(signals[8].getValueAsDouble());
+
+    var odometryData = odometryThread.poll();
+    inputs.odometryTimestamps = new double[odometryData.length];
+    inputs.odometryYaws = new Rotation2d[odometryData.length];
+    inputs.odometryPositions = new SwerveModulePosition[odometryData.length * 4];
+    for (int i = 0; i < odometryData.length; i++) {
+      inputs.odometryTimestamps[i] = odometryData[i].timestampSeconds();
+      inputs.odometryYaws[i] = odometryData[i].gyroYaw();
+      System.arraycopy(odometryData[i].positions, 0, inputs.odometryPositions, i * 4, 4);
     }
   }
 
   @Override
-  public void drive(SwerveModuleState[] setpoint) {
-    SwerveIO.super.drive(setpoint);
+  public void drive(SwerveModuleState[] setpoint, double[] forceFeedforward) {
+    for (int i = 0; i < 4; i++) {
+      modules[i].run(setpoint[i], forceFeedforward[i]);
+    }
   }
 
   @Override
@@ -94,9 +119,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     final CANcoder encoder;
 
     public Module(int id) {
-      driveMotor = new TalonFX(id * 3, "Croppenheimer");
-      steerMotor = new TalonFX(id * 3 + 1, "Croppenheimer");
-      encoder = new CANcoder(id * 3 + 2, "Croppenheimer");
+      driveMotor = new TalonFX(id * 3, RobotConstants.CANIVORE_NAME);
+      steerMotor = new TalonFX(id * 3 + 1, RobotConstants.CANIVORE_NAME);
+      encoder = new CANcoder(id * 3 + 2, RobotConstants.CANIVORE_NAME);
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
@@ -207,8 +232,19 @@ public class SwerveIOPhoenix implements SwerveIO {
       }
     }
 
+    public OdometryFrame[] poll() {
+      OdometryFrame[] retFrames;
+      synchronized (frameBuffer) {
+        retFrames = new OdometryFrame[frameBuffer.size()];
+        for (int i = 0; i < frameBuffer.size(); i++) {
+          retFrames[i] = frameBuffer.get(i);
+        }
+      }
+      return retFrames;
+    }
+
     private record OdometryFrame(
-        SwerveModulePosition[] positions, Rotation2d gyro, double timestampSeconds) {}
+        SwerveModulePosition[] positions, Rotation2d gyroYaw, double timestampSeconds) {}
 
     private record ModuleSignals(
         StatusSignal<Double> drivePos,
