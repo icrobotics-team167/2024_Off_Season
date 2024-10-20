@@ -77,5 +77,7 @@ public interface SwerveIO {
    */
   default void drive(SwerveModuleState[] setpoint, double[] forceFeedforward) {}
 
+  default void resetGyro(Rotation2d newYaw) {}
+
   default void driveCharacterization(double volts) {}
 }

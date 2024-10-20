@@ -17,8 +17,8 @@ import choreo.auto.AutoTrajectory;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.cotc.drive.Swerve;
-import java.util.Set;
 import org.littletonrobotics.junction.Logger;
 
 public class Autos {
@@ -41,6 +41,7 @@ public class Autos {
     autoChooser = new AutoChooser(factory, "Auto Selector");
 
     autoChooser.addAutoRoutine("Test", this::test);
+    autoChooser.addAutoRoutine("Four Note", this::fourNoteAuto);
   }
 
   private Command test(AutoFactory factory) {
@@ -48,28 +49,69 @@ public class Autos {
 
     final var path = factory.trajectory("Test", loop);
 
-    loop.enabled().onTrue(sequence(resetPose(path, loop), path.cmd()));
+    loop.enabled().onTrue(resetPose(path, loop).andThen(path.cmd()));
 
     return loop.cmd();
+  }
+
+  private Command fourNoteAuto(AutoFactory factory) {
+    final var loop = factory.newLoop("Four Note Auto");
+
+    final var speakerToC1 = factory.trajectory("speakerToC1", loop);
+    final var C1ToSpeaker = factory.trajectory("C1ToSpeaker", loop);
+    final var C1ToC2 = factory.trajectory("C1ToC2", loop);
+    final var speakerToC2 = factory.trajectory("speakerToC2", loop);
+    final var C2ToSpeaker = factory.trajectory("C2ToSpeaker", loop);
+    final var C2ToC3 = factory.trajectory("C2ToC3", loop);
+    final var speakerToC3 = factory.trajectory("speakerToC3", loop);
+    final var C3ToSpeaker = factory.trajectory("C3ToSpeaker", loop);
+
+    // Score and then go to C1
+    loop.enabled().onTrue(resetPose(speakerToC1, loop).andThen(speakerToC1.cmd()));
+
+    // Go score if it has C1, skip to C2 if it doesn't
+    speakerToC1.done().and(hasGamePiece(loop)).onTrue(C1ToSpeaker.cmd());
+    speakerToC1.done().and(noGamePiece(loop)).onTrue(C1ToC2.cmd());
+
+    // Once it scores C1, go to C2
+    C1ToSpeaker.done().onTrue(speakerToC2.cmd());
+
+    // Go score if it has C2, skip to C3 if it doesn't
+    speakerToC2.done().and(hasGamePiece(loop)).onTrue(C2ToSpeaker.cmd());
+    speakerToC2.done().and(noGamePiece(loop)).onTrue(C2ToC3.cmd());
+    C1ToC2.done().and(hasGamePiece(loop)).onTrue(C2ToSpeaker.cmd());
+    C1ToC2.done().and(noGamePiece(loop)).onTrue(C2ToC3.cmd());
+
+    // Once it scores C2, go to C3
+    C2ToSpeaker.done().onTrue(speakerToC3.cmd());
+
+    // Go score regardless of status
+    speakerToC3.done().onTrue(C3ToSpeaker.cmd());
+    C2ToC3.done().onTrue(C3ToSpeaker.cmd());
+
+    return loop.cmd();
+  }
+
+  private Trigger hasGamePiece(AutoLoop loop) {
+    return new Trigger(loop.getLoop(), () -> false);
+  }
+
+  private Trigger noGamePiece(AutoLoop loop) {
+    return new Trigger(loop.getLoop(), () -> true);
   }
 
   public void update() {
     autoChooser.update();
   }
 
-  /**
-   * Gets the auto command.
-   *
-   * <p>The command is deferred, meaning that it is only created on schedule.
-   */
-  public Command getAutoDeferred() {
-    return defer(autoChooser::getSelectedAutoRoutine, Set.of(swerve));
+  public Command getAuto() {
+    return autoChooser.getSelectedAutoRoutine();
   }
 
   private Command resetPose(AutoTrajectory path, AutoLoop loop) {
     return runOnce(
         () ->
-            swerve.resetPose(
+            swerve.resetForAuto(
                 path.getInitialPose()
                     .orElseGet(
                         () -> {

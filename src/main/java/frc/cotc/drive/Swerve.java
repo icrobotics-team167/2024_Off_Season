@@ -9,11 +9,13 @@ package frc.cotc.drive;
 
 import static edu.wpi.first.units.Units.*;
 import static edu.wpi.first.wpilibj2.command.Commands.sequence;
+import static java.lang.Math.PI;
 
 import choreo.trajectory.SwerveSample;
 import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -43,6 +45,10 @@ public class Swerve extends SubsystemBase {
 
   private final SwerveDrivePoseEstimator poseEstimator;
   private final VisionPoseEstimator visionPoseEstimator;
+
+  private final PIDController xController;
+  private final PIDController yController;
+  private final PIDController yawController;
 
   public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO poseEstimatorIO) {
     this.swerveIO = driveIO;
@@ -101,6 +107,11 @@ public class Swerve extends SubsystemBase {
                   timestamp,
                   VecBuilder.fill(translationalStDevs, translationalStDevs, angularStDevs));
             });
+
+    xController = new PIDController(5, 0, 0);
+    yController = new PIDController(5, 0, 0);
+    yawController = new PIDController(5, 0, 0);
+    yawController.enableContinuousInput(-PI, PI);
   }
 
   @Override
@@ -170,10 +181,6 @@ public class Swerve extends SubsystemBase {
                 new double[4]));
   }
 
-  private void drive(ChassisSpeeds speeds) {
-    drive(speeds, new double[4]);
-  }
-
   private void drive(ChassisSpeeds speeds, double[] forceFeedforwards) {
     var setpoint = kinematics.toSwerveModuleStates(speeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(setpoint, maxLinearSpeedMetersPerSec);
@@ -190,13 +197,26 @@ public class Swerve extends SubsystemBase {
     swerveIO.drive(setpoint, forceFeedforwards);
   }
 
+  private final double[] EMPTY_FORCES = new double[4];
+
   private void fieldOrientedDrive(ChassisSpeeds speeds) {
-    drive(ChassisSpeeds.fromFieldRelativeSpeeds(speeds, swerveInputs.gyroYaw));
+    fieldOrientedDrive(speeds, EMPTY_FORCES);
   }
 
-  public void followTrajectory(Pose2d pose, SwerveSample sample) {
+  private void fieldOrientedDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
+    drive(ChassisSpeeds.fromFieldRelativeSpeeds(speeds, swerveInputs.gyroYaw), forceFeedforwards);
+  }
+
+  public void followTrajectory(Pose2d targetPose, SwerveSample sample) {
     var feedforward = new ChassisSpeeds(sample.vx, sample.vy, sample.omega);
-    var feedback = new ChassisSpeeds();
+
+    var currentPose = getPose();
+    var feedback =
+        new ChassisSpeeds(
+            xController.calculate(currentPose.getX(), targetPose.getX()),
+            xController.calculate(currentPose.getY(), targetPose.getY()),
+            yawController.calculate(
+                currentPose.getRotation().getRadians(), targetPose.getRotation().getRadians()));
 
     var forceVectors = new double[4];
     for (int i = 0; i < 4; i++) {
@@ -206,7 +226,7 @@ public class Swerve extends SubsystemBase {
               .getNorm();
     }
 
-    drive(feedforward.plus(feedback), forceVectors);
+    fieldOrientedDrive(feedforward.plus(feedback), forceVectors);
   }
 
   private ChassisSpeeds getChassisSpeeds() {
@@ -217,7 +237,17 @@ public class Swerve extends SubsystemBase {
     return poseEstimator.getEstimatedPosition();
   }
 
-  public void resetPose(Pose2d pose) {
-    poseEstimator.resetPose(pose);
+  public void resetForAuto(Pose2d pose) {
+    swerveIO.resetGyro(pose.getRotation());
+    xController.reset();
+    yController.reset();
+    yawController.reset();
+    poseEstimator.resetPosition(
+        pose.getRotation(),
+        Arrays.copyOfRange(
+            swerveInputs.odometryPositions,
+            swerveInputs.odometryPositions.length - 4,
+            swerveInputs.odometryPositions.length),
+        pose);
   }
 }

@@ -10,6 +10,7 @@ package frc.cotc;
 import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.PowerDistribution;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
@@ -26,6 +27,7 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
 public class Robot extends LoggedRobot {
   private final Autos autos;
+
   // Prevent IntelliJ from yelling at me about the real/sim/log replay switching code
   @SuppressWarnings("RedundantSuppression,DataFlowIssue,UnreachableCode,DuplicateBranchesInSwitch")
   public Robot() {
@@ -77,7 +79,6 @@ public class Robot extends LoggedRobot {
     // primaryController.rightBumper().onTrue(swerve.driveCharacterization());
 
     autos = new Autos(swerve);
-    RobotModeTriggers.autonomous().whileTrue(autos.getAutoDeferred());
   }
 
   private Swerve getSwerve(String mode) {
@@ -96,6 +97,19 @@ public class Robot extends LoggedRobot {
     }
 
     return new Swerve(swerveIO, poseEstimatorIO);
+  }
+
+  private Command autoCommand;
+
+  @Override
+  public void autonomousInit() {
+    autoCommand = autos.getAuto();
+    autoCommand.schedule();
+  }
+
+  @Override
+  public void autonomousExit() {
+    autoCommand.cancel();
   }
 
   @Override

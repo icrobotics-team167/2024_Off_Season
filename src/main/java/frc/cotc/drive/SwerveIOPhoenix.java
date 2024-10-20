@@ -128,6 +128,11 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
+  public void resetGyro(Rotation2d newYaw) {
+    gyro.setYaw(newYaw.getDegrees());
+  }
+
+  @Override
   public void driveCharacterization(double volts) {
     for (int i = 0; i < 4; i++) {
       modules[i].driveCharacterization(volts);
@@ -400,8 +405,7 @@ public class SwerveIOPhoenix implements SwerveIO {
             new FOCMotorSim(DCMotor.getKrakenX60Foc(1), CONSTANTS.DRIVE_GEAR_RATIO, .05);
         steerSim =
             new DCMotorSim(
-                LinearSystemId.createDCMotorSystem(
-                    DCMotor.getKrakenX60(1), STEER_GEAR_RATIO, .0025),
+                LinearSystemId.createDCMotorSystem(DCMotor.getKrakenX60(1), .005, STEER_GEAR_RATIO),
                 DCMotor.getKrakenX60(1));
       }
 
