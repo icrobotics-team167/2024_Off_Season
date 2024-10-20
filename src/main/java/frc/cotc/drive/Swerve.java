@@ -108,8 +108,8 @@ public class Swerve extends SubsystemBase {
                   VecBuilder.fill(translationalStDevs, translationalStDevs, angularStDevs));
             });
 
-    xController = new PIDController(5, 0, 0);
-    yController = new PIDController(5, 0, 0);
+    xController = new PIDController(10, 0, 0);
+    yController = new PIDController(10, 0, 0);
     yawController = new PIDController(5, 0, 0);
     yawController.enableContinuousInput(-PI, PI);
   }
@@ -226,6 +226,8 @@ public class Swerve extends SubsystemBase {
               .getNorm();
     }
 
+    Logger.recordOutput(
+        "Choreo/Target Pose", new Pose2d(sample.x, sample.y, new Rotation2d(sample.heading)));
     fieldOrientedDrive(feedforward.plus(feedback), forceVectors);
   }
 

@@ -157,7 +157,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
-      driveConfig.MotionMagic.MotionMagicAcceleration = 12 / WHEEL_CIRCUMFERENCE;
+      driveConfig.MotionMagic.MotionMagicAcceleration = 30 / WHEEL_CIRCUMFERENCE;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = 100;
