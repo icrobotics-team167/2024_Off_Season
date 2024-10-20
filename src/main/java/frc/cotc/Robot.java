@@ -74,8 +74,7 @@ public class Robot extends LoggedRobot {
             () -> MathUtil.applyDeadband(-primaryController.getRightX(), .01)));
     RobotModeTriggers.disabled().or(primaryController.povDown()).whileTrue(swerve.stopInX());
 
-    //    primaryController.leftBumper().onTrue(swerve.getSteerCharacterization());
-    //    primaryController.rightBumper().onTrue(swerve.getDriveCharacterization());
+    // primaryController.rightBumper().onTrue(swerve.driveCharacterization());
   }
 
   private Swerve getSwerve(String mode) {

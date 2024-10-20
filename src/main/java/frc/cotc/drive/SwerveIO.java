@@ -86,7 +86,5 @@ public interface SwerveIO {
    */
   default void drive(SwerveModuleState[] setpoint, double[] forceFeedforward) {}
 
-  default void steerCharacterization(double volts) {}
-
   default void driveCharacterization(double volts) {}
 }
