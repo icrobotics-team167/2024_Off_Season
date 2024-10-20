@@ -9,11 +9,11 @@ package frc.cotc.drive;
 
 import static edu.wpi.first.units.Units.*;
 import static edu.wpi.first.wpilibj2.command.Commands.sequence;
+import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import choreo.trajectory.SwerveSample;
 import com.ctre.phoenix6.SignalLogger;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
@@ -21,11 +21,11 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import frc.cotc.Robot;
 import frc.cotc.vision.VisionPoseEstimator;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import java.util.Arrays;
@@ -37,8 +37,10 @@ public class Swerve extends SubsystemBase {
 
   private final SwerveIOInputsAutoLogged swerveInputs;
 
-  private final SwerveDriveKinematics kinematics;
-  private final SwerveModuleState[] stopInXSetpoint;
+  private final SwerveSetpointGenerator setpointGenerator;
+  private final SwerveSetpoint stopInXSetpoint;
+  private final double[] EMPTY_FORCES = new double[4];
+  private SwerveSetpoint lastSetpoint;
 
   private final double maxLinearSpeedMetersPerSec;
   private final double maxAngularSpeedRadiansPerSec;
@@ -67,30 +69,45 @@ public class Swerve extends SubsystemBase {
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);
     Logger.recordOutput("Swerve/Max Angular Speed", maxAngularSpeedRadiansPerSec);
 
-    kinematics =
-        new SwerveDriveKinematics(
-            new Translation2d(CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2),
-            new Translation2d(CONSTANTS.TRACK_LENGTH / 2, -CONSTANTS.TRACK_WIDTH / 2),
-            new Translation2d(-CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2),
-            new Translation2d(-CONSTANTS.TRACK_LENGTH / 2, -CONSTANTS.TRACK_WIDTH / 2));
+    setpointGenerator =
+        new SwerveSetpointGenerator(
+            new Translation2d[] {
+              new Translation2d(CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2),
+              new Translation2d(CONSTANTS.TRACK_LENGTH / 2, -CONSTANTS.TRACK_WIDTH / 2),
+              new Translation2d(-CONSTANTS.TRACK_LENGTH / 2, CONSTANTS.TRACK_WIDTH / 2),
+              new Translation2d(-CONSTANTS.TRACK_LENGTH / 2, -CONSTANTS.TRACK_WIDTH / 2)
+            },
+            new SwerveSetpointGenerator.ModuleLimits(
+                maxLinearSpeedMetersPerSec,
+                CONSTANTS.MAX_ACCELERATION,
+                CONSTANTS.STEER_MOTOR_MAX_SPEED / CONSTANTS.STEER_GEAR_RATIO));
     stopInXSetpoint =
-        new SwerveModuleState[] {
-          new SwerveModuleState(
-              0, new Rotation2d(Math.atan2(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2))),
-          new SwerveModuleState(
-              0,
-              new Rotation2d(Math.atan2(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2))),
-          new SwerveModuleState(
-              0,
-              new Rotation2d(Math.atan2(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2))),
-          new SwerveModuleState(
-              0,
-              new Rotation2d(Math.atan2(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2)))
-        };
+        new SwerveSetpoint(
+            new ChassisSpeeds(),
+            new SwerveModuleState[] {
+              new SwerveModuleState(
+                  0,
+                  new Rotation2d(
+                      Math.atan2(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2))),
+              new SwerveModuleState(
+                  0,
+                  new Rotation2d(
+                      Math.atan2(-CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2))),
+              new SwerveModuleState(
+                  0,
+                  new Rotation2d(
+                      Math.atan2(CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2))),
+              new SwerveModuleState(
+                  0,
+                  new Rotation2d(
+                      Math.atan2(-CONSTANTS.TRACK_WIDTH / 2, -CONSTANTS.TRACK_LENGTH / 2)))
+            },
+            EMPTY_FORCES);
+    lastSetpoint = new SwerveSetpoint(new ChassisSpeeds(), swerveInputs.moduleStates, EMPTY_FORCES);
 
     poseEstimator =
         new SwerveDrivePoseEstimator(
-            kinematics,
+            setpointGenerator.getKinematics(),
             swerveInputs.gyroYaw,
             Arrays.copyOfRange(
                 swerveInputs.odometryPositions,
@@ -125,8 +142,7 @@ public class Swerve extends SubsystemBase {
           Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
     }
     visionPoseEstimator.poll();
-    Logger.recordOutput(
-        "Swerve/Actual Speed", kinematics.toChassisSpeeds(swerveInputs.moduleStates));
+    Logger.recordOutput("Swerve/Actual Speed", getChassisSpeeds());
     Logger.recordOutput("Swerve/Odometry Position", getPose());
   }
 
@@ -142,7 +158,13 @@ public class Swerve extends SubsystemBase {
   }
 
   public Command stopInX() {
-    return run(() -> swerveIO.drive(stopInXSetpoint, new double[4]));
+    return run(
+        () -> {
+          swerveIO.drive(stopInXSetpoint, EMPTY_FORCES);
+          lastSetpoint = stopInXSetpoint;
+          Logger.recordOutput("Swerve/Commanded speeds", stopInXSetpoint.chassisSpeeds());
+          Logger.recordOutput("Swerve/Drive setpoint", stopInXSetpoint.moduleStates());
+        });
   }
 
   public Command driveCharacterization() {
@@ -170,34 +192,29 @@ public class Swerve extends SubsystemBase {
 
   private Command stop() {
     return run(
-        () ->
-            swerveIO.drive(
-                new SwerveModuleState[] {
-                  new SwerveModuleState(0, swerveInputs.moduleStates[0].angle),
-                  new SwerveModuleState(0, swerveInputs.moduleStates[1].angle),
-                  new SwerveModuleState(0, swerveInputs.moduleStates[2].angle),
-                  new SwerveModuleState(0, swerveInputs.moduleStates[3].angle)
-                },
-                new double[4]));
+        () -> {
+          lastSetpoint =
+              new SwerveSetpoint(
+                  new ChassisSpeeds(),
+                  new SwerveModuleState[] {
+                    new SwerveModuleState(0, swerveInputs.moduleStates[0].angle),
+                    new SwerveModuleState(0, swerveInputs.moduleStates[1].angle),
+                    new SwerveModuleState(0, swerveInputs.moduleStates[2].angle),
+                    new SwerveModuleState(0, swerveInputs.moduleStates[3].angle)
+                  },
+                  EMPTY_FORCES);
+          swerveIO.drive(lastSetpoint, EMPTY_FORCES);
+        });
   }
 
   private void drive(ChassisSpeeds speeds, double[] forceFeedforwards) {
-    var setpoint = kinematics.toSwerveModuleStates(speeds);
-    SwerveDriveKinematics.desaturateWheelSpeeds(setpoint, maxLinearSpeedMetersPerSec);
-    for (int i = 0; i < 4; i++) {
-      setpoint[i].optimize(swerveInputs.moduleStates[i].angle);
-      setpoint[i].speedMetersPerSecond *=
-          MathUtil.clamp(
-              Math.cos(setpoint[i].angle.minus(swerveInputs.moduleStates[i].angle).getRadians()),
-              0,
-              1);
-    }
-    Logger.recordOutput("Swerve/Commanded speeds", kinematics.toChassisSpeeds(setpoint));
-    Logger.recordOutput("Swerve/Drive setpoint", setpoint);
+    var setpoint =
+        setpointGenerator.generateSetpoint(lastSetpoint, speeds, Robot.defaultPeriodSecs);
+    Logger.recordOutput("Swerve/Commanded speeds", setpoint.chassisSpeeds());
+    Logger.recordOutput("Swerve/Drive setpoint", setpoint.moduleStates());
     swerveIO.drive(setpoint, forceFeedforwards);
+    lastSetpoint = setpoint;
   }
-
-  private final double[] EMPTY_FORCES = new double[4];
 
   private void fieldOrientedDrive(ChassisSpeeds speeds) {
     fieldOrientedDrive(speeds, EMPTY_FORCES);
@@ -232,7 +249,7 @@ public class Swerve extends SubsystemBase {
   }
 
   private ChassisSpeeds getChassisSpeeds() {
-    return kinematics.toChassisSpeeds(swerveInputs.moduleStates);
+    return setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates);
   }
 
   public Pose2d getPose() {

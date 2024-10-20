@@ -48,9 +48,14 @@ public interface SwerveIO {
 
     // Reductions
     double DRIVE_GEAR_RATIO;
+    double STEER_GEAR_RATIO;
 
     // Rad/sec
     double DRIVE_MOTOR_MAX_SPEED;
+    double STEER_MOTOR_MAX_SPEED;
+
+    // Meters/sec^2
+    double MAX_ACCELERATION;
   }
 
   /**
@@ -75,7 +80,7 @@ public interface SwerveIO {
    * @param setpoint The drive setpoint.
    * @param forceFeedforward The feedforward for the drive motor. Newtons.
    */
-  default void drive(SwerveModuleState[] setpoint, double[] forceFeedforward) {}
+  default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint, double[] forceFeedforward) {}
 
   default void resetGyro(Rotation2d newYaw) {}
 

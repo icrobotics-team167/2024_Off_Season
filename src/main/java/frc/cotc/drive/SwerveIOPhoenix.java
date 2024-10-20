@@ -7,7 +7,7 @@
 
 package frc.cotc.drive;
 
-import static edu.wpi.first.units.Units.*;
+import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
@@ -46,7 +46,6 @@ import org.littletonrobotics.junction.Logger;
 
 public class SwerveIOPhoenix implements SwerveIO {
   private static final SwerveModuleConstantsAutoLogged CONSTANTS;
-  private static final double STEER_GEAR_RATIO = 150.0 / 7.0;
   private static final double WHEEL_CIRCUMFERENCE;
 
   static {
@@ -58,8 +57,12 @@ public class SwerveIOPhoenix implements SwerveIO {
     WHEEL_CIRCUMFERENCE = CONSTANTS.WHEEL_DIAMETER * PI;
 
     CONSTANTS.DRIVE_GEAR_RATIO = (50.0 / 16.0) * (17.0 / 27.0) * (45.0 / 15.0);
+    CONSTANTS.STEER_GEAR_RATIO = 150.0 / 7.0;
 
     CONSTANTS.DRIVE_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
+    CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
+
+    CONSTANTS.MAX_ACCELERATION = 15;
   }
 
   private final Module[] modules = new Module[4];
@@ -121,9 +124,10 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
-  public void drive(SwerveModuleState[] setpoint, double[] forceFeedforward) {
+  public void drive(SwerveSetpoint setpoint, double[] forceFeedforward) {
     for (int i = 0; i < 4; i++) {
-      modules[i].run(setpoint[i], forceFeedforward[i]);
+      modules[i].run(
+          setpoint.moduleStates()[i], setpoint.steerFeedforwards()[i], forceFeedforward[i]);
     }
   }
 
@@ -157,18 +161,20 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
-      driveConfig.MotionMagic.MotionMagicAcceleration = 30 / WHEEL_CIRCUMFERENCE;
+      driveConfig.MotionMagic.MotionMagicAcceleration =
+          CONSTANTS.MAX_ACCELERATION / WHEEL_CIRCUMFERENCE;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = 100;
-      driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = 100;
+      driveConfig.TorqueCurrent.PeakReverseTorqueCurrent =
+          driveConfig.TorqueCurrent.PeakForwardTorqueCurrent;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
       var steerConfig = new TalonFXConfiguration();
       steerConfig.Feedback.SensorToMechanismRatio = 1;
       steerConfig.Feedback.FeedbackSensorSource = FeedbackSensorSourceValue.RemoteCANcoder;
       steerConfig.Feedback.FeedbackRemoteSensorID = encoder.getDeviceID();
-      steerConfig.Feedback.RotorToSensorRatio = STEER_GEAR_RATIO;
+      steerConfig.Feedback.RotorToSensorRatio = CONSTANTS.STEER_GEAR_RATIO;
       steerConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       steerConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
       steerConfig.ClosedLoopGeneral.ContinuousWrap = true;
@@ -185,8 +191,6 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kA = 0;
         driveConfig.Slot0.kP = 0;
 
-        steerConfig.Slot0.kP = 48;
-
         switch (id) {
           case 0 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
           case 1 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
@@ -197,10 +201,9 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kS = 0;
         driveConfig.Slot0.kV = 0;
         driveConfig.Slot0.kA = 2.75;
-        driveConfig.Slot0.kP = 100;
-
-        steerConfig.Slot0.kP = 48;
+        driveConfig.Slot0.kP = driveConfig.TorqueCurrent.PeakForwardTorqueCurrent * 2;
       }
+      steerConfig.Slot0.kP = 48;
 
       driveMotor.getConfigurator().apply(driveConfig);
       steerMotor.getConfigurator().apply(steerConfig);
@@ -211,9 +214,11 @@ public class SwerveIOPhoenix implements SwerveIO {
         new MotionMagicVelocityTorqueCurrentFOC(0);
     private final PositionVoltage steerControlRequest = new PositionVoltage(0).withEnableFOC(false);
 
-    private final double kT = DCMotor.getKrakenX60Foc(1).KtNMPerAmp;
+    private final double drive_kT = DCMotor.getKrakenX60Foc(1).KtNMPerAmp;
+    private final double steer_kV =
+        12 / (CONSTANTS.STEER_MOTOR_MAX_SPEED / CONSTANTS.STEER_GEAR_RATIO);
 
-    public void run(SwerveModuleState state, double forceFeedforward) {
+    public void run(SwerveModuleState state, double steerFeedforward, double forceFeedforward) {
       driveMotor.setControl(
           driveControlRequest
               .withVelocity(state.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
@@ -221,8 +226,11 @@ public class SwerveIOPhoenix implements SwerveIO {
                   forceFeedforward
                       * (CONSTANTS.WHEEL_DIAMETER / 2)
                       / CONSTANTS.DRIVE_GEAR_RATIO
-                      * kT));
-      steerMotor.setControl(steerControlRequest.withPosition(state.angle.getRotations()));
+                      * drive_kT));
+      steerMotor.setControl(
+          steerControlRequest
+              .withPosition(state.angle.getRotations())
+              .withFeedForward(steerFeedforward * steer_kV));
     }
 
     private final TorqueCurrentFOC characterizationControlRequest = new TorqueCurrentFOC(0);
@@ -353,7 +361,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       for (SimModule module : simModules) {
         module.steerSim.setState((Math.random() * 2 - 1) * PI, 0);
         module.steerMotorSim.setRawRotorPosition(
-            module.steerSim.getAngularPositionRotations() * STEER_GEAR_RATIO);
+            module.steerSim.getAngularPositionRotations() * CONSTANTS.STEER_GEAR_RATIO);
         module.encoderSim.setRawPosition(module.steerSim.getAngularPositionRotations());
       }
       simNotifier.startPeriodic(1.0 / frequency);
@@ -405,7 +413,8 @@ public class SwerveIOPhoenix implements SwerveIO {
             new FOCMotorSim(DCMotor.getKrakenX60Foc(1), CONSTANTS.DRIVE_GEAR_RATIO, .05);
         steerSim =
             new DCMotorSim(
-                LinearSystemId.createDCMotorSystem(DCMotor.getKrakenX60(1), .005, STEER_GEAR_RATIO),
+                LinearSystemId.createDCMotorSystem(
+                    DCMotor.getKrakenX60(1), .005, CONSTANTS.STEER_GEAR_RATIO),
                 DCMotor.getKrakenX60(1));
       }
 
@@ -426,10 +435,10 @@ public class SwerveIOPhoenix implements SwerveIO {
         steerSim.setInputVoltage(steerMotorSim.getMotorVoltage());
         steerSim.update(dt);
 
-        double steerRotorVel = steerSim.getAngularVelocityRPM() / 60.0 * STEER_GEAR_RATIO;
+        double steerRotorVel = steerSim.getAngularVelocityRPM() / 60.0 * CONSTANTS.STEER_GEAR_RATIO;
 
         steerMotorSim.setRawRotorPosition(
-            steerSim.getAngularPositionRotations() * STEER_GEAR_RATIO);
+            steerSim.getAngularPositionRotations() * CONSTANTS.STEER_GEAR_RATIO);
         steerMotorSim.setRotorVelocity(steerRotorVel);
         encoderSim.setRawPosition(steerSim.getAngularPositionRotations());
         encoderSim.setVelocity(steerSim.getAngularVelocityRPM() / 60.0);
