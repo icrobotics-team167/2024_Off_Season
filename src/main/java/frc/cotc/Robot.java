@@ -25,6 +25,7 @@ import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
 public class Robot extends LoggedRobot {
+  private final Autos autos;
   // Prevent IntelliJ from yelling at me about the real/sim/log replay switching code
   @SuppressWarnings("RedundantSuppression,DataFlowIssue,UnreachableCode,DuplicateBranchesInSwitch")
   public Robot() {
@@ -74,6 +75,9 @@ public class Robot extends LoggedRobot {
     RobotModeTriggers.disabled().or(primaryController.povDown()).whileTrue(swerve.stopInX());
 
     // primaryController.rightBumper().onTrue(swerve.driveCharacterization());
+
+    autos = new Autos(swerve);
+    RobotModeTriggers.autonomous().whileTrue(autos.getAutoDeferred());
   }
 
   private Swerve getSwerve(String mode) {
@@ -96,6 +100,8 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void robotPeriodic() {
+    // Updates Choreo's auto selector.
+    autos.update();
     // Runs the Scheduler. This is responsible for polling buttons, adding newly-scheduled commands,
     // running already-scheduled commands, removing finished or interrupted commands, and running
     // subsystem periodic() methods. This must be called from the robot's periodic block in order

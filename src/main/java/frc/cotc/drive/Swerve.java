@@ -116,7 +116,7 @@ public class Swerve extends SubsystemBase {
     visionPoseEstimator.poll();
     Logger.recordOutput(
         "Swerve/Actual Speed", kinematics.toChassisSpeeds(swerveInputs.moduleStates));
-    Logger.recordOutput("Swerve/Odometry Position", poseEstimator.getEstimatedPosition());
+    Logger.recordOutput("Swerve/Odometry Position", getPose());
   }
 
   public Command teleopDrive(
@@ -211,5 +211,13 @@ public class Swerve extends SubsystemBase {
 
   private ChassisSpeeds getChassisSpeeds() {
     return kinematics.toChassisSpeeds(swerveInputs.moduleStates);
+  }
+
+  public Pose2d getPose() {
+    return poseEstimator.getEstimatedPosition();
+  }
+
+  public void resetPose(Pose2d pose) {
+    poseEstimator.resetPose(pose);
   }
 }
