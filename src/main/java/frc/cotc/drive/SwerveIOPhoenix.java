@@ -15,7 +15,6 @@ import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.MotionMagicVelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.PositionVoltage;
-import com.ctre.phoenix6.controls.StaticBrake;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.Pigeon2;
@@ -28,7 +27,6 @@ import com.ctre.phoenix6.sim.CANcoderSimState;
 import com.ctre.phoenix6.sim.ChassisReference;
 import com.ctre.phoenix6.sim.Pigeon2SimState;
 import com.ctre.phoenix6.sim.TalonFXSimState;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -146,6 +144,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     final TalonFX steerMotor;
     final CANcoder encoder;
 
+    @SuppressWarnings("DuplicateBranchesInSwitch")
     public Module(int id) {
       driveMotor = new TalonFX(id * 3, RobotConstants.CANIVORE_NAME);
       steerMotor = new TalonFX(id * 3 + 1, RobotConstants.CANIVORE_NAME);
@@ -206,24 +205,18 @@ public class SwerveIOPhoenix implements SwerveIO {
     private final MotionMagicVelocityTorqueCurrentFOC driveControlRequest =
         new MotionMagicVelocityTorqueCurrentFOC(0);
     private final PositionVoltage steerControlRequest = new PositionVoltage(0).withEnableFOC(false);
-    private final StaticBrake brakeControlRequest = new StaticBrake();
 
     private final double kT = DCMotor.getKrakenX60Foc(1).KtNMPerAmp;
 
     public void run(SwerveModuleState state, double forceFeedforward) {
-      if (MathUtil.isNear(0, state.speedMetersPerSecond, 1e-4)
-          && MathUtil.isNear(0, forceFeedforward, 1e-4)) {
-        driveMotor.setControl(brakeControlRequest);
-      } else {
-        driveMotor.setControl(
-            driveControlRequest
-                .withVelocity(state.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
-                .withFeedForward(
-                    forceFeedforward
-                        * (CONSTANTS.WHEEL_DIAMETER / 2)
-                        / CONSTANTS.DRIVE_GEAR_RATIO
-                        * kT));
-      }
+      driveMotor.setControl(
+          driveControlRequest
+              .withVelocity(state.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
+              .withFeedForward(
+                  forceFeedforward
+                      * (CONSTANTS.WHEEL_DIAMETER / 2)
+                      / CONSTANTS.DRIVE_GEAR_RATIO
+                      * kT));
       steerMotor.setControl(steerControlRequest.withPosition(state.angle.getRotations()));
     }
 

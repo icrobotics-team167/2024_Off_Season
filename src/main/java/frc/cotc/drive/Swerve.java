@@ -10,6 +10,7 @@ package frc.cotc.drive;
 import static edu.wpi.first.units.Units.*;
 import static edu.wpi.first.wpilibj2.command.Commands.sequence;
 
+import choreo.trajectory.SwerveSample;
 import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
@@ -130,7 +131,7 @@ public class Swerve extends SubsystemBase {
   }
 
   public Command stopInX() {
-    return run(() -> swerveIO.drive(stopInXSetpoint));
+    return run(() -> swerveIO.drive(stopInXSetpoint, new double[4]));
   }
 
   public Command driveCharacterization() {
@@ -161,14 +162,19 @@ public class Swerve extends SubsystemBase {
         () ->
             swerveIO.drive(
                 new SwerveModuleState[] {
-                  new SwerveModuleState(),
-                  new SwerveModuleState(),
-                  new SwerveModuleState(),
-                  new SwerveModuleState()
-                }));
+                  new SwerveModuleState(0, swerveInputs.moduleStates[0].angle),
+                  new SwerveModuleState(0, swerveInputs.moduleStates[1].angle),
+                  new SwerveModuleState(0, swerveInputs.moduleStates[2].angle),
+                  new SwerveModuleState(0, swerveInputs.moduleStates[3].angle)
+                },
+                new double[4]));
   }
 
   private void drive(ChassisSpeeds speeds) {
+    drive(speeds, new double[4]);
+  }
+
+  private void drive(ChassisSpeeds speeds, double[] forceFeedforwards) {
     var setpoint = kinematics.toSwerveModuleStates(speeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(setpoint, maxLinearSpeedMetersPerSec);
     for (int i = 0; i < 4; i++) {
@@ -181,11 +187,26 @@ public class Swerve extends SubsystemBase {
     }
     Logger.recordOutput("Swerve/Commanded speeds", kinematics.toChassisSpeeds(setpoint));
     Logger.recordOutput("Swerve/Drive setpoint", setpoint);
-    swerveIO.drive(setpoint);
+    swerveIO.drive(setpoint, forceFeedforwards);
   }
 
   private void fieldOrientedDrive(ChassisSpeeds speeds) {
     drive(ChassisSpeeds.fromFieldRelativeSpeeds(speeds, swerveInputs.gyroYaw));
+  }
+
+  public void followTrajectory(Pose2d pose, SwerveSample sample) {
+    var feedforward = new ChassisSpeeds(sample.vx, sample.vy, sample.omega);
+    var feedback = new ChassisSpeeds();
+
+    var forceVectors = new double[4];
+    for (int i = 0; i < 4; i++) {
+      forceVectors[i] =
+          new Translation2d(sample.moduleForcesX()[i], sample.moduleForcesY()[i])
+              .rotateBy(new Rotation2d(-sample.heading))
+              .getNorm();
+    }
+
+    drive(feedforward.plus(feedback), forceVectors);
   }
 
   private ChassisSpeeds getChassisSpeeds() {
