@@ -172,7 +172,7 @@ public class Swerve extends SubsystemBase {
     var setpoint = kinematics.toSwerveModuleStates(speeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(setpoint, maxLinearSpeedMetersPerSec);
     for (int i = 0; i < 4; i++) {
-      setpoint[i] = SwerveModuleState.optimize(setpoint[i], swerveInputs.moduleStates[i].angle);
+      setpoint[i].optimize(swerveInputs.moduleStates[i].angle);
       setpoint[i].speedMetersPerSecond *=
           MathUtil.clamp(
               Math.cos(setpoint[i].angle.minus(swerveInputs.moduleStates[i].angle).getRadians()),

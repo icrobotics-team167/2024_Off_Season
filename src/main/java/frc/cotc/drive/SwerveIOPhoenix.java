@@ -7,10 +7,10 @@
 
 package frc.cotc.drive;
 
+import static edu.wpi.first.units.Units.*;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
-import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.MotionMagicVelocityTorqueCurrentFOC;
@@ -35,6 +35,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.util.CircularBuffer;
 import edu.wpi.first.wpilibj.Notifier;
@@ -244,8 +245,6 @@ public class SwerveIOPhoenix implements SwerveIO {
     final ModuleSignals[] moduleSignals = new ModuleSignals[4];
 
     final BaseStatusSignal[] signals = new BaseStatusSignal[18];
-    final StatusSignal<Double> yawSignal;
-    final StatusSignal<Double> yawVelSignal;
 
     final CircularBuffer<OdometryFrame> frameBuffer;
     final double FREQUENCY;
@@ -258,10 +257,8 @@ public class SwerveIOPhoenix implements SwerveIO {
       for (int i = 0; i < 4; i++) {
         System.arraycopy(moduleSignals[i].getSignals(), 0, signals, i * 4, 4);
       }
-      yawSignal = gyro.getYaw();
-      yawVelSignal = gyro.getAngularVelocityZWorld();
-      signals[16] = yawSignal;
-      signals[17] = yawVelSignal;
+      signals[16] = gyro.getYaw();
+      signals[17] = gyro.getAngularVelocityZWorld();
 
       BaseStatusSignal.setUpdateFrequencyForAll(frequency, signals);
 
@@ -286,7 +283,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                   moduleSignals[3].poll()
                 },
                 Rotation2d.fromDegrees(
-                    BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelSignal)),
+                    BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
                 Logger.getRealTimestamp() / 1e6);
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
@@ -309,19 +306,20 @@ public class SwerveIOPhoenix implements SwerveIO {
         SwerveModulePosition[] positions, Rotation2d gyroYaw, double timestampSeconds) {}
 
     record ModuleSignals(
-        StatusSignal<Double> drivePos,
-        StatusSignal<Double> driveVel,
-        StatusSignal<Double> steerPos,
-        StatusSignal<Double> steerVel) {
+        BaseStatusSignal drivePos,
+        BaseStatusSignal driveVel,
+        BaseStatusSignal steerPos,
+        BaseStatusSignal steerVel) {
       BaseStatusSignal[] getSignals() {
         return new BaseStatusSignal[] {drivePos, driveVel, steerPos, steerVel};
       }
 
       SwerveModulePosition poll() {
         return new SwerveModulePosition(
-            BaseStatusSignal.getLatencyCompensatedValue(drivePos, driveVel) * WHEEL_CIRCUMFERENCE,
+            BaseStatusSignal.getLatencyCompensatedValueAsDouble(drivePos, driveVel)
+                * WHEEL_CIRCUMFERENCE,
             Rotation2d.fromRotations(
-                BaseStatusSignal.getLatencyCompensatedValue(steerPos, steerVel)));
+                BaseStatusSignal.getLatencyCompensatedValueAsDouble(steerPos, steerVel)));
       }
 
       static ModuleSignals fromModule(Module module) {
@@ -407,7 +405,11 @@ public class SwerveIOPhoenix implements SwerveIO {
 
         driveWheelSim =
             new FOCMotorSim(DCMotor.getKrakenX60Foc(1), CONSTANTS.DRIVE_GEAR_RATIO, .05);
-        steerSim = new DCMotorSim(DCMotor.getKrakenX60(1), STEER_GEAR_RATIO, .0025);
+        steerSim =
+            new DCMotorSim(
+                LinearSystemId.createDCMotorSystem(
+                    DCMotor.getKrakenX60(1), STEER_GEAR_RATIO, .0025),
+                DCMotor.getKrakenX60(1));
       }
 
       private double lastSteerRotorVel = 0;
