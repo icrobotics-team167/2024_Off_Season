@@ -384,7 +384,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         moduleStates[i] = simModules[i].getModuleState();
       }
 
-      yawDeg -=
+      yawDeg +=
           Units.radiansToDegrees(
               kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond * dt);
       gyroSimState.setRawYaw(yawDeg);
@@ -451,7 +451,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       SwerveModuleState getModuleState() {
         return new SwerveModuleState(
             driveWheelSim.getVel() * CONSTANTS.WHEEL_DIAMETER / 2,
-            new Rotation2d(steerSim.getAngularPositionRad()).plus(Rotation2d.fromRotations(.25)));
+            new Rotation2d(steerSim.getAngularPositionRad()));
       }
     }
   }

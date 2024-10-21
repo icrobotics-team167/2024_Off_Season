@@ -38,7 +38,7 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
     String mode = Robot.isReal() ? "REAL" : "SIM";
-    // String mode = "REPLAY";
+    //    String mode = "REPLAY";
 
     switch (mode) {
       case "REAL", "SIM" -> {
@@ -47,6 +47,7 @@ public class Robot extends LoggedRobot {
         //noinspection resource
         new PowerDistribution(
             1, PowerDistribution.ModuleType.kRev); // Enables power distribution logging
+        SignalLogger.start();
       }
       case "REPLAY" -> {
         setUseTiming(false); // Run as fast as possible
@@ -60,7 +61,6 @@ public class Robot extends LoggedRobot {
       }
     }
 
-    SignalLogger.start();
     Logger.start();
 
     Swerve swerve = getSwerve(mode);

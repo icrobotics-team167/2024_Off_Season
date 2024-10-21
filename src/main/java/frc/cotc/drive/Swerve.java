@@ -125,8 +125,8 @@ public class Swerve extends SubsystemBase {
                   VecBuilder.fill(translationalStDevs, translationalStDevs, angularStDevs));
             });
 
-    xController = new PIDController(10, 0, 0);
-    yController = new PIDController(10, 0, 0);
+    xController = new PIDController(5, 0, 0);
+    yController = new PIDController(5, 0, 0);
     yawController = new PIDController(5, 0, 0);
     yawController.enableContinuousInput(-PI, PI);
   }
@@ -224,14 +224,14 @@ public class Swerve extends SubsystemBase {
     drive(ChassisSpeeds.fromFieldRelativeSpeeds(speeds, swerveInputs.gyroYaw), forceFeedforwards);
   }
 
-  public void followTrajectory(Pose2d targetPose, SwerveSample sample) {
+  public void followTrajectory(Pose2d currentPose, SwerveSample sample) {
     var feedforward = new ChassisSpeeds(sample.vx, sample.vy, sample.omega);
 
-    var currentPose = getPose();
+    var targetPose = new Pose2d(sample.x, sample.y, new Rotation2d(sample.heading));
     var feedback =
         new ChassisSpeeds(
             xController.calculate(currentPose.getX(), targetPose.getX()),
-            xController.calculate(currentPose.getY(), targetPose.getY()),
+            yController.calculate(currentPose.getY(), targetPose.getY()),
             yawController.calculate(
                 currentPose.getRotation().getRadians(), targetPose.getRotation().getRadians()));
 
@@ -243,8 +243,9 @@ public class Swerve extends SubsystemBase {
               .getNorm();
     }
 
-    Logger.recordOutput(
-        "Choreo/Target Pose", new Pose2d(sample.x, sample.y, new Rotation2d(sample.heading)));
+    Logger.recordOutput("Choreo/Target Pose", targetPose);
+    Logger.recordOutput("Choreo/Feedforward", feedforward);
+    Logger.recordOutput("Choreo/Feedback", feedback);
     fieldOrientedDrive(feedforward.plus(feedback), forceVectors);
   }
 
