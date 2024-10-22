@@ -40,7 +40,7 @@ public class FOCMotorSim {
           MathUtil.interpolate(
               motor.stallCurrentAmps,
               0,
-              MathUtil.inverseInterpolate(0, motor.freeSpeedRadPerSec, vel * gearRatio));
+              MathUtil.inverseInterpolate(0, motor.freeSpeedRadPerSec, Math.abs(vel) * gearRatio));
       current = MathUtil.clamp(current, -maxCurrentDraw, maxCurrentDraw);
     }
 
