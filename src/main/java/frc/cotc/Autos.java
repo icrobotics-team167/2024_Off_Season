@@ -93,11 +93,11 @@ public class Autos {
   }
 
   private Trigger hasGamePiece(AutoLoop loop) {
-    return new Trigger(loop.getLoop(), () -> false);
+    return new Trigger(loop.getLoop(), () -> true);
   }
 
   private Trigger noGamePiece(AutoLoop loop) {
-    return new Trigger(loop.getLoop(), () -> true);
+    return new Trigger(loop.getLoop(), () -> false);
   }
 
   public void update() {
