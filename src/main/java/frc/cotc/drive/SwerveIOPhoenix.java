@@ -11,10 +11,12 @@ import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.MotionMagicVelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.controls.StaticBrake;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.Pigeon2;
@@ -27,6 +29,7 @@ import com.ctre.phoenix6.sim.CANcoderSimState;
 import com.ctre.phoenix6.sim.ChassisReference;
 import com.ctre.phoenix6.sim.Pigeon2SimState;
 import com.ctre.phoenix6.sim.TalonFXSimState;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -35,6 +38,7 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.util.CircularBuffer;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.Threads;
@@ -153,6 +157,8 @@ public class SwerveIOPhoenix implements SwerveIO {
     final TalonFX steerMotor;
     final CANcoder encoder;
 
+    final StatusSignal<AngularVelocity> driveVelocity;
+
     @SuppressWarnings("DuplicateBranchesInSwitch")
     public Module(int id) {
       driveMotor = new TalonFX(id * 3, RobotConstants.CANIVORE_NAME);
@@ -162,8 +168,9 @@ public class SwerveIOPhoenix implements SwerveIO {
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
       driveConfig.MotionMagic.MotionMagicAcceleration =
-          CONSTANTS.MAX_ACCELERATION / WHEEL_CIRCUMFERENCE;
-      driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+          // Slight fudge factor to allow for control headroom
+          1.1 * CONSTANTS.MAX_ACCELERATION / WHEEL_CIRCUMFERENCE;
+      driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = 100;
       driveConfig.TorqueCurrent.PeakReverseTorqueCurrent =
@@ -179,12 +186,11 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
       steerConfig.ClosedLoopGeneral.ContinuousWrap = true;
       steerConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseClosedLoopSign;
-      steerConfig.CurrentLimits.StatorCurrentLimit = 40;
+      steerConfig.CurrentLimits.StatorCurrentLimit = 20;
       steerConfig.Audio.AllowMusicDurDisable = true;
 
       var encoderConfig = new CANcoderConfiguration();
 
-      //noinspection IfStatementWithIdenticalBranches
       if (Robot.isReal()) {
         driveConfig.Slot0.kS = 0;
         driveConfig.Slot0.kV = 0;
@@ -198,35 +204,46 @@ public class SwerveIOPhoenix implements SwerveIO {
           case 3 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
         }
       } else {
-        driveConfig.Slot0.kS = 0;
         driveConfig.Slot0.kV = 0;
         driveConfig.Slot0.kA = 2.75;
         driveConfig.Slot0.kP = driveConfig.TorqueCurrent.PeakForwardTorqueCurrent * 2;
+
+        steerConfig.Slot0.kP = 96;
+        steerConfig.Slot0.kD = .125;
       }
-      steerConfig.Slot0.kP = 48;
 
       driveMotor.getConfigurator().apply(driveConfig);
       steerMotor.getConfigurator().apply(steerConfig);
       encoder.getConfigurator().apply(encoderConfig);
+
+      driveVelocity = driveMotor.getVelocity();
     }
 
     private final MotionMagicVelocityTorqueCurrentFOC driveControlRequest =
-        new MotionMagicVelocityTorqueCurrentFOC(0);
+        new MotionMagicVelocityTorqueCurrentFOC(0).withOverrideCoastDurNeutral(true);
     private final PositionVoltage steerControlRequest = new PositionVoltage(0).withEnableFOC(false);
+    private final StaticBrake brakeControlRequest = new StaticBrake();
 
     private final double drive_kT = DCMotor.getKrakenX60Foc(1).KtNMPerAmp;
     private final double steer_kV =
         12 / (CONSTANTS.STEER_MOTOR_MAX_SPEED / CONSTANTS.STEER_GEAR_RATIO);
 
     public void run(SwerveModuleState state, double steerFeedforward, double forceFeedforward) {
-      driveMotor.setControl(
-          driveControlRequest
-              .withVelocity(state.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
-              .withFeedForward(
-                  forceFeedforward
-                      * (CONSTANTS.WHEEL_DIAMETER / 2)
-                      / CONSTANTS.DRIVE_GEAR_RATIO
-                      * drive_kT));
+      if (MathUtil.isNear(0, state.speedMetersPerSecond, 1e-3)
+          && MathUtil.isNear(0, forceFeedforward, 1e-3)
+          && MathUtil.isNear(
+              0, driveVelocity.refresh().getValueAsDouble() * WHEEL_CIRCUMFERENCE, 1e-3)) {
+        driveMotor.setControl(brakeControlRequest);
+      } else {
+        driveMotor.setControl(
+            driveControlRequest
+                .withVelocity(state.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
+                .withFeedForward(
+                    forceFeedforward
+                        * (CONSTANTS.WHEEL_DIAMETER / 2)
+                        / CONSTANTS.DRIVE_GEAR_RATIO
+                        * drive_kT));
+      }
       steerMotor.setControl(
           steerControlRequest
               .withPosition(state.angle.getRotations())
