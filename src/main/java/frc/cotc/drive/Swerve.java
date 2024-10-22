@@ -118,7 +118,7 @@ public class Swerve extends SubsystemBase {
     visionPoseEstimator =
         new VisionPoseEstimator(
             poseEstimatorIO,
-            this::getChassisSpeeds,
+            this::getRobotChassisSpeeds,
             (pose, timestamp, translationalStDevs, angularStDevs) -> {
               poseEstimator.addVisionMeasurement(
                   pose,
@@ -143,7 +143,7 @@ public class Swerve extends SubsystemBase {
           Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
     }
     visionPoseEstimator.poll();
-    Logger.recordOutput("Swerve/Actual Speed", getChassisSpeeds());
+    Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
     Logger.recordOutput("Swerve/Odometry Position", getPose());
   }
 
@@ -222,7 +222,7 @@ public class Swerve extends SubsystemBase {
   }
 
   private void fieldOrientedDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
-    drive(ChassisSpeeds.fromFieldRelativeSpeeds(speeds, swerveInputs.gyroYaw), forceFeedforwards);
+    drive(toRobotRelative(speeds), forceFeedforwards);
   }
 
   public void followTrajectory(Pose2d currentPose, SwerveSample sample) {
@@ -236,6 +236,8 @@ public class Swerve extends SubsystemBase {
             yawController.calculate(
                 currentPose.getRotation().getRadians(), targetPose.getRotation().getRadians()));
 
+    Logger.recordOutput("Choreo/Error", targetPose.minus(currentPose));
+
     var forceVectors = new double[4];
     for (int i = 0; i < 4; i++) {
       forceVectors[i] =
@@ -245,13 +247,20 @@ public class Swerve extends SubsystemBase {
     }
 
     Logger.recordOutput("Choreo/Target Pose", targetPose);
-    Logger.recordOutput("Choreo/Feedforward", feedforward);
-    Logger.recordOutput("Choreo/Feedback", feedback);
-    fieldOrientedDrive(feedforward.plus(feedback), forceVectors);
+    Logger.recordOutput("Choreo/Feedforward", toRobotRelative(feedforward));
+    Logger.recordOutput("Choreo/Feedback", toRobotRelative(feedback));
+
+    var output = feedforward.plus(feedback);
+    fieldOrientedDrive(output, forceVectors);
+    Logger.recordOutput("Choreo/Output", toRobotRelative(output));
   }
 
-  private ChassisSpeeds getChassisSpeeds() {
+  private ChassisSpeeds getRobotChassisSpeeds() {
     return setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates);
+  }
+
+  private ChassisSpeeds toRobotRelative(ChassisSpeeds fieldRelative) {
+    return ChassisSpeeds.fromFieldRelativeSpeeds(fieldRelative, swerveInputs.gyroYaw);
   }
 
   public Pose2d getPose() {
