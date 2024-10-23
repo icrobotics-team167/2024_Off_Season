@@ -66,7 +66,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.STEER_GEAR_RATIO = 150.0 / 7.0;
 
     CONSTANTS.DRIVE_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
-    CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
+    CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
 
     CONSTANTS.MAX_ACCELERATION = 15;
   }
@@ -210,7 +210,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kA = 2.75;
         driveConfig.Slot0.kP = driveConfig.TorqueCurrent.PeakForwardTorqueCurrent * 2;
 
-        steerConfig.Slot0.kP = 96;
+        steerConfig.Slot0.kP = 72;
         steerConfig.Slot0.kD = .125;
       }
 
