@@ -40,8 +40,10 @@ import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.util.CircularBuffer;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.Threads;
+import edu.wpi.first.wpilibj.Watchdog;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.cotc.Robot;
 import frc.cotc.RobotConstants;
@@ -361,6 +363,8 @@ public class SwerveIOPhoenix implements SwerveIO {
     final Notifier simNotifier;
     final double frequency;
 
+    final Watchdog watchdog;
+
     SimThread(Module[] modules, Pigeon2 gyro, double frequency) {
       for (int i = 0; i < 4; i++) {
         simModules[i] = new SimModule(modules[i]);
@@ -369,6 +373,8 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       simNotifier = new Notifier(this::run);
       this.frequency = frequency;
+
+      watchdog = new Watchdog(1.0 / frequency, () -> {});
     }
 
     double lastTime;
@@ -393,12 +399,14 @@ public class SwerveIOPhoenix implements SwerveIO {
     private double yawDeg = 0;
 
     public void run() {
+      watchdog.reset();
       double currentTime = Logger.getRealTimestamp() / 1e6;
       double dt = currentTime - lastTime;
       SwerveModuleState[] moduleStates = new SwerveModuleState[4];
       for (int i = 0; i < 4; i++) {
         simModules[i].run(dt);
         moduleStates[i] = simModules[i].getModuleState();
+        watchdog.addEpoch("Module " + i + " tick");
       }
 
       yawDeg +=
@@ -406,7 +414,24 @@ public class SwerveIOPhoenix implements SwerveIO {
               kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond * dt);
       gyroSimState.setRawYaw(yawDeg);
 
+      watchdog.addEpoch("Gyro calculations");
+
       lastTime = currentTime;
+      watchdog.disable();
+      if (watchdog.isExpired()) {
+        printTimingWarning();
+      }
+    }
+
+    private void printTimingWarning() {
+      DriverStation.reportWarning(
+          "Swerve sim thread went over time! Expected "
+              + 1000.0 / frequency
+              + " ms, got "
+              + watchdog.getTime() * 1000.0
+              + " ms",
+          false);
+      watchdog.printEpochs();
     }
 
     private static class SimModule {
