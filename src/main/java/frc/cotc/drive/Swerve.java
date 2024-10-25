@@ -80,8 +80,7 @@ public class Swerve extends SubsystemBase {
             new SwerveSetpointGenerator.ModuleLimits(
                 maxLinearSpeedMetersPerSec,
                 CONSTANTS.MAX_ACCELERATION,
-                // Slight fudge factor to allow for control headroom
-                .9 * CONSTANTS.STEER_MOTOR_MAX_SPEED / CONSTANTS.STEER_GEAR_RATIO));
+                CONSTANTS.STEER_MOTOR_MAX_SPEED / CONSTANTS.STEER_GEAR_RATIO));
     stopInXSetpoint =
         new SwerveSetpoint(
             new ChassisSpeeds(),
