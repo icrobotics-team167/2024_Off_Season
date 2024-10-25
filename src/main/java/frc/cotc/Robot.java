@@ -28,17 +28,18 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 public class Robot extends LoggedRobot {
   private final Autos autos;
 
-  // Prevent IntelliJ from yelling at me about the real/sim/log replay switching code
-  @SuppressWarnings("RedundantSuppression,DataFlowIssue,UnreachableCode,DuplicateBranchesInSwitch")
+  @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
   public Robot() {
     Logger.recordMetadata("Project", BuildConstants.MAVEN_NAME);
     Logger.recordMetadata("Git branch", BuildConstants.GIT_BRANCH);
     Logger.recordMetadata("Git commit date", BuildConstants.GIT_DATE);
     Logger.recordMetadata("Git SHA", BuildConstants.GIT_SHA);
+    //noinspection ConstantValue
+    Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
     String mode = Robot.isReal() ? "REAL" : "SIM";
-    //    String mode = "REPLAY";
+//        String mode = "REPLAY";
 
     switch (mode) {
       case "REAL", "SIM" -> {
