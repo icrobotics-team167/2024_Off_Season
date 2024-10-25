@@ -217,12 +217,12 @@ public class SwerveIOPhoenix implements SwerveIO {
         }
       } else {
         driveConfig.Slot0.kV = 0;
-        driveConfig.Slot0.kA = 2.8;
+        driveConfig.Slot0.kA = 3;
         driveConfig.Slot0.kP = driveConfig.TorqueCurrent.PeakForwardTorqueCurrent;
 
-        steerConfig.Slot0.kV = 12 / ((6000.0 / 100.0) / CONSTANTS.STEER_GEAR_RATIO);
-        steerConfig.Slot0.kP = 48;
-        steerConfig.Slot0.kD = .125;
+        steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
+        steerConfig.Slot0.kP = 550;
+        steerConfig.Slot0.kD = 2;
       }
 
       driveMotor.getConfigurator().apply(driveConfig);
