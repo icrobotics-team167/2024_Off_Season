@@ -250,10 +250,9 @@ public class SwerveIOPhoenix implements SwerveIO {
             driveControlRequest
                 .withVelocity(state.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
                 .withFeedForward(
-                    forceFeedforward
-                        * (CONSTANTS.WHEEL_DIAMETER / 2)
-                        / CONSTANTS.DRIVE_GEAR_RATIO
-                        * drive_kT));
+                    ((forceFeedforward * (CONSTANTS.WHEEL_DIAMETER / 2))
+                            / CONSTANTS.DRIVE_GEAR_RATIO)
+                        / drive_kT));
       }
       steerMotor.setControl(
           steerControlRequest
