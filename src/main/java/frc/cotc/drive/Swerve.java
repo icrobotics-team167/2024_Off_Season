@@ -135,15 +135,18 @@ public class Swerve extends SubsystemBase {
   public void periodic() {
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
+    var poseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
     for (int i = 0; i < swerveInputs.odometryTimestamps.length; i++) {
       poseEstimator.updateWithTime(
           swerveInputs.odometryTimestamps[i],
           swerveInputs.odometryYaws[i],
           Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
+      poseUpdates[i] = getPose();
     }
+    Logger.recordOutput("Swerve/Odometry/Pose updates", poseUpdates);
     visionPoseEstimator.poll();
     Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
-    Logger.recordOutput("Swerve/Odometry Position", getPose());
+    Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
 
   public Command teleopDrive(
@@ -208,6 +211,7 @@ public class Swerve extends SubsystemBase {
   }
 
   private void drive(ChassisSpeeds speeds, double[] forceFeedforwards) {
+    speeds = ChassisSpeeds.discretize(speeds, Robot.defaultPeriodSecs);
     var setpoint =
         setpointGenerator.generateSetpoint(lastSetpoint, speeds, Robot.defaultPeriodSecs);
     Logger.recordOutput("Swerve/Commanded speeds", setpoint.chassisSpeeds());

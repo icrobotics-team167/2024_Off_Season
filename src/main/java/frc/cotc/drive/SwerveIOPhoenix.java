@@ -68,7 +68,7 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   private final Module[] modules = new Module[4];
-  private final BaseStatusSignal[] signals = new BaseStatusSignal[17];
+  private final BaseStatusSignal[] signals = new BaseStatusSignal[18];
 
   private final OdometryThread odometryThread;
   private final Pigeon2 gyro;
@@ -87,6 +87,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     gyro = new Pigeon2(13, RobotConstants.CANIVORE_NAME);
     devices[12] = gyro;
     signals[16] = gyro.getYaw();
+    signals[17] = gyro.getAngularVelocityZWorld();
 
     odometryThread = new OdometryThread(modules, gyro, 250);
     BaseStatusSignal.setUpdateFrequencyForAll(100, signals[1], signals[5], signals[9], signals[13]);
@@ -147,13 +148,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     for (int i = 0; i < 4; i++) {
       modules[i].run(
           setpoint.moduleStates()[i],
-          new SwerveModuleState(
+          Rotation2d.fromRotations(
               BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                      signals[i * 4], signals[i * 4 + 1])
-                  * WHEEL_CIRCUMFERENCE,
-              Rotation2d.fromRotations(
-                  BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                      signals[i * 4 + 2], signals[i * 4 + 3]))),
+                  signals[i * 4 + 2], signals[i * 4 + 3])),
           setpoint.steerFeedforwards()[i],
           forceFeedforward[i]);
     }
@@ -233,7 +230,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kP = 480;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
-        steerConfig.Slot0.kP = 480;
+        steerConfig.Slot0.kP = 400;
         steerConfig.Slot0.kD = 2;
       }
 
@@ -251,16 +248,15 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     void run(
         SwerveModuleState desiredState,
-        SwerveModuleState currentState,
+        Rotation2d currentAngle,
         double steerFeedforward,
         double forceFeedforward) {
       if (MathUtil.isNear(0, desiredState.speedMetersPerSecond, 1e-3)
-          && MathUtil.isNear(0, forceFeedforward, 1e-3)
-          && MathUtil.isNear(0, currentState.speedMetersPerSecond, 1e-3)) {
+          && MathUtil.isNear(0, forceFeedforward, 1e-3)) {
         driveMotor.setControl(brakeControlRequest);
       } else {
         desiredState.speedMetersPerSecond *=
-            Math.cos(desiredState.angle.minus(currentState.angle).getRadians());
+            Math.cos(desiredState.angle.minus(currentAngle).getRadians());
         driveMotor.setControl(
             driveControlRequest
                 .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
@@ -304,11 +300,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     OdometryThread(Module[] modules, Pigeon2 gyro, double frequency) {
       for (int i = 0; i < 4; i++) {
         moduleSignals[i] = ModuleSignals.fromModule(modules[i]);
+        System.arraycopy(moduleSignals[i].asArray(), 0, signals, i * 4, 4);
       }
 
-      for (int i = 0; i < 4; i++) {
-        System.arraycopy(moduleSignals[i].getSignals(), 0, signals, i * 4, 4);
-      }
       signals[16] = gyro.getYaw();
       signals[17] = gyro.getAngularVelocityZWorld();
 
@@ -362,7 +356,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         BaseStatusSignal driveVel,
         BaseStatusSignal steerPos,
         BaseStatusSignal steerVel) {
-      BaseStatusSignal[] getSignals() {
+      BaseStatusSignal[] asArray() {
         return new BaseStatusSignal[] {drivePos, driveVel, steerPos, steerVel};
       }
 
