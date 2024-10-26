@@ -398,10 +398,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       watchdog = new Watchdog(1.0 / frequency, () -> {});
     }
 
-    double lastTime;
-
     public void start() {
-      lastTime = Logger.getRealTimestamp() / 1e6;
       for (SimModule module : simModules) {
         module.steerSim.setState((Math.random() * 2 - 1) * PI, 0);
         module.steerMotorSim.setRawRotorPosition(
@@ -421,23 +418,20 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     public void run() {
       watchdog.reset();
-      double currentTime = Logger.getRealTimestamp() / 1e6;
-      double dt = currentTime - lastTime;
       SwerveModuleState[] moduleStates = new SwerveModuleState[4];
       for (int i = 0; i < 4; i++) {
-        simModules[i].run(dt);
+        simModules[i].run(1.0 / frequency);
         moduleStates[i] = simModules[i].getModuleState();
         watchdog.addEpoch("Module " + i + " tick");
       }
 
       yawDeg +=
           Units.radiansToDegrees(
-              kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond * dt);
+              kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond / frequency);
       gyroSimState.setRawYaw(yawDeg);
 
       watchdog.addEpoch("Gyro calculations");
 
-      lastTime = currentTime;
       watchdog.disable();
       if (watchdog.isExpired()) {
         printTimingWarning();
