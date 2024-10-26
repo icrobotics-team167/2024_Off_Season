@@ -11,7 +11,6 @@ import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
-import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
@@ -36,7 +35,6 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.util.CircularBuffer;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Notifier;
@@ -148,7 +146,16 @@ public class SwerveIOPhoenix implements SwerveIO {
   public void drive(SwerveSetpoint setpoint, double[] forceFeedforward) {
     for (int i = 0; i < 4; i++) {
       modules[i].run(
-          setpoint.moduleStates()[i], setpoint.steerFeedforwards()[i], forceFeedforward[i]);
+          setpoint.moduleStates()[i],
+          new SwerveModuleState(
+              BaseStatusSignal.getLatencyCompensatedValueAsDouble(
+                      signals[i * 4], signals[i * 4 + 1])
+                  * WHEEL_CIRCUMFERENCE,
+              Rotation2d.fromRotations(
+                  BaseStatusSignal.getLatencyCompensatedValueAsDouble(
+                      signals[i * 4 + 2], signals[i * 4 + 3]))),
+          setpoint.steerFeedforwards()[i],
+          forceFeedforward[i]);
     }
   }
 
@@ -173,8 +180,6 @@ public class SwerveIOPhoenix implements SwerveIO {
     final TalonFX driveMotor;
     final TalonFX steerMotor;
     final CANcoder encoder;
-
-    final StatusSignal<AngularVelocity> driveVelocity;
 
     @SuppressWarnings("DuplicateBranchesInSwitch")
     public Module(int id) {
@@ -228,15 +233,13 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kP = 480;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
-        steerConfig.Slot0.kP = 550;
+        steerConfig.Slot0.kP = 480;
         steerConfig.Slot0.kD = 2;
       }
 
       driveMotor.getConfigurator().apply(driveConfig);
       steerMotor.getConfigurator().apply(steerConfig);
       encoder.getConfigurator().apply(encoderConfig);
-
-      driveVelocity = driveMotor.getVelocity();
     }
 
     private final MotionMagicVelocityTorqueCurrentFOC driveControlRequest =
@@ -246,16 +249,21 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     private final double drive_kT = DCMotor.getKrakenX60Foc(1).KtNMPerAmp;
 
-    void run(SwerveModuleState state, double steerFeedforward, double forceFeedforward) {
-      if (MathUtil.isNear(0, state.speedMetersPerSecond, 1e-3)
+    void run(
+        SwerveModuleState desiredState,
+        SwerveModuleState currentState,
+        double steerFeedforward,
+        double forceFeedforward) {
+      if (MathUtil.isNear(0, desiredState.speedMetersPerSecond, 1e-3)
           && MathUtil.isNear(0, forceFeedforward, 1e-3)
-          && MathUtil.isNear(
-              0, driveVelocity.refresh().getValueAsDouble() * WHEEL_CIRCUMFERENCE, 1e-3)) {
+          && MathUtil.isNear(0, currentState.speedMetersPerSecond, 1e-3)) {
         driveMotor.setControl(brakeControlRequest);
       } else {
+        desiredState.speedMetersPerSecond *=
+            Math.cos(desiredState.angle.minus(currentState.angle).getRadians());
         driveMotor.setControl(
             driveControlRequest
-                .withVelocity(state.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
+                .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
                 .withFeedForward(
                     ((forceFeedforward * (CONSTANTS.WHEEL_DIAMETER / 2))
                             / CONSTANTS.DRIVE_GEAR_RATIO)
@@ -263,7 +271,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       }
       steerMotor.setControl(
           steerControlRequest
-              .withPosition(state.angle.getRotations())
+              .withPosition(desiredState.angle.getRotations())
               .withVelocity(Units.radiansToRotations(steerFeedforward)));
     }
 
