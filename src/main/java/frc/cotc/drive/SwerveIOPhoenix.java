@@ -16,6 +16,7 @@ import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
 import com.ctre.phoenix6.hardware.CANcoder;
+import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.Pigeon2;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.FeedbackSensorSourceValue;
@@ -65,7 +66,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.DRIVE_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
     CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(3000);
 
-    CONSTANTS.MAX_ACCELERATION = 15;
+    CONSTANTS.MAX_ACCELERATION = 12;
   }
 
   private final Module[] modules = new Module[4];
@@ -75,18 +76,24 @@ public class SwerveIOPhoenix implements SwerveIO {
   private final Pigeon2 gyro;
 
   public SwerveIOPhoenix() {
+    var devices = new ParentDevice[13];
     for (int i = 0; i < 4; i++) {
       modules[i] = new Module(i);
       signals[i * 4] = modules[i].driveMotor.getVelocity();
       signals[i * 4 + 1] = modules[i].driveMotor.getAcceleration();
       signals[i * 4 + 2] = modules[i].encoder.getAbsolutePosition();
       signals[i * 4 + 3] = modules[i].steerMotor.getVelocity();
+
+      System.arraycopy(modules[i].getDevices(), 0, devices, i * 3, 3);
     }
     gyro = new Pigeon2(13, RobotConstants.CANIVORE_NAME);
+    devices[12] = gyro;
     signals[16] = gyro.getYaw();
 
     odometryThread = new OdometryThread(modules, gyro, 250);
     BaseStatusSignal.setUpdateFrequencyForAll(100, signals[1], signals[5], signals[9], signals[13]);
+
+    ParentDevice.optimizeBusUtilizationForAll(devices);
 
     if (Robot.isSimulation()) {
       new SimThread(modules, gyro, 500).start();
@@ -217,8 +224,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         }
       } else {
         driveConfig.Slot0.kV = 0;
-        driveConfig.Slot0.kA = 3;
-        driveConfig.Slot0.kP = driveConfig.TorqueCurrent.PeakForwardTorqueCurrent;
+        driveConfig.Slot0.kA = 2.778066825;
+        driveConfig.Slot0.kP = 480;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
         steerConfig.Slot0.kP = 550;
@@ -239,7 +246,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     private final double drive_kT = DCMotor.getKrakenX60Foc(1).KtNMPerAmp;
 
-    public void run(SwerveModuleState state, double steerFeedforward, double forceFeedforward) {
+    void run(SwerveModuleState state, double steerFeedforward, double forceFeedforward) {
       if (MathUtil.isNear(0, state.speedMetersPerSecond, 1e-3)
           && MathUtil.isNear(0, forceFeedforward, 1e-3)
           && MathUtil.isNear(
@@ -262,15 +269,19 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     private final TorqueCurrentFOC characterizationControlRequest = new TorqueCurrentFOC(0);
 
-    public void driveCharacterization(double amps) {
+    void driveCharacterization(double amps) {
       steerMotor.setControl(steerControlRequest.withPosition(0));
       driveMotor.setControl(characterizationControlRequest.withOutput(amps));
     }
 
-    public SwerveModulePosition getPosition() {
+    SwerveModulePosition getPosition() {
       return new SwerveModulePosition(
           driveMotor.getPosition().getValueAsDouble() * WHEEL_CIRCUMFERENCE,
           Rotation2d.fromRotations(encoder.getAbsolutePosition().getValueAsDouble()));
+    }
+
+    ParentDevice[] getDevices() {
+      return new ParentDevice[] {driveMotor, steerMotor, encoder};
     }
   }
 
