@@ -57,7 +57,13 @@ public interface SwerveIO {
     double STEER_MOTOR_MAX_SPEED;
 
     // Meters/sec^2
-    double MAX_ACCELERATION;
+    double MAX_LINEAR_ACCELERATION;
+
+    // Due to kinematic limits, it may not be possible for the bot to stay moving straight when
+    // spinning and moving at the same time. This fudge factor slows down the max angular speed
+    // when the bot is translating, but doesn't affect the limit when the bot isn't translating.
+    // Scalar
+    double ANGULAR_SPEED_FUDGING;
   }
 
   /**
