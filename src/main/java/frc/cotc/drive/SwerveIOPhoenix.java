@@ -11,6 +11,7 @@ import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.SignalLogger;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
@@ -36,10 +37,7 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.util.CircularBuffer;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.Notifier;
-import edu.wpi.first.wpilibj.Threads;
-import edu.wpi.first.wpilibj.Watchdog;
+import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.cotc.Robot;
 import frc.cotc.RobotConstants;
@@ -64,9 +62,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.DRIVE_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
     CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
-    CONSTANTS.MAX_LINEAR_ACCELERATION = 13;
+    CONSTANTS.MAX_LINEAR_ACCELERATION = 12;
 
-    CONSTANTS.ANGULAR_SPEED_FUDGING = .65;
+    CONSTANTS.ANGULAR_SPEED_FUDGING = .8;
   }
 
   private final Module[] modules = new Module[4];
@@ -205,12 +203,11 @@ public class SwerveIOPhoenix implements SwerveIO {
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
       driveConfig.MotionMagic.MotionMagicAcceleration =
-          // Slight fudge factor to allow for control headroom
-          1.1 * CONSTANTS.MAX_LINEAR_ACCELERATION / WHEEL_CIRCUMFERENCE;
+          CONSTANTS.MAX_LINEAR_ACCELERATION / WHEEL_CIRCUMFERENCE;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
-      driveConfig.CurrentLimits.StatorCurrentLimit = 120;
-      driveConfig.CurrentLimits.SupplyCurrentLimit = 80;
+      driveConfig.CurrentLimits.StatorCurrentLimit = 100;
+      driveConfig.CurrentLimits.SupplyCurrentLimit = 60;
       driveConfig.CurrentLimits.SupplyCurrentLowerTime = 1.5;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
@@ -434,11 +431,15 @@ public class SwerveIOPhoenix implements SwerveIO {
             new Translation2d(-CONSTANTS.TRACK_LENGTH / 2, -CONSTANTS.TRACK_WIDTH / 2));
     private double yawDeg = 0;
 
+    private double currentDraw = 0;
+
     public void run() {
       watchdog.reset();
+      double voltage = Math.max(13 - (.01 * currentDraw), 8);
+      currentDraw = 0;
       SwerveModuleState[] moduleStates = new SwerveModuleState[4];
       for (int i = 0; i < 4; i++) {
-        simModules[i].run(1.0 / frequency);
+        currentDraw += simModules[i].run(1.0 / frequency, voltage);
         moduleStates[i] = simModules[i].getModuleState();
         watchdog.addEpoch("Module " + i + " tick");
       }
@@ -451,6 +452,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       watchdog.addEpoch("Gyro calculations");
 
       watchdog.disable();
+      SignalLogger.writeDouble("Swerve Sim Thread time (ms)", watchdog.getTime() * 1000);
       if (watchdog.isExpired()) {
         printTimingWarning();
       }
@@ -495,7 +497,10 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       private double lastSteerRotorVel = 0;
 
-      void run(double dt) {
+      double run(double dt, double voltage) {
+        driveMotorSim.setSupplyVoltage(voltage);
+        steerMotorSim.setSupplyVoltage(voltage);
+
         // Update drive sim
         driveWheelSim.tick(driveMotorSim.getTorqueCurrent(), dt);
 
@@ -521,6 +526,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         steerMotorSim.setRotorAcceleration((lastSteerRotorVel - steerRotorVel) / dt);
 
         lastSteerRotorVel = steerRotorVel;
+
+        return driveMotorSim.getSupplyCurrent() + steerMotorSim.getSupplyCurrent();
       }
 
       SwerveModuleState getModuleState() {
