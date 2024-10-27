@@ -14,6 +14,7 @@ import static java.lang.Math.PI;
 
 import choreo.trajectory.SwerveSample;
 import com.ctre.phoenix6.SignalLogger;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
@@ -44,6 +45,7 @@ public class Swerve extends SubsystemBase {
 
   private final double maxLinearSpeedMetersPerSec;
   private final double maxAngularSpeedRadiansPerSec;
+  private final double angularSpeedFudgeFactor;
 
   private final SwerveDrivePoseEstimator poseEstimator;
   private final VisionPoseEstimator visionPoseEstimator;
@@ -66,6 +68,7 @@ public class Swerve extends SubsystemBase {
         .75
             * maxLinearSpeedMetersPerSec
             / Math.hypot(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2);
+    angularSpeedFudgeFactor = CONSTANTS.ANGULAR_SPEED_FUDGING;
 
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);
     Logger.recordOutput("Swerve/Max Angular Speed", maxAngularSpeedRadiansPerSec);
@@ -80,7 +83,7 @@ public class Swerve extends SubsystemBase {
             },
             new SwerveSetpointGenerator.ModuleLimits(
                 maxLinearSpeedMetersPerSec,
-                CONSTANTS.MAX_ACCELERATION,
+                CONSTANTS.MAX_LINEAR_ACCELERATION,
                 CONSTANTS.STEER_MOTOR_MAX_SPEED / CONSTANTS.STEER_GEAR_RATIO));
     stopInXSetpoint =
         new SwerveSetpoint(
@@ -212,6 +215,19 @@ public class Swerve extends SubsystemBase {
   }
 
   private void drive(ChassisSpeeds speeds, double[] forceFeedforwards) {
+    var translationalMagnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+    if (translationalMagnitude > maxLinearSpeedMetersPerSec) {
+      speeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
+      speeds.vyMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
+
+      translationalMagnitude = maxLinearSpeedMetersPerSec;
+    }
+    speeds.omegaRadiansPerSecond *=
+        MathUtil.interpolate(
+            1,
+            angularSpeedFudgeFactor,
+            MathUtil.inverseInterpolate(0, maxLinearSpeedMetersPerSec, translationalMagnitude));
+
     speeds = ChassisSpeeds.discretize(speeds, Robot.defaultPeriodSecs);
     var setpoint =
         setpointGenerator.generateSetpoint(lastSetpoint, speeds, Robot.defaultPeriodSecs);

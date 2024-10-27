@@ -64,7 +64,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.DRIVE_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
     CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
-    CONSTANTS.MAX_ACCELERATION = 15;
+    CONSTANTS.MAX_LINEAR_ACCELERATION = 13;
+
+    CONSTANTS.ANGULAR_SPEED_FUDGING = .65;
   }
 
   private final Module[] modules = new Module[4];
@@ -204,7 +206,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;
       driveConfig.MotionMagic.MotionMagicAcceleration =
           // Slight fudge factor to allow for control headroom
-          1.1 * CONSTANTS.MAX_ACCELERATION / WHEEL_CIRCUMFERENCE;
+          1.1 * CONSTANTS.MAX_LINEAR_ACCELERATION / WHEEL_CIRCUMFERENCE;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.CurrentLimits.StatorCurrentLimit = 120;
@@ -246,8 +248,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kP = 480;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
-        steerConfig.Slot0.kP = 600;
-        steerConfig.Slot0.kD = 2.5;
+        steerConfig.Slot0.kP = 575;
+        steerConfig.Slot0.kD = 2;
       }
 
       driveMotor.getConfigurator().apply(driveConfig);
