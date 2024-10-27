@@ -95,7 +95,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     ParentDevice.optimizeBusUtilizationForAll(devices);
 
     if (Robot.isSimulation()) {
-      new SimThread(modules, gyro, 500).start();
+      new SimThread(modules, gyro, 1000).start();
     }
     odometryThread.start();
   }
