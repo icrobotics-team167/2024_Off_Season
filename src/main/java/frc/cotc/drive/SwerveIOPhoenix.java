@@ -267,8 +267,7 @@ public class SwerveIOPhoenix implements SwerveIO {
           && MathUtil.isNear(0, forceFeedforward, 1e-3)) {
         driveMotor.setControl(brakeControlRequest);
       } else {
-        desiredState.speedMetersPerSecond *=
-            Math.cos(desiredState.angle.minus(currentAngle).getRadians());
+       desiredState.cosineScale(currentAngle);
         driveMotor.setControl(
             driveControlRequest
                 .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
