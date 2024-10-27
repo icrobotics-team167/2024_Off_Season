@@ -24,6 +24,8 @@ public interface SwerveIO {
         };
     Rotation2d gyroYaw = new Rotation2d();
 
+    double measurementLatency;
+
     // I wanted this to be a 2D array, so that one of the dimensions can be data ID and the other
     // dimension can be the module ID, but AK doesn't support 2D arrays
     // So the data is packed into a 1D array

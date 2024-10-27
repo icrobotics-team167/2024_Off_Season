@@ -112,8 +112,20 @@ public class SwerveIOPhoenix implements SwerveIO {
               Rotation2d.fromRotations(
                   BaseStatusSignal.getLatencyCompensatedValueAsDouble(
                       signals[i * 4 + 2], signals[i * 4 + 3])));
+
+      inputs.measurementLatency +=
+          signals[i * 4].getTimestamp().getLatency()
+              + signals[i * 4 + 1].getTimestamp().getLatency()
+              + signals[i * 4 + 2].getTimestamp().getLatency()
+              + signals[i * 4 + 3].getTimestamp().getLatency();
     }
-    inputs.gyroYaw = Rotation2d.fromDegrees(signals[16].getValueAsDouble());
+    inputs.gyroYaw =
+        Rotation2d.fromDegrees(
+            BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17]));
+    inputs.measurementLatency +=
+        signals[16].getTimestamp().getLatency() + signals[17].getTimestamp().getLatency();
+
+    inputs.measurementLatency /= 18;
 
     var odometryData = odometryThread.poll();
 
