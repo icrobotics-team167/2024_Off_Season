@@ -133,6 +133,8 @@ public class Swerve extends SubsystemBase {
 
   @Override
   public void periodic() {
+    Logger.recordOutput("Swerve/Commanded speeds", lastSetpoint.chassisSpeeds());
+    Logger.recordOutput("Swerve/Drive setpoint", lastSetpoint.moduleStates());
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
     var poseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
@@ -165,8 +167,6 @@ public class Swerve extends SubsystemBase {
         () -> {
           swerveIO.drive(stopInXSetpoint, EMPTY_FORCES);
           lastSetpoint = stopInXSetpoint;
-          Logger.recordOutput("Swerve/Commanded speeds", stopInXSetpoint.chassisSpeeds());
-          Logger.recordOutput("Swerve/Drive setpoint", stopInXSetpoint.moduleStates());
         });
   }
 
@@ -214,8 +214,6 @@ public class Swerve extends SubsystemBase {
     speeds = ChassisSpeeds.discretize(speeds, Robot.defaultPeriodSecs);
     var setpoint =
         setpointGenerator.generateSetpoint(lastSetpoint, speeds, Robot.defaultPeriodSecs);
-    Logger.recordOutput("Swerve/Commanded speeds", setpoint.chassisSpeeds());
-    Logger.recordOutput("Swerve/Drive setpoint", setpoint.moduleStates());
     swerveIO.drive(setpoint, forceFeedforwards);
     lastSetpoint = setpoint;
   }
