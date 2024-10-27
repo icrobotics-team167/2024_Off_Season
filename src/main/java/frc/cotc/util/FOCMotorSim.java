@@ -46,7 +46,7 @@ public class FOCMotorSim {
 
     // Torque / moi = acceleration
     accel = ((current * motor.KtNMPerAmp) * gearRatio) / moi;
-    // pos = p_0 * v_0 + (1/2 * a * dt^2)
+    // pos = p_0 + v_0 * dt + (1/2 * a * dt^2)
     pos += vel * dt + (accel * dt * dt / 2);
     vel += accel * dt;
   }
