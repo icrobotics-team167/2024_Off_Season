@@ -63,7 +63,8 @@ public class Swerve extends SubsystemBase {
         (CONSTANTS.DRIVE_MOTOR_MAX_SPEED / CONSTANTS.DRIVE_GEAR_RATIO)
             * (CONSTANTS.WHEEL_DIAMETER / 2);
     maxAngularSpeedRadiansPerSec =
-        maxLinearSpeedMetersPerSec
+        .75
+            * maxLinearSpeedMetersPerSec
             / Math.hypot(CONSTANTS.TRACK_WIDTH / 2, CONSTANTS.TRACK_LENGTH / 2);
 
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);

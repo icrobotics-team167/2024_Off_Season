@@ -62,9 +62,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.STEER_GEAR_RATIO = 150.0 / 7.0;
 
     CONSTANTS.DRIVE_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
-    CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(3000);
+    CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
-    CONSTANTS.MAX_ACCELERATION = 12;
+    CONSTANTS.MAX_ACCELERATION = 15;
   }
 
   private final Module[] modules = new Module[4];
@@ -102,7 +102,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
   @Override
   public void updateInputs(SwerveIOInputs inputs) {
-    BaseStatusSignal.refreshAll(signals);
+    BaseStatusSignal.waitForAll(Robot.defaultPeriodSecs / 2, signals);
     for (int i = 0; i < 4; i++) {
       inputs.moduleStates[i] =
           new SwerveModuleState(
@@ -160,9 +160,13 @@ public class SwerveIOPhoenix implements SwerveIO {
     for (int i = 0; i < 4; i++) {
       modules[i].run(
           setpoint.moduleStates()[i],
-          Rotation2d.fromRotations(
+          new SwerveModuleState(
               BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                  signals[i * 4 + 2], signals[i * 4 + 3])),
+                      signals[i * 4], signals[i * 4 + 1])
+                  * WHEEL_CIRCUMFERENCE,
+              Rotation2d.fromRotations(
+                  BaseStatusSignal.getLatencyCompensatedValueAsDouble(
+                      signals[i * 4 + 2], signals[i * 4 + 3]))),
           setpoint.steerFeedforwards()[i],
           forceFeedforward[i]);
     }
@@ -242,8 +246,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kP = 480;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
-        steerConfig.Slot0.kP = 400;
-        steerConfig.Slot0.kD = 2;
+        steerConfig.Slot0.kP = 600;
+        steerConfig.Slot0.kD = 2.5;
       }
 
       driveMotor.getConfigurator().apply(driveConfig);
@@ -260,14 +264,15 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     void run(
         SwerveModuleState desiredState,
-        Rotation2d currentAngle,
+        SwerveModuleState currentState,
         double steerFeedforward,
         double forceFeedforward) {
       if (MathUtil.isNear(0, desiredState.speedMetersPerSecond, 1e-3)
-          && MathUtil.isNear(0, forceFeedforward, 1e-3)) {
+          && MathUtil.isNear(0, forceFeedforward, 1e-3)
+          && MathUtil.isNear(0, currentState.speedMetersPerSecond, 1e-3)) {
         driveMotor.setControl(brakeControlRequest);
       } else {
-       desiredState.cosineScale(currentAngle);
+        desiredState.cosineScale(currentState.angle);
         driveMotor.setControl(
             driveControlRequest
                 .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
