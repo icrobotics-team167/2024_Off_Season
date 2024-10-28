@@ -21,10 +21,10 @@ public class FOCMotorSim {
   private final double gearRatio;
   private final double moi;
 
-  public FOCMotorSim(DCMotor motor, double gearRatio, double moi) {
+  public FOCMotorSim(DCMotor motor, double gearRatio, double moiKgMetersSquared) {
     this.motor = motor;
     this.gearRatio = gearRatio;
-    this.moi = moi;
+    this.moi = moiKgMetersSquared;
   }
 
   private double pos = 0;
