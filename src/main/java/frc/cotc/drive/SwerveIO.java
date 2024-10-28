@@ -10,11 +10,13 @@ package frc.cotc.drive;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import frc.cotc.util.MotorCurrentDraws;
 import org.littletonrobotics.junction.AutoLog;
+import org.littletonrobotics.junction.LogTable;
+import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 public interface SwerveIO {
-  @AutoLog
-  class SwerveIOInputs {
+  class SwerveIOInputs implements LoggableInputs {
     SwerveModuleState[] moduleStates =
         new SwerveModuleState[] {
           new SwerveModuleState(),
@@ -38,6 +40,35 @@ public interface SwerveIO {
         };
     Rotation2d[] odometryYaws = new Rotation2d[0];
     double[] odometryTimestamps = new double[0];
+
+    MotorCurrentDraws[] driveMotorCurrents = new MotorCurrentDraws[4];
+    MotorCurrentDraws[] steerMotorCurrents = new MotorCurrentDraws[4];
+
+    @Override
+    public void toLog(LogTable table) {
+      table.put("ModuleStates", moduleStates);
+      table.put("GyroYaw", gyroYaw);
+      table.put("MeasurementLatency", measurementLatency);
+      table.put("OdometryPositions", odometryPositions);
+      table.put("OdometryYaws", odometryYaws);
+      table.put("OdometryTimestamps", odometryTimestamps);
+      table.put("DriveMotorCurrents", MotorCurrentDraws.struct, driveMotorCurrents);
+      table.put("SteerMotorCurrents", MotorCurrentDraws.struct, steerMotorCurrents);
+    }
+
+    @Override
+    public void fromLog(LogTable table) {
+      moduleStates = table.get("ModuleStates", moduleStates);
+      gyroYaw = table.get("GyroYaw", gyroYaw);
+      measurementLatency = table.get("MeasurementLatency", measurementLatency);
+      odometryPositions = table.get("OdometryPositions", odometryPositions);
+      odometryYaws = table.get("OdometryYaws", odometryYaws);
+      odometryTimestamps = table.get("OdometryTimestamps", odometryTimestamps);
+      driveMotorCurrents =
+          table.get("DriveMotorCurrents", MotorCurrentDraws.struct, driveMotorCurrents);
+      steerMotorCurrents =
+          table.get("SteerMotorCurrents", MotorCurrentDraws.struct, steerMotorCurrents);
+    }
   }
 
   @SuppressWarnings("CanBeFinal")

@@ -36,7 +36,7 @@ import org.littletonrobotics.junction.Logger;
 public class Swerve extends SubsystemBase {
   private final SwerveIO swerveIO;
 
-  private final SwerveIOInputsAutoLogged swerveInputs;
+  private final SwerveIO.SwerveIOInputs swerveInputs;
 
   private final SwerveSetpointGenerator setpointGenerator;
   private final SwerveSetpoint stopInXSetpoint;
@@ -57,7 +57,7 @@ public class Swerve extends SubsystemBase {
   public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO poseEstimatorIO) {
     this.swerveIO = driveIO;
     var CONSTANTS = driveIO.getConstants();
-    swerveInputs = new SwerveIOInputsAutoLogged();
+    swerveInputs = new SwerveIO.SwerveIOInputs();
     driveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve/Constants", CONSTANTS);
 

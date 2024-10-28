@@ -68,28 +68,34 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   private final Module[] modules = new Module[4];
-  private final BaseStatusSignal[] signals = new BaseStatusSignal[18];
+  private final BaseStatusSignal[] signals = new BaseStatusSignal[34];
 
   private final OdometryThread odometryThread;
   private final Pigeon2 gyro;
 
   public SwerveIOPhoenix() {
     var devices = new ParentDevice[13];
+    var lowFreqSignals = new BaseStatusSignal[20];
     for (int i = 0; i < 4; i++) {
       modules[i] = new Module(i);
-      signals[i * 4] = modules[i].driveMotor.getVelocity();
-      signals[i * 4 + 1] = modules[i].driveMotor.getAcceleration();
-      signals[i * 4 + 2] = modules[i].encoder.getAbsolutePosition();
-      signals[i * 4 + 3] = modules[i].steerMotor.getVelocity();
+      signals[i * 8] = modules[i].driveMotor.getVelocity(false);
+      signals[i * 8 + 1] = modules[i].driveMotor.getAcceleration(false);
+      signals[i * 8 + 2] = modules[i].encoder.getAbsolutePosition(false);
+      signals[i * 8 + 3] = modules[i].steerMotor.getVelocity(false);
+      signals[i * 8 + 4] = modules[i].driveMotor.getStatorCurrent(false);
+      signals[i * 8 + 5] = modules[i].driveMotor.getSupplyCurrent(false);
+      signals[i * 8 + 6] = modules[i].steerMotor.getStatorCurrent(false);
+      signals[i * 8 + 7] = modules[i].steerMotor.getSupplyCurrent(false);
 
       System.arraycopy(modules[i].getDevices(), 0, devices, i * 3, 3);
     }
     gyro = new Pigeon2(13, RobotConstants.CANIVORE_NAME);
     devices[12] = gyro;
-    signals[16] = gyro.getYaw();
-    signals[17] = gyro.getAngularVelocityZWorld();
+    signals[32] = gyro.getYaw(false);
+    signals[33] = gyro.getAngularVelocityZWorld(false);
 
     odometryThread = new OdometryThread(modules, gyro, 250);
+
     BaseStatusSignal.setUpdateFrequencyForAll(100, signals[1], signals[5], signals[9], signals[13]);
 
     ParentDevice.optimizeBusUtilizationForAll(devices);
@@ -153,6 +159,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         inputs.odometryPositions[i] = modules[i].getPosition();
       }
     }
+
+    for (int i = 0; i < 4; i++) {}
   }
 
   @Override
