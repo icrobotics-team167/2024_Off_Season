@@ -42,6 +42,7 @@ import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.cotc.Robot;
 import frc.cotc.RobotConstants;
 import frc.cotc.util.FOCMotorSim;
+import frc.cotc.util.MotorCurrentDraws;
 import org.littletonrobotics.junction.Logger;
 
 public class SwerveIOPhoenix implements SwerveIO {
@@ -79,15 +80,17 @@ public class SwerveIOPhoenix implements SwerveIO {
     for (int i = 0; i < 4; i++) {
       modules[i] = new Module(i);
       signals[i * 8] = modules[i].driveMotor.getVelocity(false);
-      signals[i * 8 + 1] = modules[i].driveMotor.getAcceleration(false);
-      signals[i * 8 + 2] = modules[i].encoder.getAbsolutePosition(false);
-      signals[i * 8 + 3] = modules[i].steerMotor.getVelocity(false);
+      signals[i * 8 + 1] = modules[i].encoder.getAbsolutePosition(false);
+      signals[i * 8 + 2] = modules[i].steerMotor.getVelocity(false);
+      signals[i * 8 + 3] = modules[i].driveMotor.getAcceleration(false);
       signals[i * 8 + 4] = modules[i].driveMotor.getStatorCurrent(false);
       signals[i * 8 + 5] = modules[i].driveMotor.getSupplyCurrent(false);
       signals[i * 8 + 6] = modules[i].steerMotor.getStatorCurrent(false);
       signals[i * 8 + 7] = modules[i].steerMotor.getSupplyCurrent(false);
 
       System.arraycopy(modules[i].getDevices(), 0, devices, i * 3, 3);
+
+      System.arraycopy(signals, i * 8 + 3, lowFreqSignals, i * 5, 5);
     }
     gyro = new Pigeon2(13, RobotConstants.CANIVORE_NAME);
     devices[12] = gyro;
@@ -96,7 +99,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     odometryThread = new OdometryThread(modules, gyro, 250);
 
-    BaseStatusSignal.setUpdateFrequencyForAll(100, signals[1], signals[5], signals[9], signals[13]);
+    BaseStatusSignal.setUpdateFrequencyForAll(50, lowFreqSignals);
 
     ParentDevice.optimizeBusUtilizationForAll(devices);
 
@@ -108,30 +111,18 @@ public class SwerveIOPhoenix implements SwerveIO {
 
   @Override
   public void updateInputs(SwerveIOInputs inputs) {
-    BaseStatusSignal.waitForAll(Robot.defaultPeriodSecs / 2, signals);
+    BaseStatusSignal.refreshAll(signals);
     for (int i = 0; i < 4; i++) {
-      inputs.moduleStates[i] =
-          new SwerveModuleState(
-              BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                      signals[i * 4], signals[i * 4 + 1])
-                  * WHEEL_CIRCUMFERENCE,
-              Rotation2d.fromRotations(
-                  BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                      signals[i * 4 + 2], signals[i * 4 + 3])));
+      inputs.moduleStates[i] = getCurrentState(i);
 
-      inputs.measurementLatency +=
-          signals[i * 4].getTimestamp().getLatency()
-              + signals[i * 4 + 1].getTimestamp().getLatency()
-              + signals[i * 4 + 2].getTimestamp().getLatency()
-              + signals[i * 4 + 3].getTimestamp().getLatency();
+      inputs.driveMotorCurrents[i] =
+          MotorCurrentDraws.fromSignals(signals[i * 8 + 4], signals[i * 8 + 5]);
+      inputs.steerMotorCurrents[i] =
+          MotorCurrentDraws.fromSignals(signals[i * 8 + 6], signals[i * 8 + 7]);
     }
     inputs.gyroYaw =
         Rotation2d.fromDegrees(
-            BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17]));
-    inputs.measurementLatency +=
-        signals[16].getTimestamp().getLatency() + signals[17].getTimestamp().getLatency();
-
-    inputs.measurementLatency /= 18;
+            BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[32], signals[33]));
 
     var odometryData = odometryThread.poll();
 
@@ -159,8 +150,15 @@ public class SwerveIOPhoenix implements SwerveIO {
         inputs.odometryPositions[i] = modules[i].getPosition();
       }
     }
+  }
 
-    for (int i = 0; i < 4; i++) {}
+  private SwerveModuleState getCurrentState(int id) {
+    return new SwerveModuleState(
+        BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[id * 8], signals[id * 8 + 3])
+            * WHEEL_CIRCUMFERENCE,
+        Rotation2d.fromRotations(
+            BaseStatusSignal.getLatencyCompensatedValueAsDouble(
+                signals[id * 8 + 1], signals[id * 8 + 2])));
   }
 
   @Override
@@ -168,13 +166,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     for (int i = 0; i < 4; i++) {
       modules[i].run(
           setpoint.moduleStates()[i],
-          new SwerveModuleState(
-              BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                      signals[i * 4], signals[i * 4 + 1])
-                  * WHEEL_CIRCUMFERENCE,
-              Rotation2d.fromRotations(
-                  BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                      signals[i * 4 + 2], signals[i * 4 + 3]))),
+          getCurrentState(i),
           setpoint.steerFeedforwards()[i],
           forceFeedforward[i]);
     }
@@ -353,11 +345,19 @@ public class SwerveIOPhoenix implements SwerveIO {
                 },
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
-                Logger.getRealTimestamp() / 1e6);
+                signals.length);
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
         }
       }
+    }
+
+    private double getTimestamp() {
+      double sumTime = 0;
+      for (var signal : signals) {
+        sumTime += signal.getTimestamp().getTime();
+      }
+      return sumTime / signals.length;
     }
 
     OdometryFrame[] poll() {

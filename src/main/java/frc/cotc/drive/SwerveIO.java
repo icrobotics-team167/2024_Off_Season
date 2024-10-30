@@ -26,8 +26,6 @@ public interface SwerveIO {
         };
     Rotation2d gyroYaw = new Rotation2d();
 
-    double measurementLatency;
-
     // I wanted this to be a 2D array, so that one of the dimensions can be data ID and the other
     // dimension can be the module ID, but AK doesn't support 2D arrays
     // So the data is packed into a 1D array
@@ -48,7 +46,6 @@ public interface SwerveIO {
     public void toLog(LogTable table) {
       table.put("ModuleStates", moduleStates);
       table.put("GyroYaw", gyroYaw);
-      table.put("MeasurementLatency", measurementLatency);
       table.put("OdometryPositions", odometryPositions);
       table.put("OdometryYaws", odometryYaws);
       table.put("OdometryTimestamps", odometryTimestamps);
@@ -60,7 +57,6 @@ public interface SwerveIO {
     public void fromLog(LogTable table) {
       moduleStates = table.get("ModuleStates", moduleStates);
       gyroYaw = table.get("GyroYaw", gyroYaw);
-      measurementLatency = table.get("MeasurementLatency", measurementLatency);
       odometryPositions = table.get("OdometryPositions", odometryPositions);
       odometryYaws = table.get("OdometryYaws", odometryYaws);
       odometryTimestamps = table.get("OdometryTimestamps", odometryTimestamps);
