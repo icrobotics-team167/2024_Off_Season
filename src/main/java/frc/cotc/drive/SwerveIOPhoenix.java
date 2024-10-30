@@ -345,7 +345,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                 },
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
-                signals.length);
+                getTimestamp());
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
         }
