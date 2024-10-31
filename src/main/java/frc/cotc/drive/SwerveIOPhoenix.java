@@ -104,7 +104,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     ParentDevice.optimizeBusUtilizationForAll(devices);
 
     if (Robot.isSimulation()) {
-      new SimThread(modules, gyro, 1000).start();
+      new SimThread(modules, gyro).start();
     }
     odometryThread.start();
   }
@@ -245,8 +245,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kP = 480;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
-        steerConfig.Slot0.kP = 575;
-        steerConfig.Slot0.kD = 2;
+        steerConfig.Slot0.kP = 700;
+        steerConfig.Slot0.kD = 2.5;
       }
 
       driveMotor.getConfigurator().apply(driveConfig);
@@ -401,34 +401,18 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
   }
 
-  private static class SimThread {
+  private static class SimThread extends Thread {
     final SimModule[] simModules = new SimModule[4];
     final Pigeon2SimState gyroSimState;
-    final Notifier simNotifier;
-    final double frequency;
 
-    final Watchdog watchdog;
-
-    SimThread(Module[] modules, Pigeon2 gyro, double frequency) {
+    SimThread(Module[] modules, Pigeon2 gyro) {
       for (int i = 0; i < 4; i++) {
         simModules[i] = new SimModule(modules[i]);
       }
       gyroSimState = gyro.getSimState();
 
-      simNotifier = new Notifier(this::run);
-      this.frequency = frequency;
-
-      watchdog = new Watchdog(1.0 / frequency, () -> {});
-    }
-
-    public void start() {
-      for (SimModule module : simModules) {
-        module.steerSim.setState((Math.random() * 2 - 1) * PI, 0);
-        module.steerMotorSim.setRawRotorPosition(
-            module.steerSim.getAngularPositionRotations() * CONSTANTS.STEER_GEAR_RATIO);
-        module.encoderSim.setRawPosition(module.steerSim.getAngularPositionRotations());
-      }
-      simNotifier.startPeriodic(1.0 / frequency);
+      setDaemon(true);
+      Threads.setCurrentThreadPriority(true, 1);
     }
 
     private final SwerveDriveKinematics kinematics =
@@ -442,39 +426,38 @@ public class SwerveIOPhoenix implements SwerveIO {
     private double currentDraw = 0;
 
     public void run() {
-      watchdog.reset();
-      double voltage = Math.max(13 - (.01 * currentDraw), 8);
-      currentDraw = 0;
-      SwerveModuleState[] moduleStates = new SwerveModuleState[4];
-      for (int i = 0; i < 4; i++) {
-        currentDraw += simModules[i].run(1.0 / frequency, voltage);
-        moduleStates[i] = simModules[i].getModuleState();
-        watchdog.addEpoch("Module " + i + " tick");
+      for (SimModule module : simModules) {
+        module.steerSim.setState((Math.random() * 2 - 1) * PI, 0);
+        module.steerMotorSim.setRawRotorPosition(
+            module.steerSim.getAngularPositionRotations() * CONSTANTS.STEER_GEAR_RATIO);
+        module.encoderSim.setRawPosition(module.steerSim.getAngularPositionRotations());
       }
 
-      yawDeg +=
-          Units.radiansToDegrees(
-              kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond / frequency);
-      gyroSimState.setRawYaw(yawDeg);
+      // - .001 to prevent divide by 0 errors later
+      double lastTime = (Logger.getRealTimestamp() / 1e6) - .001;
+      //noinspection InfiniteLoopStatement
+      while (true) {
+        double currentTime = Logger.getRealTimestamp() / 1e6;
+        double dt = currentTime - lastTime;
 
-      watchdog.addEpoch("Gyro calculations");
+        double voltage = Math.max(13 - (.01 * currentDraw), 8);
+        currentDraw = 0;
+        SwerveModuleState[] moduleStates = new SwerveModuleState[4];
+        for (int i = 0; i < 4; i++) {
+          currentDraw += simModules[i].run(dt, voltage);
+          moduleStates[i] = simModules[i].getModuleState();
+        }
 
-      watchdog.disable();
-      SignalLogger.writeDouble("Swerve Sim Thread time (ms)", watchdog.getTime() * 1000);
-      if (watchdog.isExpired()) {
-        printTimingWarning();
+        yawDeg +=
+            Units.radiansToDegrees(
+                kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond * dt);
+        gyroSimState.setRawYaw(yawDeg);
+
+        SignalLogger.writeDouble("Swerve Sim Thread/Time (ms)", dt * 1000);
+        SignalLogger.writeDouble("Swerve Sim Thread/Frequency (hz)", 1.0 / dt);
+
+        lastTime = currentTime;
       }
-    }
-
-    private void printTimingWarning() {
-      DriverStation.reportWarning(
-          "Swerve sim thread went over time! Expected "
-              + 1000.0 / frequency
-              + " ms, got "
-              + watchdog.getTime() * 1000.0
-              + " ms",
-          false);
-      watchdog.printEpochs();
     }
 
     private static class SimModule {
