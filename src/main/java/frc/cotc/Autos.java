@@ -15,7 +15,6 @@ import choreo.auto.AutoFactory;
 import choreo.auto.AutoLoop;
 import choreo.auto.AutoTrajectory;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.cotc.drive.Swerve;
@@ -33,9 +32,7 @@ public class Autos {
             swerve,
             swerve::getPose,
             swerve::followTrajectory,
-            () ->
-                DriverStation.getAlliance().isPresent()
-                    && DriverStation.getAlliance().get() == DriverStation.Alliance.Red,
+            Robot::isOnRed,
             new AutoFactory.AutoBindings(),
             (pose, starting) -> Logger.recordOutput("Choreo/Trajectory", pose.getPoses()));
     autoChooser = new AutoChooser(factory, "Auto Selector");

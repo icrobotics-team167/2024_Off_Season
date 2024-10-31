@@ -9,6 +9,7 @@ package frc.cotc;
 
 import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -122,5 +123,10 @@ public class Robot extends LoggedRobot {
     // subsystem periodic() methods. This must be called from the robot's periodic block in order
     // for anything in the Command-based framework to work.
     CommandScheduler.getInstance().run();
+  }
+
+  public static boolean isOnRed() {
+    return DriverStation.getAlliance().orElse(DriverStation.Alliance.Blue)
+        == DriverStation.Alliance.Red;
   }
 }
