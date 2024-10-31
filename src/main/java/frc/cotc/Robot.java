@@ -43,13 +43,19 @@ public class Robot extends LoggedRobot {
     //        String mode = "REPLAY";
 
     switch (mode) {
-      case "REAL", "SIM" -> {
+      case "REAL" -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
         //noinspection resource
         new PowerDistribution(
             1, PowerDistribution.ModuleType.kRev); // Enables power distribution logging
-        SignalLogger.start();
+        SignalLogger.start(); // Start logging Phoenix CAN signals
+      }
+      case "SIM" -> {
+        Logger.addDataReceiver(new WPILOGWriter()); // Log to the project's logs folder
+        Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
+
+        SignalLogger.start(); // Start logging Phoenix CAN signals
       }
       case "REPLAY" -> {
         setUseTiming(false); // Run as fast as possible
