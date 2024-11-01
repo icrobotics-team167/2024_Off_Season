@@ -63,9 +63,9 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.DRIVE_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(5800);
     CONSTANTS.STEER_MOTOR_MAX_SPEED = Units.rotationsPerMinuteToRadiansPerSecond(6000);
 
-    CONSTANTS.MAX_LINEAR_ACCELERATION = 12;
+    CONSTANTS.MAX_LINEAR_ACCELERATION = 15;
 
-    CONSTANTS.ANGULAR_SPEED_FUDGING = .8;
+    CONSTANTS.ANGULAR_SPEED_FUDGING = .75;
   }
 
   private final Module[] modules = new Module[4];
@@ -206,9 +206,8 @@ public class SwerveIOPhoenix implements SwerveIO {
           CONSTANTS.MAX_LINEAR_ACCELERATION / WHEEL_CIRCUMFERENCE;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
-      driveConfig.CurrentLimits.StatorCurrentLimit = 100;
+      driveConfig.CurrentLimits.StatorCurrentLimit = 80;
       driveConfig.CurrentLimits.SupplyCurrentLimit = 60;
-      driveConfig.CurrentLimits.SupplyCurrentLowerTime = 1.5;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
       var steerConfig = new TalonFXConfiguration();
@@ -241,8 +240,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         }
       } else {
         driveConfig.Slot0.kV = 0;
-        driveConfig.Slot0.kA = 2.778066825;
-        driveConfig.Slot0.kP = 480;
+        driveConfig.Slot0.kA = 1.369959677;
+        driveConfig.Slot0.kP = 700;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
         steerConfig.Slot0.kP = 700;
@@ -440,7 +439,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         double currentTime = Logger.getRealTimestamp() / 1e6;
         double dt = currentTime - lastTime;
 
-        double voltage = Math.max(13 - (.01 * currentDraw), 8);
+        double voltage = Math.max(12.3 - (.018 * currentDraw), 6);
         currentDraw = 0;
         SwerveModuleState[] moduleStates = new SwerveModuleState[4];
         for (int i = 0; i < 4; i++) {
@@ -478,7 +477,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         encoderSim.Orientation = ChassisReference.CounterClockwise_Positive;
 
         driveWheelSim =
-            new FOCMotorSim(DCMotor.getKrakenX60Foc(1), CONSTANTS.DRIVE_GEAR_RATIO, .05);
+            new FOCMotorSim(DCMotor.getKrakenX60Foc(1), CONSTANTS.DRIVE_GEAR_RATIO, .025);
         steerSim =
             new DCMotorSim(
                 LinearSystemId.createDCMotorSystem(
