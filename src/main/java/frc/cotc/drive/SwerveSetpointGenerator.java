@@ -190,8 +190,8 @@ public class SwerveSetpointGenerator {
    * @param desiredState The desired state of motion, such as from the driver sticks or a path
    *     following algorithm.
    * @param dt The loop time.
-   * @return A Setpoint object that satisfies all the KinematicLimits while converging to
-   *     desiredState quickly.
+   * @return A setpoint that satisfies all the kinematic limits while converging to desiredState
+   *     quickly.
    */
   public SwerveSetpoint generateSetpoint(
       final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double dt) {
