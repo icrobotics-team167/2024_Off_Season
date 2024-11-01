@@ -13,12 +13,14 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import frc.cotc.Robot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * "Inspired" by FRC team 254. See the license file in the root directory of this project.
+ * Originally by FRC team 254, modified by 6328, and further modified by 167. See the license files
+ * in the root directory of this project.
  *
  * <p>Takes a prior setpoint (ChassisSpeeds), a desired setpoint (from a driver, or from a path
  * follower), and outputs a new setpoint that respects all the kinematic constraints on module
@@ -78,9 +80,23 @@ public class SwerveSetpointGenerator {
     double f(double x, double y);
   }
 
+  /**
+   * The physical limits of the modules.
+   *
+   * @param maxDriveVelocity Meters per second.
+   * @param maxDriveAcceleration Meters per second squared.
+   * @param maxSteeringVelocity Radians per second.
+   */
   public record ModuleLimits(
       double maxDriveVelocity, double maxDriveAcceleration, double maxSteeringVelocity) {}
 
+  /**
+   * A generated setpoint.
+   *
+   * @param chassisSpeeds Robot relative.
+   * @param moduleStates
+   * @param steerFeedforwards Radians per second.
+   */
   public record SwerveSetpoint(
       ChassisSpeeds chassisSpeeds, SwerveModuleState[] moduleStates, double[] steerFeedforwards) {}
 
@@ -161,6 +177,11 @@ public class SwerveSetpointGenerator {
     return findRoot(func, x_0, y_0, f_0 - offset, x_1, y_1, f_1 - offset, 10);
   }
 
+  public SwerveSetpoint generateSetpoint(
+      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState) {
+    return generateSetpoint(prevSetpoint, desiredState, Robot.defaultPeriodSecs);
+  }
+
   /**
    * Generate a new setpoint.
    *
@@ -174,6 +195,7 @@ public class SwerveSetpointGenerator {
    */
   public SwerveSetpoint generateSetpoint(
       final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double dt) {
+    desiredState = ChassisSpeeds.discretize(desiredState, Robot.defaultPeriodSecs);
     SwerveModuleState[] desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
     // Make sure desiredState respects velocity limits.
     if (limits.maxDriveVelocity() > 0.0) {

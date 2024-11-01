@@ -227,9 +227,7 @@ public class Swerve extends SubsystemBase {
             angularSpeedFudgeFactor,
             MathUtil.inverseInterpolate(0, maxLinearSpeedMetersPerSec, translationalMagnitude));
 
-    speeds = ChassisSpeeds.discretize(speeds, Robot.defaultPeriodSecs);
-    var setpoint =
-        setpointGenerator.generateSetpoint(lastSetpoint, speeds, Robot.defaultPeriodSecs);
+    var setpoint = setpointGenerator.generateSetpoint(lastSetpoint, speeds);
     swerveIO.drive(setpoint, forceFeedforwards);
     lastSetpoint = setpoint;
   }
