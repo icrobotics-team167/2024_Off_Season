@@ -13,7 +13,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
@@ -73,16 +73,17 @@ public class Robot extends LoggedRobot {
 
     Swerve swerve = getSwerve(mode);
 
-    CommandXboxController primaryController = new CommandXboxController(0);
+    CommandJoystick primaryLeft = new CommandJoystick(0);
+    CommandJoystick primaryRight = new CommandJoystick(1);
 
     // Robot wants +X fwd, +Y left
     // Sticks are +X right +Y back
     swerve.setDefaultCommand(
         swerve.teleopDrive(
-            () -> MathUtil.applyDeadband(-primaryController.getLeftY(), .01),
-            () -> MathUtil.applyDeadband(-primaryController.getLeftX(), .01),
-            () -> MathUtil.applyDeadband(-primaryController.getRightX(), .01)));
-    RobotModeTriggers.disabled().or(primaryController.povDown()).whileTrue(swerve.stopInX());
+            () -> MathUtil.applyDeadband(-primaryLeft.getY(), .01),
+            () -> MathUtil.applyDeadband(-primaryLeft.getX(), .01),
+            () -> MathUtil.applyDeadband(-primaryRight.getX(), .01)));
+    RobotModeTriggers.disabled().or(primaryLeft.button(3)).whileTrue(swerve.stopInX());
 
     // primaryController.rightBumper().onTrue(swerve.driveCharacterization());
 
