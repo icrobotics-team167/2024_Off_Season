@@ -424,6 +424,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     private double currentDraw = 0;
 
+    @Override
     public void run() {
       for (SimModule module : simModules) {
         module.steerSim.setState((Math.random() * 2 - 1) * PI, 0);
