@@ -207,7 +207,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.CurrentLimits.StatorCurrentLimit = 80;
-      driveConfig.CurrentLimits.SupplyCurrentLimit = 60;
+      driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
       var steerConfig = new TalonFXConfiguration();
@@ -244,8 +244,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kP = 700;
 
         steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
-        steerConfig.Slot0.kP = 700;
-        steerConfig.Slot0.kD = 2.5;
+        steerConfig.Slot0.kP = 650;
+        steerConfig.Slot0.kD = 2;
       }
 
       driveMotor.getConfigurator().apply(driveConfig);

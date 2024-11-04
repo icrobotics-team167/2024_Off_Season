@@ -26,7 +26,6 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-import frc.cotc.Robot;
 import frc.cotc.vision.VisionPoseEstimator;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import java.util.Arrays;
