@@ -232,6 +232,9 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveConfig.Slot0.kA = 0;
         driveConfig.Slot0.kP = 0;
 
+        steerConfig.Slot0.kP = 0;
+        steerConfig.Slot0.kD = 0;
+
         switch (id) {
           case 0 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
           case 1 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
@@ -239,14 +242,16 @@ public class SwerveIOPhoenix implements SwerveIO {
           case 3 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
         }
       } else {
-        driveConfig.Slot0.kV = 0;
         driveConfig.Slot0.kA = 1.369959677;
         driveConfig.Slot0.kP = 700;
 
-        steerConfig.Slot0.kV = 12 / ((6000.0 / 60.0) / CONSTANTS.STEER_GEAR_RATIO);
         steerConfig.Slot0.kP = 650;
         steerConfig.Slot0.kD = 2;
       }
+      steerConfig.Slot0.kV =
+          12
+              / (Units.radiansToRotations(CONSTANTS.STEER_MOTOR_MAX_SPEED)
+                  / CONSTANTS.STEER_GEAR_RATIO);
 
       driveMotor.getConfigurator().apply(driveConfig);
       steerMotor.getConfigurator().apply(steerConfig);
@@ -366,6 +371,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         for (int i = 0; i < frameBuffer.size(); i++) {
           retFrames[i] = frameBuffer.get(i);
         }
+        frameBuffer.clear();
       }
       return retFrames;
     }
