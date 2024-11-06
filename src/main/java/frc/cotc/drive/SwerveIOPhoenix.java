@@ -40,7 +40,6 @@ import edu.wpi.first.util.CircularBuffer;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.cotc.Robot;
-import frc.cotc.RobotConstants;
 import frc.cotc.util.FOCMotorSim;
 import frc.cotc.util.MotorCurrentDraws;
 import org.littletonrobotics.junction.Logger;
@@ -92,7 +91,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       System.arraycopy(signals, i * 8 + 3, lowFreqSignals, i * 5, 5);
     }
-    gyro = new Pigeon2(13, RobotConstants.CANIVORE_NAME);
+    gyro = new Pigeon2(13, Robot.CANIVORE_NAME);
     devices[12] = gyro;
     signals[32] = gyro.getYaw(false);
     signals[33] = gyro.getAngularVelocityZWorld(false);
@@ -196,9 +195,9 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     @SuppressWarnings("DuplicateBranchesInSwitch")
     public Module(int id) {
-      driveMotor = new TalonFX(id * 3, RobotConstants.CANIVORE_NAME);
-      steerMotor = new TalonFX(id * 3 + 1, RobotConstants.CANIVORE_NAME);
-      encoder = new CANcoder(id * 3 + 2, RobotConstants.CANIVORE_NAME);
+      driveMotor = new TalonFX(id * 3, Robot.CANIVORE_NAME);
+      steerMotor = new TalonFX(id * 3 + 1, Robot.CANIVORE_NAME);
+      encoder = new CANcoder(id * 3 + 2, Robot.CANIVORE_NAME);
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = CONSTANTS.DRIVE_GEAR_RATIO;

@@ -27,6 +27,8 @@ import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
 public class Robot extends LoggedRobot {
+  public static final String CANIVORE_NAME = "Canivore";
+
   private final Autos autos;
 
   @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
