@@ -20,7 +20,6 @@ import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
 import frc.cotc.vision.VisionPoseEstimatorIO;
-import java.util.Objects;
 import org.littletonrobotics.junction.*;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
@@ -137,7 +136,7 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void simulationPeriodic() {
-    if (!Objects.equals(mode, "REPLAY")) {
+    if (!mode.equals("REPLAY")) {
       RoboRioSim.setVInVoltage(simVoltage);
     }
   }
