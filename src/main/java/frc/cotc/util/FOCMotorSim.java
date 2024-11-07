@@ -18,12 +18,10 @@ import edu.wpi.first.math.system.plant.DCMotor;
  */
 public class FOCMotorSim {
   private final DCMotor motor;
-  private final double gearRatio;
   private final double moi;
 
-  public FOCMotorSim(DCMotor motor, double gearRatio, double moiKgMetersSquared) {
+  public FOCMotorSim(DCMotor motor, double moiKgMetersSquared) {
     this.motor = motor;
-    this.gearRatio = gearRatio;
     this.moi = moiKgMetersSquared;
   }
 
@@ -32,20 +30,25 @@ public class FOCMotorSim {
   private double accel = 0;
 
   public void tick(double current, double dt) {
-    // If we are accelerating, (AKA torque is in the same direction as current velocity) then clamp
-    // current. Otherwise, we don't. This is to simulate braking effects.
+    double maxCurrentDraw;
+    // If accelerating (aka current and vel have the same sign), then limit current based on
+    // current vel
     if (Math.signum(current) == Math.signum(vel)) {
       // Clamp current draw to the max possible draw based on current vel
-      double maxCurrentDraw =
+      maxCurrentDraw =
           MathUtil.interpolate(
               motor.stallCurrentAmps,
               0,
-              MathUtil.inverseInterpolate(0, motor.freeSpeedRadPerSec, Math.abs(vel) * gearRatio));
-      current = MathUtil.clamp(current, -maxCurrentDraw, maxCurrentDraw);
+              MathUtil.inverseInterpolate(0, motor.freeSpeedRadPerSec, Math.abs(vel)));
+
+    } else {
+      // Otherwise, clamp based on max stall current
+      maxCurrentDraw = motor.stallCurrentAmps;
     }
+    current = MathUtil.clamp(current, -maxCurrentDraw, maxCurrentDraw);
 
     // Torque / moi = acceleration
-    accel = ((current * motor.KtNMPerAmp) * gearRatio) / moi;
+    accel = (current * motor.KtNMPerAmp) / moi;
     // pos = p_0 + v_0 * dt + (1/2 * a * dt^2)
     pos += vel * dt + (accel * dt * dt / 2);
     vel += accel * dt;

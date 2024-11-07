@@ -13,14 +13,16 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
 import frc.cotc.Robot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.littletonrobotics.junction.Logger;
 
 /**
- * Originally by FRC team 254, modified by 6328, and further modified by 167. See the license files
- * in the root directory of this project.
+ * Originally by FRC team 254, modified by Michael Jansen, and further modified by 167. See the
+ * license files in the root directory of this project.
  *
  * <p>Takes a prior setpoint (ChassisSpeeds), a desired setpoint (from a driver, or from a path
  * follower), and outputs a new setpoint that respects all the kinematic constraints on module
@@ -30,11 +32,39 @@ import java.util.Optional;
  */
 public class SwerveSetpointGenerator {
   private final SwerveDriveKinematics kinematics;
-  private final ModuleLimits limits;
+  private final Translation2d[] moduleLocations;
+  private final DCMotor driveMotor;
+  private final double driveCurrentLimitAmps;
+  private final double maxDriveVelocity;
+  private final double maxSteerSpeedRadPerSec;
+  private final double massKg;
+  private final double moiKgMetersSquared;
+  private final double wheelRadiusMeters;
+  private final double wheelFrictionForce;
+  private final double maxTorqueFriction;
 
-  public SwerveSetpointGenerator(Translation2d[] moduleLocations, ModuleLimits limits) {
-    this.limits = limits;
+  public SwerveSetpointGenerator(
+      final Translation2d[] moduleLocations,
+      final DCMotor driveMotor,
+      final double driveCurrentLimitAmps,
+      final double maxSteerSpeedRadPerSec,
+      final double massKg,
+      final double moiKgMetersSquared,
+      final double wheelDiameterMeters,
+      final double wheelCoF) {
+
+    this.driveMotor = driveMotor;
+    this.driveCurrentLimitAmps = driveCurrentLimitAmps;
+    this.maxSteerSpeedRadPerSec = maxSteerSpeedRadPerSec;
     kinematics = new SwerveDriveKinematics(moduleLocations);
+    this.moduleLocations = moduleLocations;
+    this.massKg = massKg;
+    this.moiKgMetersSquared = moiKgMetersSquared;
+    this.wheelRadiusMeters = wheelDiameterMeters / 2;
+    this.maxDriveVelocity = driveMotor.freeSpeedRadPerSec * wheelRadiusMeters;
+
+    wheelFrictionForce = wheelCoF * ((massKg / 4) * 9.81);
+    maxTorqueFriction = this.wheelFrictionForce * wheelRadiusMeters;
   }
 
   public SwerveDriveKinematics getKinematics() {
@@ -79,16 +109,6 @@ public class SwerveSetpointGenerator {
   private interface Function2d {
     double f(double x, double y);
   }
-
-  /**
-   * The physical limits of the modules.
-   *
-   * @param maxDriveVelocity Meters per second.
-   * @param maxDriveAcceleration Meters per second squared.
-   * @param maxSteeringVelocity Radians per second.
-   */
-  public record ModuleLimits(
-      double maxDriveVelocity, double maxDriveAcceleration, double maxSteeringVelocity) {}
 
   /**
    * A generated setpoint.
@@ -178,8 +198,16 @@ public class SwerveSetpointGenerator {
   }
 
   public SwerveSetpoint generateSetpoint(
-      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState) {
-    return generateSetpoint(prevSetpoint, desiredState, Robot.defaultPeriodSecs);
+      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double voltage) {
+    return generateSetpoint(prevSetpoint, desiredState, voltage, Robot.defaultPeriodSecs);
+  }
+
+  private enum ActiveConstraint {
+    STEER_VEL,
+    CENTRIPETAL,
+    MOTOR_DYNAMICS,
+    CURRENT_LIMITS,
+    TRACTION;
   }
 
   /**
@@ -194,13 +222,11 @@ public class SwerveSetpointGenerator {
    *     quickly.
    */
   public SwerveSetpoint generateSetpoint(
-      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double dt) {
+      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double voltage, double dt) {
     SwerveModuleState[] desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
     // Make sure desiredState respects velocity limits.
-    if (limits.maxDriveVelocity() > 0.0) {
-      SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, limits.maxDriveVelocity());
-      desiredState = kinematics.toChassisSpeeds(desiredModuleState);
-    }
+    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxDriveVelocity);
+    desiredState = kinematics.toChassisSpeeds(desiredModuleState);
 
     // Special case: desiredState is a complete stop. In this case, module angle is arbitrary, so
     // just use the previous angle.
@@ -266,6 +292,8 @@ public class SwerveSetpointGenerator {
     double dtheta =
         desiredState.omegaRadiansPerSecond - prevSetpoint.chassisSpeeds().omegaRadiansPerSecond;
 
+    ActiveConstraint[] activeConstraints = new ActiveConstraint[4];
+
     // 's' interpolates between start and goal. At 0, we are at prevState and at 1, we are at
     // desiredState.
     double min_s = 1.0;
@@ -279,12 +307,12 @@ public class SwerveSetpointGenerator {
     // and then backing out the maximum interpolant between start and goal states. We remember the
     // minimum across all modules, since
     // that is the active constraint.
-    final double max_theta_step = dt * limits.maxSteeringVelocity();
     for (int i = 0; i < 4; ++i) {
       if (!need_to_steer) {
         overrideSteering.add(Optional.of(prevSetpoint.moduleStates()[i].angle));
         continue;
       }
+      double max_theta_step = dt * maxSteerSpeedRadPerSec;
       overrideSteering.add(Optional.empty());
       if (epsilonEquals(prevSetpoint.moduleStates()[i].speedMetersPerSecond, 0.0)) {
         // If module is stopped, we know that we will need to move straight to the final steering
@@ -317,6 +345,7 @@ public class SwerveSetpointGenerator {
                   prevSetpoint.moduleStates()[i].angle.rotateBy(
                       Rotation2d.fromRadians(
                           Math.signum(necessaryRotation.getRadians()) * max_theta_step))));
+          activeConstraints[i] = ActiveConstraint.STEER_VEL;
           min_s = 0.0;
           continue;
         }
@@ -325,6 +354,20 @@ public class SwerveSetpointGenerator {
         // s can't get any lower. Save some CPU.
         continue;
       }
+
+      // Enforce centripetal force limits to prevent sliding.
+      // We do this by changing max_theta_step to the maximum change in heading over dt
+      // that would create a large enough radius to keep the centripetal force under the
+      // friction force.
+      double maxHeadingChange =
+          (dt * wheelFrictionForce)
+              / ((massKg / 4) * Math.abs(prevSetpoint.moduleStates()[i].speedMetersPerSecond));
+      max_theta_step = Math.min(max_theta_step, maxHeadingChange);
+
+      activeConstraints[i] =
+          max_theta_step == maxHeadingChange
+              ? ActiveConstraint.CENTRIPETAL
+              : ActiveConstraint.STEER_VEL;
 
       double s =
           findSteeringMaxS(
@@ -338,38 +381,115 @@ public class SwerveSetpointGenerator {
       min_s = Math.min(min_s, s);
     }
 
-    // Enforce drive wheel acceleration limits.
-    final double max_vel_step = dt * limits.maxDriveAcceleration();
-    for (int i = 0; i < 4; ++i) {
+    // Enforce drive wheel torque limits
+    Translation2d chassisForceVec = new Translation2d();
+    double chassisTorque = 0.0;
+    for (int i = 0; i < 4; i++) {
+      double prevSpeed = prevSetpoint.moduleStates()[i].speedMetersPerSecond;
+      desiredModuleState[i].optimize(prevSetpoint.moduleStates()[i].angle);
+      double desiredSpeed = desiredModuleState[i].speedMetersPerSecond;
+
+      int forceSign;
+      Rotation2d forceAngle = prevSetpoint.moduleStates()[i].angle;
+      if (epsilonEquals(prevSpeed, 0.0)
+          || (prevSpeed > 0 && desiredSpeed >= prevSpeed)
+          || (prevSpeed < 0 && desiredSpeed <= prevSpeed)) {
+        forceSign = 1; // Force will be applied in direction of module
+        if (prevSpeed < 0) {
+          forceAngle = forceAngle.plus(Rotation2d.k180deg);
+        }
+      } else {
+        forceSign = -1; // Force will be applied in opposite direction of module
+        if (prevSpeed > 0) {
+          forceAngle = forceAngle.plus(Rotation2d.k180deg);
+        }
+      }
+
+      double currentDraw;
+      if (forceSign == 1) {
+        double lastVelRadPerSec =
+            prevSetpoint.moduleStates()[i].speedMetersPerSecond / wheelRadiusMeters;
+        // Use the current battery voltage since we won't be able to supply 12v if the
+        // battery is sagging down to 11v, which will affect the max torque output
+        if (voltage > 12) {
+          voltage = 12;
+        }
+        currentDraw =
+            Math.min(
+                driveMotor.getCurrent(Math.abs(lastVelRadPerSec), voltage), driveCurrentLimitAmps);
+      } else {
+        currentDraw = driveCurrentLimitAmps;
+      }
+      double moduleTorque = driveMotor.getTorque(currentDraw);
+      Logger.recordOutput("Swerve/Setpoint Generator/Expected current draws/" + i, currentDraw);
+
+      if (currentDraw == driveCurrentLimitAmps) {
+        activeConstraints[i] = ActiveConstraint.CURRENT_LIMITS;
+      } else if (!epsilonEquals(0, currentDraw)) {
+        activeConstraints[i] = ActiveConstraint.MOTOR_DYNAMICS;
+      }
+
+      // Limit torque to prevent wheel slip
+      moduleTorque = Math.min(moduleTorque, maxTorqueFriction);
+
+      if (moduleTorque == maxTorqueFriction) {
+        activeConstraints[i] = ActiveConstraint.TRACTION;
+      }
+
+      double forceAtCarpet = moduleTorque / wheelRadiusMeters;
+      Translation2d moduleForceVec = new Translation2d(forceAtCarpet * forceSign, forceAngle);
+
+      // Add the module force vector to the chassis force vector
+      chassisForceVec = chassisForceVec.plus(moduleForceVec);
+
+      // Calculate the torque this module will apply to the chassis
+      if (!epsilonEquals(0, moduleForceVec.getNorm())) {
+        Rotation2d angleToModule = moduleLocations[i].getAngle();
+        Rotation2d theta = moduleForceVec.getAngle().minus(angleToModule);
+        chassisTorque += forceAtCarpet * moduleLocations[i].getNorm() * theta.getSin();
+      }
+    }
+
+    Translation2d chassisAccelVec = chassisForceVec.div(massKg);
+    double chassisAngularAccel = chassisTorque / moiKgMetersSquared;
+
+    // Use kinematics to convert chassis accelerations to module accelerations
+    ChassisSpeeds chassisAccel =
+        new ChassisSpeeds(chassisAccelVec.getX(), chassisAccelVec.getY(), chassisAngularAccel);
+    var accelStates = kinematics.toSwerveModuleStates(chassisAccel);
+
+    for (int i = 0; i < 4; i++) {
       if (min_s == 0.0) {
         // No need to carry on.
         break;
       }
+
+      double maxVelStep = Math.abs(accelStates[i].speedMetersPerSecond * dt);
+
       double vx_min_s =
           min_s == 1.0 ? desired_vx[i] : (desired_vx[i] - prev_vx[i]) * min_s + prev_vx[i];
       double vy_min_s =
           min_s == 1.0 ? desired_vy[i] : (desired_vy[i] - prev_vy[i]) * min_s + prev_vy[i];
       // Find the max s for this drive wheel. Search on the interval between 0 and min_s, because we
-      // already know we can't go faster
-      // than that.
+      // already know we can't go faster than that.
       double s =
-          min_s
-              * findDriveMaxS(
-                  prev_vx[i],
-                  prev_vy[i],
-                  Math.hypot(prev_vx[i], prev_vy[i]),
-                  vx_min_s,
-                  vy_min_s,
-                  Math.hypot(vx_min_s, vy_min_s),
-                  max_vel_step);
+          findDriveMaxS(
+              prev_vx[i],
+              prev_vy[i],
+              Math.hypot(prev_vx[i], prev_vy[i]),
+              vx_min_s,
+              vy_min_s,
+              Math.hypot(vx_min_s, vy_min_s),
+              maxVelStep);
       min_s = Math.min(min_s, s);
     }
 
     ChassisSpeeds retSpeeds =
         new ChassisSpeeds(
-            prevSetpoint.chassisSpeeds().vxMetersPerSecond + min_s * dx,
-            prevSetpoint.chassisSpeeds().vyMetersPerSecond + min_s * dy,
-            prevSetpoint.chassisSpeeds().omegaRadiansPerSecond + min_s * dtheta);
+            prevSetpoint.chassisSpeeds.vxMetersPerSecond + min_s * dx,
+            prevSetpoint.chassisSpeeds.vyMetersPerSecond + min_s * dy,
+            prevSetpoint.chassisSpeeds.omegaRadiansPerSecond + min_s * dtheta);
+    retSpeeds = ChassisSpeeds.discretize(retSpeeds, dt);
     var retStates = kinematics.toSwerveModuleStates(retSpeeds);
     var steerFeedforwards = new double[4];
     for (int i = 0; i < 4; ++i) {
@@ -390,6 +510,9 @@ public class SwerveSetpointGenerator {
 
       steerFeedforwards[i] =
           retStates[i].angle.minus(prevSetpoint.moduleStates()[i].angle).getRadians() / dt;
+
+      Logger.recordOutput(
+          "Swerve/Setpoint Generator/Active constraints/" + i, activeConstraints[i]);
     }
     return new SwerveSetpoint(retSpeeds, retStates, steerFeedforwards);
   }

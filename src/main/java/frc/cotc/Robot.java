@@ -11,6 +11,7 @@ import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.PowerDistribution;
+import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
@@ -19,9 +20,8 @@ import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
 import frc.cotc.vision.VisionPoseEstimatorIO;
-import org.littletonrobotics.junction.LogFileUtil;
-import org.littletonrobotics.junction.LoggedRobot;
-import org.littletonrobotics.junction.Logger;
+import java.util.Objects;
+import org.littletonrobotics.junction.*;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
@@ -29,6 +29,7 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 public class Robot extends LoggedRobot {
   public static final String CANIVORE_NAME = "Canivore";
 
+  private final String mode;
   private final Autos autos;
 
   @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
@@ -41,8 +42,8 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
-    String mode = Robot.isReal() ? "REAL" : "SIM";
-    //        String mode = "REPLAY";
+    mode = Robot.isReal() ? "REAL" : "SIM";
+    //        mode = "REPLAY";
 
     switch (mode) {
       case "REAL" -> {
@@ -132,6 +133,15 @@ public class Robot extends LoggedRobot {
     // subsystem periodic() methods. This must be called from the robot's periodic block in order
     // for anything in the Command-based framework to work.
     CommandScheduler.getInstance().run();
+  }
+
+  public static volatile double simVoltage = 12;
+
+  @Override
+  public void simulationPeriodic() {
+    if (!Objects.equals(mode, "REPLAY")) {
+      RoboRioSim.setVInVoltage(simVoltage);
+    }
   }
 
   public static boolean isOnRed() {

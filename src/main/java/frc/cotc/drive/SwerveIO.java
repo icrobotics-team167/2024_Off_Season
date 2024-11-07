@@ -10,6 +10,7 @@ package frc.cotc.drive;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
 import frc.cotc.util.MotorCurrentDraws;
 import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
@@ -59,20 +60,20 @@ public interface SwerveIO {
   @AutoLog
   class SwerveModuleConstants {
     // Meters
-    double TRACK_WIDTH;
-    double TRACK_LENGTH;
-    double WHEEL_DIAMETER;
+    double TRACK_WIDTH_METERS;
+    double TRACK_LENGTH_METERS;
+    double WHEEL_DIAMETER_METERS;
+    double WHEEL_COF;
 
-    // Reductions
-    double DRIVE_GEAR_RATIO;
-    double STEER_GEAR_RATIO;
+    // Should have a gear reduction applied with .withReduction()
+    DCMotor DRIVE_MOTOR;
+    double DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
 
-    // Rad/sec
-    double DRIVE_MOTOR_MAX_SPEED;
-    double STEER_MOTOR_MAX_SPEED;
+    double MASS_KG;
+    double MOI_KG_METERS_SQUARED;
 
-    // Meters/sec^2
-    double MAX_LINEAR_ACCELERATION;
+    // Should already have a reduction applied
+    double MAX_STEER_SPEED_RAD_PER_SEC;
 
     // Due to kinematic limits, it may not be possible for the bot to stay moving straight when
     // spinning and moving at the same time. This fudge factor slows down the max angular speed
