@@ -13,13 +13,14 @@ import static java.lang.Math.PI;
 import choreo.trajectory.SwerveSample;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.Vector;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -40,10 +41,10 @@ public class Swerve extends SubsystemBase {
   private SwerveSetpoint lastSetpoint;
 
   private final double maxLinearSpeedMetersPerSec;
-  private final double maxAngularSpeedRadiansPerSec;
+  private final double drivebaseRadius;
   private final double angularSpeedFudgeFactor;
 
-  private final SwerveDrivePoseEstimator poseEstimator;
+  private final SwervePoseEstimator poseEstimator;
   private final VisionPoseEstimator visionPoseEstimator;
 
   private final PIDController xController;
@@ -59,13 +60,12 @@ public class Swerve extends SubsystemBase {
 
     maxLinearSpeedMetersPerSec =
         CONSTANTS.DRIVE_MOTOR.freeSpeedRadPerSec * (CONSTANTS.WHEEL_DIAMETER_METERS / 2);
-    maxAngularSpeedRadiansPerSec =
-        maxLinearSpeedMetersPerSec
-            / Math.hypot(CONSTANTS.TRACK_WIDTH_METERS / 2, CONSTANTS.TRACK_LENGTH_METERS / 2);
+    drivebaseRadius =
+        Math.hypot(CONSTANTS.TRACK_WIDTH_METERS / 2, CONSTANTS.TRACK_LENGTH_METERS / 2);
     angularSpeedFudgeFactor = CONSTANTS.ANGULAR_SPEED_FUDGING;
 
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);
-    Logger.recordOutput("Swerve/Max Angular Speed", maxAngularSpeedRadiansPerSec);
+    Logger.recordOutput("Swerve/Max Angular Speed", maxLinearSpeedMetersPerSec / drivebaseRadius);
 
     setpointGenerator =
         new SwerveSetpointGenerator(
@@ -115,24 +115,15 @@ public class Swerve extends SubsystemBase {
     lastSetpoint = new SwerveSetpoint(new ChassisSpeeds(), swerveInputs.moduleStates, EMPTY_FORCES);
 
     poseEstimator =
-        new SwerveDrivePoseEstimator(
+        new SwervePoseEstimator(
             setpointGenerator.getKinematics(),
-            swerveInputs.gyroYaw,
             Arrays.copyOfRange(
                 swerveInputs.odometryPositions,
                 swerveInputs.odometryPositions.length - 4,
                 swerveInputs.odometryPositions.length),
+            swerveInputs.gyroYaw,
             new Pose2d());
-    visionPoseEstimator =
-        new VisionPoseEstimator(
-            poseEstimatorIO,
-            this::getRobotChassisSpeeds,
-            (pose, timestamp, translationalStDevs, angularStDevs) -> {
-              poseEstimator.addVisionMeasurement(
-                  pose,
-                  timestamp,
-                  VecBuilder.fill(translationalStDevs, translationalStDevs, angularStDevs));
-            });
+    visionPoseEstimator = new VisionPoseEstimator(poseEstimatorIO, this::getRobotChassisSpeeds);
 
     xController = new PIDController(5, 0, 0);
     yController = new PIDController(5, 0, 0);
@@ -147,20 +138,56 @@ public class Swerve extends SubsystemBase {
 
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
+    Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
 
-    var poseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
+    var driveStdDevs = getDriveStdDevs();
+    Logger.recordOutput("Swerve/Odometry/Drive Std Devs/Translational", driveStdDevs.get(0));
+    Logger.recordOutput("Swerve/Odometry/Drive Std Devs/Rotational", driveStdDevs.get(2));
+    poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
+
+    var drivePoseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
     for (int i = 0; i < swerveInputs.odometryTimestamps.length; i++) {
       poseEstimator.updateWithTime(
           swerveInputs.odometryTimestamps[i],
           swerveInputs.odometryYaws[i],
           Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
-      poseUpdates[i] = getPose();
+      drivePoseUpdates[i] = getPose();
     }
-    Logger.recordOutput("Swerve/Odometry/Pose updates", poseUpdates);
-    Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
+    Logger.recordOutput("Swerve/Odometry/Drive pose updates", drivePoseUpdates);
 
-    visionPoseEstimator.poll();
+    var poseEstimates = visionPoseEstimator.poll();
+    var visionPoseUpdates = new Pose2d[poseEstimates.length];
+    for (int i = 0; i < poseEstimates.length; i++) {
+      poseEstimator.addVisionMeasurement(poseEstimates[i]);
+      visionPoseUpdates[i] = getPose();
+    }
+    Logger.recordOutput("Swerve/Odometry/Vision pose updates", visionPoseUpdates);
+
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
+  }
+
+  private Vector<N3> getDriveStdDevs() {
+    var idealStates =
+        setpointGenerator.getKinematics().toSwerveModuleStates(getRobotChassisSpeeds());
+
+    double squaredSum = 0;
+    for (int i = 0; i < 4; i++) {
+      var measuredVector =
+          new Translation2d(
+              swerveInputs.moduleStates[i].speedMetersPerSecond,
+              swerveInputs.moduleStates[i].angle);
+      var idealVector =
+          new Translation2d(idealStates[i].speedMetersPerSecond, idealStates[i].angle);
+
+      var delta = measuredVector.getDistance(idealVector);
+
+      squaredSum += delta * delta;
+    }
+
+    double linearStdDevs = Math.max(Math.sqrt(squaredSum / 4), 1e-3);
+    double angularStdDevs = linearStdDevs / drivebaseRadius;
+
+    return VecBuilder.fill(linearStdDevs, linearStdDevs, angularStdDevs);
   }
 
   public Command teleopDrive(
@@ -171,7 +198,7 @@ public class Swerve extends SubsystemBase {
                 new ChassisSpeeds(
                     xSupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
                     ySupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
-                    omegaSupplier.getAsDouble() * maxAngularSpeedRadiansPerSec)));
+                    omegaSupplier.getAsDouble() * maxLinearSpeedMetersPerSec / drivebaseRadius)));
   }
 
   public Command stopInX() {
