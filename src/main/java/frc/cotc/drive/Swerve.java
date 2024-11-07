@@ -184,7 +184,7 @@ public class Swerve extends SubsystemBase {
       squaredSum += delta * delta;
     }
 
-    double linearStdDevs = Math.max(Math.sqrt(squaredSum / 4), 1e-3);
+    double linearStdDevs = Math.sqrt(squaredSum / 4);
     double angularStdDevs = linearStdDevs / drivebaseRadius;
 
     return VecBuilder.fill(linearStdDevs, linearStdDevs, angularStdDevs);
