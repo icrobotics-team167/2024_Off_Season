@@ -88,8 +88,6 @@ public class Robot extends LoggedRobot {
             () -> MathUtil.applyDeadband(-primaryRight.getX(), .01)));
     RobotModeTriggers.disabled().or(primaryLeft.button(3)).whileTrue(swerve.stopInX());
 
-    // primaryController.rightBumper().onTrue(swerve.driveCharacterization());
-
     autos = new Autos(swerve);
   }
 

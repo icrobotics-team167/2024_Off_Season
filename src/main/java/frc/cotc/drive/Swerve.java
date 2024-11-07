@@ -7,13 +7,10 @@
 
 package frc.cotc.drive;
 
-import static edu.wpi.first.units.Units.*;
-import static edu.wpi.first.wpilibj2.command.Commands.sequence;
 import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import choreo.trajectory.SwerveSample;
-import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.controller.PIDController;
@@ -26,7 +23,6 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.cotc.vision.VisionPoseEstimator;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import java.util.Arrays;
@@ -168,7 +164,7 @@ public class Swerve extends SubsystemBase {
       DoubleSupplier xSupplier, DoubleSupplier ySupplier, DoubleSupplier omegaSupplier) {
     return run(
         () ->
-            fieldOrientedDrive(
+            teleopDrive(
                 new ChassisSpeeds(
                     xSupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
                     ySupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
@@ -181,29 +177,6 @@ public class Swerve extends SubsystemBase {
           swerveIO.drive(stopInXSetpoint, EMPTY_FORCES);
           lastSetpoint = stopInXSetpoint;
         });
-  }
-
-  public Command driveCharacterization() {
-    SysIdRoutine characterizationRoutine =
-        new SysIdRoutine(
-            new SysIdRoutine.Config(
-                Volts.of(4).per(Second),
-                Volts.of(4),
-                Seconds.of(4),
-                (state) -> SignalLogger.writeString("SysIDState", state.toString())),
-            new SysIdRoutine.Mechanism(
-                (voltage) -> swerveIO.driveCharacterization(voltage.baseUnitMagnitude()),
-                null,
-                this));
-    return sequence(
-        characterizationRoutine.quasistatic(SysIdRoutine.Direction.kForward),
-        stop().withTimeout(2),
-        characterizationRoutine.quasistatic(SysIdRoutine.Direction.kReverse),
-        stop().withTimeout(2),
-        characterizationRoutine.dynamic(SysIdRoutine.Direction.kForward),
-        stop().withTimeout(2),
-        characterizationRoutine.dynamic(SysIdRoutine.Direction.kReverse),
-        stop().withTimeout(2));
   }
 
   private Command stop() {
@@ -223,7 +196,7 @@ public class Swerve extends SubsystemBase {
         });
   }
 
-  private void drive(ChassisSpeeds speeds, double[] forceFeedforwards) {
+  private void autoDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
     var translationalMagnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
     if (translationalMagnitude > maxLinearSpeedMetersPerSec) {
       speeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
@@ -244,12 +217,36 @@ public class Swerve extends SubsystemBase {
     lastSetpoint = setpoint;
   }
 
-  private void fieldOrientedDrive(ChassisSpeeds speeds) {
-    fieldOrientedDrive(speeds, EMPTY_FORCES);
+  private void teleopDrive(ChassisSpeeds speeds) {
+    speeds = toRobotRelative(speeds);
+
+    var translationalMagnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+    if (translationalMagnitude > maxLinearSpeedMetersPerSec) {
+      speeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
+      speeds.vyMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
+
+      translationalMagnitude = maxLinearSpeedMetersPerSec;
+    }
+    speeds.omegaRadiansPerSecond *=
+        MathUtil.interpolate(
+            1,
+            angularSpeedFudgeFactor,
+            MathUtil.inverseInterpolate(0, maxLinearSpeedMetersPerSec, translationalMagnitude));
+
+    var setpoint =
+        setpointGenerator.generateSetpoint(
+            new SwerveSetpoint(
+                setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates),
+                swerveInputs.moduleStates,
+                EMPTY_FORCES),
+            speeds,
+            RobotController.getBatteryVoltage());
+    swerveIO.drive(setpoint, EMPTY_FORCES);
+    lastSetpoint = setpoint;
   }
 
   private void fieldOrientedDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
-    drive(toRobotRelative(speeds), forceFeedforwards);
+    autoDrive(toRobotRelative(speeds), forceFeedforwards);
   }
 
   public void followTrajectory(Pose2d currentPose, SwerveSample sample) {
