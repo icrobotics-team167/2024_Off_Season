@@ -144,8 +144,10 @@ public class Swerve extends SubsystemBase {
   public void periodic() {
     Logger.recordOutput("Swerve/Commanded speeds", lastSetpoint.chassisSpeeds());
     Logger.recordOutput("Swerve/Drive setpoint", lastSetpoint.moduleStates());
+
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
+
     var poseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
     for (int i = 0; i < swerveInputs.odometryTimestamps.length; i++) {
       poseEstimator.updateWithTime(
@@ -155,8 +157,9 @@ public class Swerve extends SubsystemBase {
       poseUpdates[i] = getPose();
     }
     Logger.recordOutput("Swerve/Odometry/Pose updates", poseUpdates);
-    visionPoseEstimator.poll();
     Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
+
+    visionPoseEstimator.poll();
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
 
