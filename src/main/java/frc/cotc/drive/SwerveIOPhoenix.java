@@ -109,7 +109,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     BaseStatusSignal.setUpdateFrequencyForAll(50, lowFreqSignals);
 
-    ParentDevice.optimizeBusUtilizationForAll(devices);
+    ParentDevice.optimizeBusUtilizationForAll(4, devices);
 
     if (Robot.isSimulation()) {
       new SimThread(modules, gyro).start();
@@ -424,21 +424,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         simModules[i] = new SimModule(modules[i]);
       }
       gyroSimState = gyro.getSimState();
-
-      setDaemon(true);
-      Threads.setCurrentThreadPriority(true, 1);
     }
-
-    private final SwerveDriveKinematics kinematics =
-        new SwerveDriveKinematics(
-            new Translation2d(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
-            new Translation2d(CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2),
-            new Translation2d(-CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
-            new Translation2d(
-                -CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2));
-    private double yawDeg = 0;
-
-    private double currentDraw = 0;
 
     @Override
     public void run() {
@@ -449,6 +435,20 @@ public class SwerveIOPhoenix implements SwerveIO {
         module.encoderSim.setRawPosition(module.steerSim.getAngularPositionRotations());
       }
 
+      SwerveDriveKinematics kinematics =
+          new SwerveDriveKinematics(
+              new Translation2d(
+                  CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
+              new Translation2d(
+                  CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2),
+              new Translation2d(
+                  -CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
+              new Translation2d(
+                  -CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2));
+      double yawDeg = 0;
+
+      double filteredCurrentDraw = 0;
+
       // - .001 to prevent divide by 0 errors later
       double lastTime = (Logger.getRealTimestamp() / 1e6) - .001;
       //noinspection InfiniteLoopStatement
@@ -456,14 +456,19 @@ public class SwerveIOPhoenix implements SwerveIO {
         double currentTime = Logger.getRealTimestamp() / 1e6;
         double dt = currentTime - lastTime;
 
-        double voltage = Math.max(12.3 - (.018 * currentDraw), 6);
+        double voltage = Math.max(12.3 - (.018 * filteredCurrentDraw), 6);
         Robot.simVoltage = voltage;
-        currentDraw = 0;
+        double instantaneousCurrentDraw = 0;
         SwerveModuleState[] moduleStates = new SwerveModuleState[4];
         for (int i = 0; i < 4; i++) {
-          currentDraw += simModules[i].run(dt, voltage);
+          instantaneousCurrentDraw += simModules[i].run(dt, voltage);
           moduleStates[i] = simModules[i].getModuleState();
         }
+        // On a real battery, the battery's internal capacitance absorbs large spikes in current,
+        // but accurately simulating that is a PITA, so in order to simulate capacitance, the
+        // current draw is run through a simple low pass filter to smooth out the current draw.
+        // Without this, large current spikes can trigger the TalonFX over-voltage protection.
+        filteredCurrentDraw += (instantaneousCurrentDraw - filteredCurrentDraw) * (dt * 10);
 
         yawDeg +=
             Units.radiansToDegrees(
@@ -474,6 +479,8 @@ public class SwerveIOPhoenix implements SwerveIO {
         SignalLogger.writeDouble("Swerve Sim Thread/Frequency (hz)", 1.0 / dt);
 
         lastTime = currentTime;
+
+        Thread.yield();
       }
     }
 

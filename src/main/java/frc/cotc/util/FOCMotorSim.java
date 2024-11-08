@@ -20,6 +20,11 @@ public class FOCMotorSim {
   private final DCMotor motor;
   private final double moi;
 
+  /**
+   * @param motor The DCMotor object. {@link DCMotor#withReduction} needs to be applied if it's not
+   *     a direct drive system.
+   * @param moiKgMetersSquared The moment of inertia for the simulated flywheel.
+   */
   public FOCMotorSim(DCMotor motor, double moiKgMetersSquared) {
     this.motor = motor;
     this.moi = moiKgMetersSquared;
@@ -29,6 +34,13 @@ public class FOCMotorSim {
   private double vel = 0;
   private double accel = 0;
 
+  /**
+   * Ticks the simulation one timestep forwards.
+   *
+   * @param current The torque current of the motor. Should be positive for forward accel and
+   *     negative for backwards accel.
+   * @param dt The delta time in which to tick forwards.
+   */
   public void tick(double current, double dt) {
     double maxCurrentDraw;
     // If accelerating (aka current and vel have the same sign), then limit current based on
