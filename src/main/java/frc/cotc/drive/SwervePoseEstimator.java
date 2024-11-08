@@ -38,11 +38,12 @@ public class SwervePoseEstimator {
   private Pose2d poseEstimate;
 
   /**
-   * Constructs a PoseEstimator.
+   * Constructs a SwervePoseEstimator.
    *
    * @param kinematics A correctly-configured kinematics object for your drivetrain.
    * @param initialPositions The initial positions.
    * @param initialYaw The initial gyro yaw.
+   * @param initialPose The initial pose.
    */
   public SwervePoseEstimator(
       SwerveDriveKinematics kinematics,
@@ -188,7 +189,7 @@ public class SwervePoseEstimator {
    * while still accounting for measurement noise.
    *
    * <p>This method can be called as infrequently as you want, as long as you are calling {@link
-   * #update} every loop.
+   * #updateWithTime} every loop.
    *
    * <p>To promote stability of the pose estimate and make it robust to bad vision data, we
    * recommend only adding vision measurements that are already within one meter or so of the
@@ -266,18 +267,6 @@ public class SwervePoseEstimator {
     // Step 9: Update latest pose estimate. Since we cleared all updates after this vision update,
     // it's guaranteed to be the latest vision update.
     this.poseEstimate = visionUpdate.compensate(odometry.getPoseMeters());
-  }
-
-  /**
-   * Updates the pose estimator with wheel encoder and gyro information. This should be called every
-   * loop.
-   *
-   * @param gyroAngle The current gyro angle.
-   * @param wheelPositions The current encoder readings.
-   * @return The estimated pose of the robot in meters.
-   */
-  public Pose2d update(Rotation2d gyroAngle, SwerveModulePosition[] wheelPositions) {
-    return updateWithTime(MathSharedStore.getTimestamp(), gyroAngle, wheelPositions);
   }
 
   /**

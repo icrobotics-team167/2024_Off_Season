@@ -147,11 +147,11 @@ public class Swerve extends SubsystemBase {
 
     var drivePoseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
     for (int i = 0; i < swerveInputs.odometryTimestamps.length; i++) {
-      poseEstimator.updateWithTime(
-          swerveInputs.odometryTimestamps[i],
-          swerveInputs.odometryYaws[i],
-          Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
-      drivePoseUpdates[i] = getPose();
+      drivePoseUpdates[i] =
+          poseEstimator.updateWithTime(
+              swerveInputs.odometryTimestamps[i],
+              swerveInputs.odometryYaws[i],
+              Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
     }
     Logger.recordOutput("Swerve/Odometry/Drive pose updates", drivePoseUpdates);
 
@@ -184,6 +184,7 @@ public class Swerve extends SubsystemBase {
       squaredSum += delta * delta;
     }
 
+    // Sqrt of avg = standard deviation
     double linearStdDevs = Math.sqrt(squaredSum / 4);
     double angularStdDevs = linearStdDevs / drivebaseRadius;
 
