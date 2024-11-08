@@ -28,7 +28,6 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 public class Robot extends LoggedRobot {
   public static final String CANIVORE_NAME = "Canivore";
 
-  private final String mode;
   private final Autos autos;
 
   @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
@@ -41,8 +40,8 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
-    mode = Robot.isReal() ? "REAL" : "SIM";
-    //        mode = "REPLAY";
+    String mode = Robot.isReal() ? "REAL" : "SIM";
+    //    String mode = "REPLAY";
 
     switch (mode) {
       case "REAL" -> {
@@ -136,7 +135,7 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void simulationPeriodic() {
-    if (!mode.equals("REPLAY")) {
+    if (!Logger.hasReplaySource()) {
       RoboRioSim.setVInVoltage(simVoltage);
     }
   }
