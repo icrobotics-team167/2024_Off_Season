@@ -44,6 +44,7 @@ deploy {
                     predeploy << { execute 'rm -rf /home/lvuser/deploy' }
                     files = project.fileTree('src/main/deploy')
                     directory = '/home/lvuser/deploy'
+                    deleteOldFiles = true
                 }
             }
         }
