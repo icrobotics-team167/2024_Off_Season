@@ -230,6 +230,23 @@ public class Swerve extends SubsystemBase {
   }
 
   private void autoDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
+    // teleopDrive uses the current drive state for more responsiveness, autoDrive uses the
+    // previous generated setpoint for more consistency
+    drive(speeds, lastSetpoint, forceFeedforwards);
+  }
+
+  private void teleopDrive(ChassisSpeeds speeds) {
+    drive(
+        toRobotRelative(speeds),
+        new SwerveSetpoint(
+            setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates),
+            swerveInputs.moduleStates,
+            EMPTY_FORCES),
+        EMPTY_FORCES);
+  }
+
+  private void drive(
+      ChassisSpeeds speeds, SwerveSetpoint lastSetpoint, double[] forceFeedforwards) {
     var translationalMagnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
     if (translationalMagnitude > maxLinearSpeedMetersPerSec) {
       speeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
@@ -247,35 +264,7 @@ public class Swerve extends SubsystemBase {
         setpointGenerator.generateSetpoint(
             lastSetpoint, speeds, RobotController.getBatteryVoltage());
     swerveIO.drive(setpoint, forceFeedforwards);
-    lastSetpoint = setpoint;
-  }
-
-  private void teleopDrive(ChassisSpeeds speeds) {
-    speeds = toRobotRelative(speeds);
-
-    var translationalMagnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
-    if (translationalMagnitude > maxLinearSpeedMetersPerSec) {
-      speeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
-      speeds.vyMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
-
-      translationalMagnitude = maxLinearSpeedMetersPerSec;
-    }
-    speeds.omegaRadiansPerSecond *=
-        MathUtil.interpolate(
-            1,
-            angularSpeedFudgeFactor,
-            MathUtil.inverseInterpolate(0, maxLinearSpeedMetersPerSec, translationalMagnitude));
-
-    var setpoint =
-        setpointGenerator.generateSetpoint(
-            new SwerveSetpoint(
-                setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates),
-                swerveInputs.moduleStates,
-                EMPTY_FORCES),
-            speeds,
-            RobotController.getBatteryVoltage());
-    swerveIO.drive(setpoint, EMPTY_FORCES);
-    lastSetpoint = setpoint;
+    this.lastSetpoint = setpoint;
   }
 
   private void fieldOrientedDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
