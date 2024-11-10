@@ -25,41 +25,39 @@ public class MotorCurrentDraws {
     return new MotorCurrentDraws(statorSignal.getValueAsDouble(), supplySignal.getValueAsDouble());
   }
 
-  public static MotorCurrentDrawsStruct struct = new MotorCurrentDrawsStruct();
+  public static Struct<MotorCurrentDraws> struct =
+      new Struct<>() {
+        @Override
+        public Class<MotorCurrentDraws> getTypeClass() {
+          return MotorCurrentDraws.class;
+        }
 
-  public static class MotorCurrentDrawsStruct implements Struct<MotorCurrentDraws> {
+        @Override
+        public String getTypeName() {
+          return "MotorCurrentDraws";
+        }
 
-    @Override
-    public Class<MotorCurrentDraws> getTypeClass() {
-      return MotorCurrentDraws.class;
-    }
+        @Override
+        public int getSize() {
+          return kSizeDouble * 2;
+        }
 
-    @Override
-    public String getTypeName() {
-      return "MotorCurrentDraws";
-    }
+        @Override
+        public String getSchema() {
+          return "double stator;double supply";
+        }
 
-    @Override
-    public int getSize() {
-      return kSizeDouble * 2;
-    }
+        @Override
+        public MotorCurrentDraws unpack(ByteBuffer bb) {
+          var stator = bb.getDouble();
+          var supply = bb.getDouble();
+          return new MotorCurrentDraws(stator, supply);
+        }
 
-    @Override
-    public String getSchema() {
-      return "double stator;double supply";
-    }
-
-    @Override
-    public MotorCurrentDraws unpack(ByteBuffer bb) {
-      var stator = bb.getDouble();
-      var supply = bb.getDouble();
-      return new MotorCurrentDraws(stator, supply);
-    }
-
-    @Override
-    public void pack(ByteBuffer bb, MotorCurrentDraws value) {
-      bb.putDouble(value.statorCurrent);
-      bb.putDouble(value.supplyCurrent);
-    }
-  }
+        @Override
+        public void pack(ByteBuffer bb, MotorCurrentDraws value) {
+          bb.putDouble(value.statorCurrent);
+          bb.putDouble(value.supplyCurrent);
+        }
+      };
 }

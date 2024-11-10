@@ -7,27 +7,24 @@
 
 package frc.cotc.vision;
 
-import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import java.util.function.Supplier;
-import org.littletonrobotics.junction.AutoLog;
+import org.littletonrobotics.junction.LogTable;
+import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 public interface VisionPoseEstimatorIO {
-  @AutoLog
-  class VisionPoseEstimatorInputs {
-    double[] timestamps = new double[0];
-    Pose2d[] poses = new Pose2d[0];
-    double[] translationalStDevs = new double[0];
-    double[] rotationalStDevs = new double[0];
+  class VisionPoseEstimatorInputs implements LoggableInputs {
+    VisionPoseEstimator.PoseEstimate[] poseEstimates;
+
+    @Override
+    public void toLog(LogTable table) {
+      table.put("poseEstimates", VisionPoseEstimator.PoseEstimate.struct, poseEstimates);
+    }
+
+    @Override
+    public void fromLog(LogTable table) {
+      poseEstimates = table.get("poseEstimates", VisionPoseEstimator.PoseEstimate.struct);
+    }
   }
 
-  default void updateInputs(VisionPoseEstimatorInputs inputs) {}
-
-  /**
-   * Reliability/noise of data can be affected by robot movement, so standard deviation estimates
-   * should account for that.
-   *
-   * @param velocities A supplier for the robot's current velocity.
-   */
-  default void addVelocityDataSource(Supplier<ChassisSpeeds> velocities) {}
+  default void updateInputs(VisionPoseEstimatorInputs inputs, ChassisSpeeds speeds) {}
 }

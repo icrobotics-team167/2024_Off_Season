@@ -123,7 +123,7 @@ public class Swerve extends SubsystemBase {
                 swerveInputs.odometryPositions.length),
             swerveInputs.gyroYaw,
             new Pose2d());
-    visionPoseEstimator = new VisionPoseEstimator(poseEstimatorIO, this::getRobotChassisSpeeds);
+    visionPoseEstimator = new VisionPoseEstimator(poseEstimatorIO);
 
     xController = new PIDController(5, 0, 0);
     yController = new PIDController(5, 0, 0);
@@ -155,7 +155,9 @@ public class Swerve extends SubsystemBase {
     }
     Logger.recordOutput("Swerve/Odometry/Drive pose updates", drivePoseUpdates);
 
-    var poseEstimates = visionPoseEstimator.poll();
+    var poseEstimates =
+        visionPoseEstimator.poll(
+            ChassisSpeeds.fromRobotRelativeSpeeds(getRobotChassisSpeeds(), swerveInputs.gyroYaw));
     var visionPoseUpdates = new Pose2d[poseEstimates.length];
     for (int i = 0; i < poseEstimates.length; i++) {
       poseEstimator.addVisionMeasurement(poseEstimates[i]);

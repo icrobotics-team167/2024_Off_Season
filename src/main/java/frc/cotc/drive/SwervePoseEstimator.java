@@ -23,8 +23,6 @@ import java.util.TreeMap;
 
 public class SwervePoseEstimator {
   private final SwerveDriveOdometry odometry;
-  private final Matrix<N3, N1> driveQ = new Matrix<>(Nat.N3(), Nat.N1());
-  private final Matrix<N3, N3> visionK = new Matrix<>(Nat.N3(), Nat.N3());
 
   private static final double BUFFER_DURATION = 1.5;
   // Maps timestamps to odometry-only pose estimates
@@ -53,20 +51,6 @@ public class SwervePoseEstimator {
     odometry = new SwerveDriveOdometry(kinematics, initialYaw, initialPositions, initialPose);
 
     poseEstimate = odometry.getPoseMeters();
-  }
-
-  private boolean driveMatrixInitialized = false;
-
-  /**
-   * @param driveMeasurementStdDevs Standard deviations of the pose estimate (x position in meters,
-   *     y position in meters, and heading in radians). Increase these numbers to trust your state
-   *     estimate less.
-   */
-  public final void setDriveMeasurementStdDevs(Matrix<N3, N1> driveMeasurementStdDevs) {
-    for (int i = 0; i < 3; ++i) {
-      driveQ.set(i, 0, driveMeasurementStdDevs.get(i, 0) * driveMeasurementStdDevs.get(i, 0));
-    }
-    driveMatrixInitialized = true;
   }
 
   /**
@@ -184,6 +168,23 @@ public class SwervePoseEstimator {
     visionUpdates.headMap(newestNeededVisionUpdateTimestamp, false).clear();
   }
 
+  private final Matrix<N3, N1> driveQ = new Matrix<>(Nat.N3(), Nat.N1());
+  private boolean driveMatrixInitialized = false;
+
+  /**
+   * @param driveMeasurementStdDevs Standard deviations of the pose estimate (x position in meters,
+   *     y position in meters, and heading in radians). Increase these numbers to trust your state
+   *     estimate less.
+   */
+  public final void setDriveMeasurementStdDevs(Matrix<N3, N1> driveMeasurementStdDevs) {
+    for (int i = 0; i < 3; ++i) {
+      driveQ.set(i, 0, driveMeasurementStdDevs.get(i, 0) * driveMeasurementStdDevs.get(i, 0));
+    }
+    driveMatrixInitialized = true;
+  }
+
+  private final Matrix<N3, N3> visionK = new Matrix<>(Nat.N3(), Nat.N3());
+
   /**
    * Adds a vision measurement to the Kalman Filter. This will correct the odometry pose estimate
    * while still accounting for measurement noise.
@@ -201,14 +202,16 @@ public class SwervePoseEstimator {
     }
 
     // Update vision matrix
-    // Square each term
-    var r = new double[3];
-    for (int i = 0; i < 3; ++i) {
-      r[i] = measurement.stdDevs().get(i, 0) * measurement.stdDevs().get(i, 0);
-    }
+    // Step 0: square each term
+    var r =
+        new double[] {
+          measurement.xStdDevs() * measurement.xStdDevs(),
+          measurement.yStdDevs() * measurement.yStdDevs(),
+          measurement.yawStdDevs() * measurement.yawStdDevs()
+        };
 
-    // Solve for closed form Kalman gain for continuous Kalman filter with A = 0
-    // and C = I. See wpimath/algorithms.md.
+    // Step 1: solve for closed form Kalman gain for continuous Kalman filter with A = 0 and C =
+    // I. See wpimath/algorithms.md.
     for (int row = 0; row < 3; ++row) {
       if (driveQ.get(row, 0) == 0.0) {
         visionK.set(row, row, 0.0);

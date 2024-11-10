@@ -20,6 +20,7 @@ import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
 import frc.cotc.vision.VisionPoseEstimatorIO;
+import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.*;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
@@ -94,7 +95,11 @@ public class Robot extends LoggedRobot {
     VisionPoseEstimatorIO poseEstimatorIO;
 
     switch (mode) {
-      case "REAL", "SIM" -> {
+      case "REAL" -> {
+        swerveIO = new SwerveIOPhoenix();
+        poseEstimatorIO = new VisionPoseEstimatorIOPhoton();
+      }
+      case "SIM" -> {
         swerveIO = new SwerveIOPhoenix();
         poseEstimatorIO = new VisionPoseEstimatorIO() {};
       }
