@@ -435,7 +435,8 @@ public class SwerveSetpointGenerator {
         activeConstraints[i] = ActiveConstraint.TRACTION;
         currentDraw = driveMotor.getCurrent(maxTorqueFriction);
       }
-      Logger.recordOutput("Swerve/Setpoint Generator/Expected current draws/" + i, currentDraw);
+      Logger.recordOutput(
+          "Swerve/Setpoint Generator/Expected current draws/" + i, currentDraw * forceSign);
 
       double forceAtCarpet = moduleTorque / wheelRadiusMeters;
       Translation2d moduleForceVec = new Translation2d(forceAtCarpet * forceSign, forceAngle);
