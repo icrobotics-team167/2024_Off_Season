@@ -40,16 +40,12 @@ public class Swerve extends SubsystemBase {
   private final double[] EMPTY_FORCES = new double[4];
   private SwerveSetpoint lastSetpoint;
 
-  private final double maxLinearSpeedMetersPerSec;
-  private final double drivebaseRadius;
-  private final double angularSpeedFudgeFactor;
+  private final double maxLinearSpeedMetersPerSec, drivebaseRadius, angularSpeedFudgeFactor;
 
   private final SwervePoseEstimator poseEstimator;
   private final VisionPoseEstimator visionPoseEstimator;
 
-  private final PIDController xController;
-  private final PIDController yController;
-  private final PIDController yawController;
+  private final PIDController xController, yController, yawController;
 
   public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO poseEstimatorIO) {
     this.swerveIO = driveIO;
