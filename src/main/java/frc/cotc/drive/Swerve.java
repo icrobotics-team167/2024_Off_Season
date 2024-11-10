@@ -12,15 +12,12 @@ import static java.lang.Math.PI;
 
 import choreo.trajectory.SwerveSample;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.VecBuilder;
-import edu.wpi.first.math.Vector;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -147,8 +144,7 @@ public class Swerve extends SubsystemBase {
     Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
 
     var driveStdDevs = getDriveStdDevs();
-    Logger.recordOutput("Swerve/Odometry/Drive Std Devs/Translational", driveStdDevs.get(0));
-    Logger.recordOutput("Swerve/Odometry/Drive Std Devs/Rotational", driveStdDevs.get(2));
+    Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
     poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
     var drivePoseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
@@ -164,12 +160,19 @@ public class Swerve extends SubsystemBase {
     for (int i = 0; i < visionIOs.length; i++) {
       visionIOs[i].updateInputs(visionInputs[i]);
       Logger.processInputs("Vision/" + i, visionInputs[i]);
+
+      for (var poseEstimate : visionInputs[i].poseEstimates) {
+        poseEstimator.addVisionMeasurement(
+            poseEstimate.estimatedPose().toPose2d(),
+            poseEstimate.timestamp(),
+            new double[] {.1, .1, .1});
+      }
     }
 
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
 
-  private Vector<N3> getDriveStdDevs() {
+  private double[] getDriveStdDevs() {
     var idealStates =
         setpointGenerator.getKinematics().toSwerveModuleStates(getRobotChassisSpeeds());
 
@@ -188,10 +191,11 @@ public class Swerve extends SubsystemBase {
     }
 
     // Sqrt of avg = standard deviation
-    double linearStdDevs = Math.sqrt(squaredSum / 4);
+    // Minimum value is 1 cm deviation to prevent unwanted behavior from a 0 value
+    double linearStdDevs = Math.max(Math.sqrt(squaredSum / 4), .01);
     double angularStdDevs = linearStdDevs / drivebaseRadius;
 
-    return VecBuilder.fill(linearStdDevs, linearStdDevs, angularStdDevs);
+    return new double[] {linearStdDevs, linearStdDevs, angularStdDevs};
   }
 
   public Command teleopDrive(

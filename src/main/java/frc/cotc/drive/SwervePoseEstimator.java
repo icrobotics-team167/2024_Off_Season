@@ -14,8 +14,6 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Twist2d;
 import edu.wpi.first.math.interpolation.TimeInterpolatableBuffer;
 import edu.wpi.first.math.kinematics.*;
-import edu.wpi.first.math.numbers.N1;
-import edu.wpi.first.math.numbers.N3;
 import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -167,7 +165,7 @@ public class SwervePoseEstimator {
     visionUpdates.headMap(newestNeededVisionUpdateTimestamp, false).clear();
   }
 
-  private final Matrix<N3, N1> driveQ = new Matrix<>(Nat.N3(), Nat.N1());
+  private double[] driveStdDevs = new double[3];
   private boolean driveMatrixInitialized = false;
 
   /**
@@ -175,14 +173,13 @@ public class SwervePoseEstimator {
    *     y position in meters, and heading in radians). Increase these numbers to trust your state
    *     estimate less.
    */
-  public final void setDriveMeasurementStdDevs(Matrix<N3, N1> driveMeasurementStdDevs) {
-    for (int i = 0; i < 3; ++i) {
-      driveQ.set(i, 0, driveMeasurementStdDevs.get(i, 0) * driveMeasurementStdDevs.get(i, 0));
+  public final void setDriveMeasurementStdDevs(double[] driveMeasurementStdDevs) {
+    if (driveMeasurementStdDevs.length != 3) {
+      throw new IllegalArgumentException("Length of driveMeasurementStdDevs must be 3!");
     }
+    driveStdDevs = driveMeasurementStdDevs;
     driveMatrixInitialized = true;
   }
-
-  private final Matrix<N3, N3> visionK = new Matrix<>(Nat.N3(), Nat.N3());
 
   /**
    * Adds a vision measurement to the Kalman Filter. This will correct the odometry pose estimate
@@ -209,14 +206,15 @@ public class SwervePoseEstimator {
 
     // Step 1: solve for closed form Kalman gain for continuous Kalman filter with A = 0 and C =
     // I. See wpimath/algorithms.md.
+    var visionK = new Matrix<>(Nat.N3(), Nat.N3());
     for (int row = 0; row < 3; ++row) {
-      if (driveQ.get(row, 0) == 0.0) {
+      if (driveStdDevs[row] == 0.0) {
         visionK.set(row, row, 0.0);
       } else {
         visionK.set(
             row,
             row,
-            driveQ.get(row, 0) / (driveQ.get(row, 0) + Math.sqrt(driveQ.get(row, 0) * r[row])));
+            driveStdDevs[row] / (driveStdDevs[row] + Math.sqrt(driveStdDevs[row] * r[row])));
       }
     }
 
