@@ -16,7 +16,6 @@ import edu.wpi.first.math.interpolation.TimeInterpolatableBuffer;
 import edu.wpi.first.math.kinematics.*;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
-import frc.cotc.vision.VisionPoseEstimator;
 import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -196,19 +195,17 @@ public class SwervePoseEstimator {
    * recommend only adding vision measurements that are already within one meter or so of the
    * current pose estimate.
    */
-  public void addVisionMeasurement(VisionPoseEstimator.PoseEstimate measurement) {
+  public void addVisionMeasurement(Pose2d poseEstimate, double timestamp, double[] stdDevs) {
     if (!driveMatrixInitialized) {
       throw new NullPointerException("Drive standard deviation matrix not initialized!");
     }
 
     // Update vision matrix
     // Step 0: square each term
-    var r =
-        new double[] {
-          measurement.xStdDevs() * measurement.xStdDevs(),
-          measurement.yStdDevs() * measurement.yStdDevs(),
-          measurement.yawStdDevs() * measurement.yawStdDevs()
-        };
+    var r = new double[3];
+    for (int i = 0; i < 3; i++) {
+      r[i] = stdDevs[i] * stdDevs[i];
+    }
 
     // Step 1: solve for closed form Kalman gain for continuous Kalman filter with A = 0 and C =
     // I. See wpimath/algorithms.md.
@@ -226,8 +223,7 @@ public class SwervePoseEstimator {
     // Update pose estimate
     // Step 0: If this measurement is old enough to be outside the pose buffer's timespan, skip.
     if (odometryPoseBuffer.getInternalBuffer().isEmpty()
-        || odometryPoseBuffer.getInternalBuffer().lastKey() - BUFFER_DURATION
-            > measurement.timestamp()) {
+        || odometryPoseBuffer.getInternalBuffer().lastKey() - BUFFER_DURATION > timestamp) {
       return;
     }
 
@@ -235,7 +231,7 @@ public class SwervePoseEstimator {
     cleanUpVisionUpdates();
 
     // Step 2: Get the pose measured by odometry at the moment the vision measurement was made.
-    var odometrySample = odometryPoseBuffer.getSample(measurement.timestamp());
+    var odometrySample = odometryPoseBuffer.getSample(timestamp);
 
     if (odometrySample.isEmpty()) {
       return;
@@ -243,14 +239,14 @@ public class SwervePoseEstimator {
 
     // Step 3: Get the vision-compensated pose estimate at the moment the vision measurement was
     // made.
-    var visionSample = sampleAt(measurement.timestamp());
+    var visionSample = sampleAt(timestamp);
 
     if (visionSample.isEmpty()) {
       return;
     }
 
     // Step 4: Measure the twist between the old pose estimate and the vision pose.
-    var twist = visionSample.get().log(measurement.pose());
+    var twist = visionSample.get().log(poseEstimate);
 
     // Step 5: We should not trust the twist entirely, so instead we scale this twist by a Kalman
     // gain matrix representing how much we trust vision measurements compared to our current pose.
@@ -262,10 +258,10 @@ public class SwervePoseEstimator {
 
     // Step 7: Calculate and record the vision update.
     var visionUpdate = new VisionUpdate(visionSample.get().exp(scaledTwist), odometrySample.get());
-    visionUpdates.put(measurement.timestamp(), visionUpdate);
+    visionUpdates.put(timestamp, visionUpdate);
 
     // Step 8: Remove later vision measurements. (Matches previous behavior)
-    visionUpdates.tailMap(measurement.timestamp(), false).entrySet().clear();
+    visionUpdates.tailMap(timestamp, false).entrySet().clear();
 
     // Step 9: Update latest pose estimate. Since we cleared all updates after this vision update,
     // it's guaranteed to be the latest vision update.

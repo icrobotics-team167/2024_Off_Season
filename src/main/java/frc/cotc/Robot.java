@@ -19,8 +19,6 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
-import frc.cotc.vision.VisionPoseEstimatorIO;
-import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import org.littletonrobotics.junction.*;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
@@ -92,24 +90,17 @@ public class Robot extends LoggedRobot {
 
   private Swerve getSwerve(String mode) {
     SwerveIO swerveIO;
-    VisionPoseEstimatorIO poseEstimatorIO;
 
     switch (mode) {
-      case "REAL" -> {
+      case "REAL", "SIM" -> {
         swerveIO = new SwerveIOPhoenix();
-        poseEstimatorIO = new VisionPoseEstimatorIOPhoton();
-      }
-      case "SIM" -> {
-        swerveIO = new SwerveIOPhoenix();
-        poseEstimatorIO = new VisionPoseEstimatorIO() {};
       }
       default -> {
         swerveIO = new SwerveIO() {};
-        poseEstimatorIO = new VisionPoseEstimatorIO() {};
       }
     }
 
-    return new Swerve(swerveIO, poseEstimatorIO);
+    return new Swerve(swerveIO);
   }
 
   private Command autoCommand;

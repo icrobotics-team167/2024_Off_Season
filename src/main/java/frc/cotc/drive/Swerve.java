@@ -24,8 +24,6 @@ import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.cotc.vision.VisionPoseEstimator;
-import frc.cotc.vision.VisionPoseEstimatorIO;
 import java.util.Arrays;
 import java.util.function.DoubleSupplier;
 import org.littletonrobotics.junction.Logger;
@@ -45,13 +43,12 @@ public class Swerve extends SubsystemBase {
   private final double angularSpeedFudgeFactor;
 
   private final SwervePoseEstimator poseEstimator;
-  private final VisionPoseEstimator visionPoseEstimator;
 
   private final PIDController xController;
   private final PIDController yController;
   private final PIDController yawController;
 
-  public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO poseEstimatorIO) {
+  public Swerve(SwerveIO driveIO) {
     this.swerveIO = driveIO;
     var CONSTANTS = driveIO.getConstants();
     swerveInputs = new SwerveIO.SwerveIOInputs();
@@ -123,7 +120,6 @@ public class Swerve extends SubsystemBase {
                 swerveInputs.odometryPositions.length),
             swerveInputs.gyroYaw,
             new Pose2d());
-    visionPoseEstimator = new VisionPoseEstimator(poseEstimatorIO);
 
     xController = new PIDController(5, 0, 0);
     yController = new PIDController(5, 0, 0);
@@ -154,16 +150,6 @@ public class Swerve extends SubsystemBase {
               Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
     }
     Logger.recordOutput("Swerve/Odometry/Drive pose updates", drivePoseUpdates);
-
-    var poseEstimates =
-        visionPoseEstimator.poll(
-            ChassisSpeeds.fromRobotRelativeSpeeds(getRobotChassisSpeeds(), swerveInputs.gyroYaw));
-    var visionPoseUpdates = new Pose2d[poseEstimates.length];
-    for (int i = 0; i < poseEstimates.length; i++) {
-      poseEstimator.addVisionMeasurement(poseEstimates[i]);
-      visionPoseUpdates[i] = getPose();
-    }
-    Logger.recordOutput("Swerve/Odometry/Vision pose updates", visionPoseUpdates);
 
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
