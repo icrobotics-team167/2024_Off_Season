@@ -24,6 +24,8 @@ import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.cotc.vision.VisionPoseEstimatorIO;
+import frc.cotc.vision.VisionPoseEstimatorIO.VisionPoseEstimatorIOInputs;
 import java.util.Arrays;
 import java.util.function.DoubleSupplier;
 import org.littletonrobotics.junction.Logger;
@@ -44,11 +46,14 @@ public class Swerve extends SubsystemBase {
 
   private final SwervePoseEstimator poseEstimator;
 
+  private final VisionPoseEstimatorIO[] visionIOs;
+  private final VisionPoseEstimatorIOInputs[] visionInputs;
+
   private final PIDController xController;
   private final PIDController yController;
   private final PIDController yawController;
 
-  public Swerve(SwerveIO driveIO) {
+  public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO[] visionIOs) {
     this.swerveIO = driveIO;
     var CONSTANTS = driveIO.getConstants();
     swerveInputs = new SwerveIO.SwerveIOInputs();
@@ -120,6 +125,11 @@ public class Swerve extends SubsystemBase {
                 swerveInputs.odometryPositions.length),
             swerveInputs.gyroYaw,
             new Pose2d());
+    this.visionIOs = visionIOs;
+    visionInputs = new VisionPoseEstimatorIOInputs[visionIOs.length];
+    for (int i = 0; i < visionIOs.length; i++) {
+      visionInputs[i] = new VisionPoseEstimatorIOInputs();
+    }
 
     xController = new PIDController(5, 0, 0);
     yController = new PIDController(5, 0, 0);
@@ -150,6 +160,11 @@ public class Swerve extends SubsystemBase {
               Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
     }
     Logger.recordOutput("Swerve/Odometry/Drive pose updates", drivePoseUpdates);
+
+    for (int i = 0; i < visionIOs.length; i++) {
+      visionIOs[i].updateInputs(visionInputs[i]);
+      Logger.processInputs("Vision/" + i, visionInputs[i]);
+    }
 
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
