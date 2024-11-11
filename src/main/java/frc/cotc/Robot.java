@@ -134,6 +134,9 @@ public class Robot extends LoggedRobot {
     // subsystem periodic() methods. This must be called from the robot's periodic block in order
     // for anything in the Command-based framework to work.
     CommandScheduler.getInstance().run();
+    Logger.recordOutput(
+        "LoggedRobot/MemoryUsageMb",
+        (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1e6);
   }
 
   public static volatile double simVoltage = 12;
