@@ -13,7 +13,7 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 public interface VisionPoseEstimatorIO {
   class VisionPoseEstimatorInputs implements LoggableInputs {
-    VisionPoseEstimator.PoseEstimate[] poseEstimates;
+    VisionPoseEstimator.PoseEstimate[] poseEstimates = new VisionPoseEstimator.PoseEstimate[0];
 
     @Override
     public void toLog(LogTable table) {

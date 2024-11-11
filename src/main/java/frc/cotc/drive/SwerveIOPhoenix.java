@@ -337,6 +337,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       BaseStatusSignal.setUpdateFrequencyForAll(frequency, signals);
 
       setDaemon(true);
+      setName("Phoenix Odometry Thread");
       Threads.setCurrentThreadPriority(true, 2);
 
       FREQUENCY = frequency;
@@ -424,6 +425,10 @@ public class SwerveIOPhoenix implements SwerveIO {
         simModules[i] = new SimModule(modules[i]);
       }
       gyroSimState = gyro.getSimState();
+
+      setName("Phoenix Sim Thread");
+      setDaemon(true);
+      Threads.setCurrentThreadPriority(true, 1);
     }
 
     @Override

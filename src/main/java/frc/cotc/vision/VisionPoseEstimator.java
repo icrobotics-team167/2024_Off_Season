@@ -11,13 +11,13 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.util.struct.Struct;
 import edu.wpi.first.util.struct.StructSerializable;
+import frc.cotc.vision.VisionPoseEstimatorIO.VisionPoseEstimatorInputs;
 import java.nio.ByteBuffer;
 import org.littletonrobotics.junction.Logger;
 
 public class VisionPoseEstimator {
   private final VisionPoseEstimatorIO io;
-  private final VisionPoseEstimatorInputsAutoLogged inputs =
-      new VisionPoseEstimatorInputsAutoLogged();
+  private final VisionPoseEstimatorInputs inputs = new VisionPoseEstimatorInputs();
 
   public VisionPoseEstimator(VisionPoseEstimatorIO io) {
     this.io = io;
