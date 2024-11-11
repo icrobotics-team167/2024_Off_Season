@@ -416,9 +416,10 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
   }
 
-  private static class SimThread extends Thread {
+  private static class SimThread {
     final SimModule[] simModules = new SimModule[4];
     final Pigeon2SimState gyroSimState;
+    final Notifier notifier;
 
     SimThread(Module[] modules, Pigeon2 gyro) {
       for (int i = 0; i < 4; i++) {
@@ -426,13 +427,10 @@ public class SwerveIOPhoenix implements SwerveIO {
       }
       gyroSimState = gyro.getSimState();
 
-      setName("Phoenix Sim Thread");
-      setDaemon(true);
-      Threads.setCurrentThreadPriority(true, 1);
+      notifier = new Notifier(this::run);
     }
 
-    @Override
-    public void run() {
+    private void start() {
       for (SimModule module : simModules) {
         module.steerSim.setState((Math.random() * 2 - 1) * PI, 0);
         module.steerMotorSim.setRawRotorPosition(
@@ -440,53 +438,54 @@ public class SwerveIOPhoenix implements SwerveIO {
         module.encoderSim.setRawPosition(module.steerSim.getAngularPositionRotations());
       }
 
-      SwerveDriveKinematics kinematics =
-          new SwerveDriveKinematics(
-              new Translation2d(
-                  CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
-              new Translation2d(
-                  CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2),
-              new Translation2d(
-                  -CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
-              new Translation2d(
-                  -CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2));
-      double yawDeg = 0;
+      double frequencySeconds = 1.0 / 2000;
 
-      double filteredCurrentDraw = 0;
+      // Minus one iteration to prevent divide by 0 errors later
+      lastTime = (Logger.getRealTimestamp() / 1e6) - frequencySeconds;
 
-      // - .001 to prevent divide by 0 errors later
-      double lastTime = (Logger.getRealTimestamp() / 1e6) - .001;
-      //noinspection InfiniteLoopStatement
-      while (true) {
-        double currentTime = Logger.getRealTimestamp() / 1e6;
-        double dt = currentTime - lastTime;
+      notifier.startPeriodic(frequencySeconds);
+    }
 
-        double voltage = Math.max(12.3 - (.018 * filteredCurrentDraw), 6);
-        Robot.simVoltage = voltage;
-        double instantaneousCurrentDraw = 0;
-        SwerveModuleState[] moduleStates = new SwerveModuleState[4];
-        for (int i = 0; i < 4; i++) {
-          instantaneousCurrentDraw += simModules[i].run(dt, voltage);
-          moduleStates[i] = simModules[i].getModuleState();
-        }
-        // On a real battery, the battery's internal capacitance absorbs large spikes in current,
-        // but accurately simulating that is a PITA, so in order to simulate capacitance, the
-        // current draw is run through a simple low pass filter to smooth out the current draw.
-        // Without this, large current spikes can trigger the TalonFX over-voltage protection.
-        filteredCurrentDraw += (instantaneousCurrentDraw - filteredCurrentDraw) * (dt * 10);
+    private final SwerveDriveKinematics kinematics =
+        new SwerveDriveKinematics(
+            new Translation2d(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
+            new Translation2d(CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2),
+            new Translation2d(-CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
+            new Translation2d(
+                -CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2));
+    private double yawDeg = 0;
+    private double filteredCurrentDraw = 0;
+    private double lastTime;
 
-        yawDeg +=
-            Units.radiansToDegrees(
-                kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond * dt);
-        gyroSimState.setRawYaw(yawDeg);
+    private void run() {
+      double currentTime = Logger.getRealTimestamp() / 1e6;
+      double dt = currentTime - lastTime;
 
-        SignalLogger.writeDouble("Swerve Sim Thread/Time (ms)", dt * 1000);
-        SignalLogger.writeDouble("Swerve Sim Thread/Frequency (hz)", 1.0 / dt);
-
-        lastTime = currentTime;
-
-        Thread.yield();
+      double voltage = Math.max(12.3 - (.018 * filteredCurrentDraw), 6);
+      Robot.simVoltage = voltage;
+      double instantaneousCurrentDraw = 0;
+      SwerveModuleState[] moduleStates = new SwerveModuleState[4];
+      for (int i = 0; i < 4; i++) {
+        instantaneousCurrentDraw += simModules[i].run(dt, voltage);
+        moduleStates[i] = simModules[i].getModuleState();
       }
+      // On a real battery, the battery's internal capacitance absorbs large spikes in current,
+      // but accurately simulating that is a PITA, so in order to simulate capacitance, the
+      // current draw is run through a simple low pass filter to smooth out the current draw.
+      // Without this, large current spikes can trigger the TalonFX over-voltage protection.
+      filteredCurrentDraw += (instantaneousCurrentDraw - filteredCurrentDraw) * (dt * 10);
+
+      yawDeg +=
+          Units.radiansToDegrees(
+              kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond * dt);
+      gyroSimState.setRawYaw(yawDeg);
+
+      SignalLogger.writeDouble("Swerve Sim Thread/Time (ms)", dt * 1000);
+      SignalLogger.writeDouble("Swerve Sim Thread/Frequency (hz)", 1.0 / dt);
+
+      lastTime = currentTime;
+
+      Thread.yield();
     }
 
     private static class SimModule {
