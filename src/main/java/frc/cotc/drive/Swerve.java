@@ -12,20 +12,17 @@ import static java.lang.Math.PI;
 
 import choreo.trajectory.SwerveSample;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.VecBuilder;
-import edu.wpi.first.math.Vector;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.cotc.vision.VisionPoseEstimator;
 import frc.cotc.vision.VisionPoseEstimatorIO;
+import frc.cotc.vision.VisionPoseEstimatorIO.VisionPoseEstimatorIOInputs;
 import java.util.Arrays;
 import java.util.function.DoubleSupplier;
 import org.littletonrobotics.junction.Logger;
@@ -43,11 +40,13 @@ public class Swerve extends SubsystemBase {
   private final double maxLinearSpeedMetersPerSec, drivebaseRadius, angularSpeedFudgeFactor;
 
   private final SwervePoseEstimator poseEstimator;
-  private final VisionPoseEstimator visionPoseEstimator;
+
+  private final VisionPoseEstimatorIO[] visionIOs;
+  private final VisionPoseEstimatorIOInputs[] visionInputs;
 
   private final PIDController xController, yController, yawController;
 
-  public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO poseEstimatorIO) {
+  public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO[] visionIOs) {
     this.swerveIO = driveIO;
     var CONSTANTS = driveIO.getConstants();
     swerveInputs = new SwerveIO.SwerveIOInputs();
@@ -119,7 +118,11 @@ public class Swerve extends SubsystemBase {
                 swerveInputs.odometryPositions.length),
             swerveInputs.gyroYaw,
             new Pose2d());
-    visionPoseEstimator = new VisionPoseEstimator(poseEstimatorIO);
+    this.visionIOs = visionIOs;
+    visionInputs = new VisionPoseEstimatorIOInputs[visionIOs.length];
+    for (int i = 0; i < visionIOs.length; i++) {
+      visionInputs[i] = new VisionPoseEstimatorIOInputs();
+    }
 
     xController = new PIDController(5, 0, 0);
     yController = new PIDController(5, 0, 0);
@@ -137,8 +140,7 @@ public class Swerve extends SubsystemBase {
     Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
 
     var driveStdDevs = getDriveStdDevs();
-    Logger.recordOutput("Swerve/Odometry/Drive Std Devs/Translational", driveStdDevs.get(0));
-    Logger.recordOutput("Swerve/Odometry/Drive Std Devs/Rotational", driveStdDevs.get(2));
+    Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
     poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
     var drivePoseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
@@ -151,20 +153,22 @@ public class Swerve extends SubsystemBase {
     }
     Logger.recordOutput("Swerve/Odometry/Drive pose updates", drivePoseUpdates);
 
-    var poseEstimates =
-        visionPoseEstimator.poll(
-            ChassisSpeeds.fromRobotRelativeSpeeds(getRobotChassisSpeeds(), swerveInputs.gyroYaw));
-    var visionPoseUpdates = new Pose2d[poseEstimates.length];
-    for (int i = 0; i < poseEstimates.length; i++) {
-      poseEstimator.addVisionMeasurement(poseEstimates[i]);
-      visionPoseUpdates[i] = getPose();
+    for (int i = 0; i < visionIOs.length; i++) {
+      visionIOs[i].updateInputs(visionInputs[i]);
+      Logger.processInputs("Vision/" + i, visionInputs[i]);
+
+      for (var poseEstimate : visionInputs[i].poseEstimates) {
+        poseEstimator.addVisionMeasurement(
+            poseEstimate.estimatedPose().toPose2d(),
+            poseEstimate.timestamp(),
+            new double[] {.1, .1, .1});
+      }
     }
-    Logger.recordOutput("Swerve/Odometry/Vision pose updates", visionPoseUpdates);
 
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
 
-  private Vector<N3> getDriveStdDevs() {
+  private double[] getDriveStdDevs() {
     var idealStates =
         setpointGenerator.getKinematics().toSwerveModuleStates(getRobotChassisSpeeds());
 
@@ -183,10 +187,11 @@ public class Swerve extends SubsystemBase {
     }
 
     // Sqrt of avg = standard deviation
-    double linearStdDevs = Math.sqrt(squaredSum / 4);
+    // Minimum value is 1 cm deviation to prevent unwanted behavior from a 0 value
+    double linearStdDevs = Math.max(Math.sqrt(squaredSum / 4), .01);
     double angularStdDevs = linearStdDevs / drivebaseRadius;
 
-    return VecBuilder.fill(linearStdDevs, linearStdDevs, angularStdDevs);
+    return new double[] {linearStdDevs, linearStdDevs, angularStdDevs};
   }
 
   public Command teleopDrive(
