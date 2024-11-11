@@ -14,6 +14,7 @@ import choreo.trajectory.SwerveSample;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -21,8 +22,10 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.cotc.Robot;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIO.VisionPoseEstimatorIOInputs;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.DoubleSupplier;
 import org.littletonrobotics.junction.Logger;
@@ -112,11 +115,11 @@ public class Swerve extends SubsystemBase {
     poseEstimator =
         new SwervePoseEstimator(
             setpointGenerator.getKinematics(),
+            new Rotation2d(),
             Arrays.copyOfRange(
                 swerveInputs.odometryPositions,
                 swerveInputs.odometryPositions.length - 4,
                 swerveInputs.odometryPositions.length),
-            swerveInputs.gyroYaw,
             new Pose2d());
     this.visionIOs = visionIOs;
     visionInputs = new VisionPoseEstimatorIOInputs[visionIOs.length];
@@ -143,27 +146,31 @@ public class Swerve extends SubsystemBase {
     Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
     poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
-    var drivePoseUpdates = new Pose2d[swerveInputs.odometryTimestamps.length];
     for (int i = 0; i < swerveInputs.odometryTimestamps.length; i++) {
-      drivePoseUpdates[i] =
-          poseEstimator.updateWithTime(
-              swerveInputs.odometryTimestamps[i],
-              swerveInputs.odometryYaws[i],
-              Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
+      poseEstimator.updateWithTime(
+          swerveInputs.odometryTimestamps[i],
+          swerveInputs.odometryYaws[i],
+          Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
     }
-    Logger.recordOutput("Swerve/Odometry/Drive pose updates", drivePoseUpdates);
 
+    var tagPoses = new ArrayList<Pose3d>();
     for (int i = 0; i < visionIOs.length; i++) {
       visionIOs[i].updateInputs(visionInputs[i]);
       Logger.processInputs("Vision/" + i, visionInputs[i]);
 
       for (var poseEstimate : visionInputs[i].poseEstimates) {
+        if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .006)) {
+          continue;
+        }
+
         poseEstimator.addVisionMeasurement(
             poseEstimate.estimatedPose().toPose2d(),
             poseEstimate.timestamp(),
             new double[] {.1, .1, .1});
+        tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
       }
     }
+    Logger.recordOutput("Swerve/Odometry/Vision tags used", tagPoses.toArray(new Pose3d[0]));
 
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
@@ -213,21 +220,8 @@ public class Swerve extends SubsystemBase {
         });
   }
 
-  private Command stop() {
-    return run(
-        () -> {
-          lastSetpoint =
-              new SwerveSetpoint(
-                  new ChassisSpeeds(),
-                  new SwerveModuleState[] {
-                    new SwerveModuleState(0, swerveInputs.moduleStates[0].angle),
-                    new SwerveModuleState(0, swerveInputs.moduleStates[1].angle),
-                    new SwerveModuleState(0, swerveInputs.moduleStates[2].angle),
-                    new SwerveModuleState(0, swerveInputs.moduleStates[3].angle)
-                  },
-                  EMPTY_FORCES);
-          swerveIO.drive(lastSetpoint, EMPTY_FORCES);
-        });
+  public Command resetGyro() {
+    return runOnce(() -> swerveIO.resetGyro(poseEstimator.getEstimatedPosition().getRotation()));
   }
 
   private void autoDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
@@ -326,5 +320,10 @@ public class Swerve extends SubsystemBase {
             swerveInputs.odometryPositions.length - 4,
             swerveInputs.odometryPositions.length),
         pose);
+    if (Robot.isSimulation()
+        && !Logger.hasReplaySource()
+        && swerveIO instanceof SwerveIOPhoenix phoenix) {
+      phoenix.resetGroundTruth(pose);
+    }
   }
 }

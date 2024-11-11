@@ -36,14 +36,14 @@ public class SwervePoseEstimator {
    * Constructs a SwervePoseEstimator.
    *
    * @param kinematics A correctly-configured kinematics object for your drivetrain.
-   * @param initialPositions The initial positions.
    * @param initialYaw The initial gyro yaw.
+   * @param initialPositions The initial positions.
    * @param initialPose The initial pose.
    */
   public SwervePoseEstimator(
       SwerveDriveKinematics kinematics,
-      SwerveModulePosition[] initialPositions,
       Rotation2d initialYaw,
+      SwerveModulePosition[] initialPositions,
       Pose2d initialPose) {
     odometry = new SwerveDriveOdometry(kinematics, initialYaw, initialPositions, initialPose);
 

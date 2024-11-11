@@ -31,9 +31,9 @@ public interface VisionPoseEstimatorIO {
 
   record PoseEstimate(Pose3d estimatedPose, double timestamp, Pose3d[] tagsUsed) {
     public void toLog(LogTable table, int i) {
-      table.put("PoseEstimates/" + i + "estimatedPose", estimatedPose);
-      table.put("PoseEstimates/" + i + "timestamp", timestamp);
-      table.put("PoseEstimates/" + i + "tagsUsed", tagsUsed);
+      table.put("PoseEstimates/" + i + "/estimatedPose", estimatedPose);
+      table.put("PoseEstimates/" + i + "/timestamp", timestamp);
+      table.put("PoseEstimates/" + i + "/tagsUsed", tagsUsed);
     }
 
     public static PoseEstimate[] fromLog(LogTable table) {
@@ -41,13 +41,13 @@ public interface VisionPoseEstimatorIO {
 
       int i = 0;
       while (true) {
-        var timestamp = table.get("PoseEstimates/" + i + "timestamp", -1.0);
+        var timestamp = table.get("PoseEstimates/" + i + "/timestamp", -1.0);
         if (timestamp < 0) {
           break;
         }
 
-        var estimatedPose = table.get("PoseEstimates/" + i + "estimatedPose", Pose3d.kZero);
-        var tagsUsed = table.get("PoseEstimates/" + i + "tagsUsed", new Pose3d[0]);
+        var estimatedPose = table.get("PoseEstimates/" + i + "/estimatedPose", Pose3d.kZero);
+        var tagsUsed = table.get("PoseEstimates/" + i + "/tagsUsed", new Pose3d[0]);
 
         entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed));
       }

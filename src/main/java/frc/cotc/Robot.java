@@ -9,6 +9,10 @@ package frc.cotc;
 
 import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
@@ -20,7 +24,9 @@ import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
 import frc.cotc.vision.VisionPoseEstimatorIO;
+import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import java.util.Arrays;
+import java.util.function.Supplier;
 import org.littletonrobotics.junction.*;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
@@ -86,21 +92,54 @@ public class Robot extends LoggedRobot {
             () -> MathUtil.applyDeadband(-primaryLeft.getX(), .01),
             () -> MathUtil.applyDeadband(-primaryRight.getX(), .01)));
     RobotModeTriggers.disabled().or(primaryLeft.button(3)).whileTrue(swerve.stopInX());
+    RobotModeTriggers.teleop().onTrue(swerve.resetGyro());
 
     autos = new Autos(swerve);
   }
 
   private Swerve getSwerve(String mode) {
     SwerveIO swerveIO;
-    VisionPoseEstimatorIO[] visionIOs = new VisionPoseEstimatorIO[2];
+    VisionPoseEstimatorIO[] visionIOs;
 
     switch (mode) {
       case "REAL", "SIM" -> {
         swerveIO = new SwerveIOPhoenix();
-        Arrays.fill(visionIOs, new VisionPoseEstimatorIO() {});
+        visionIOs =
+            new VisionPoseEstimatorIO[] {
+              new VisionPoseEstimatorIOPhoton(
+                  "FrontLeftCamera",
+                  new Transform3d(
+                      0.1,
+                      .1,
+                      .1,
+                      new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)))),
+              new VisionPoseEstimatorIOPhoton(
+                  "FrontRightCamera",
+                  new Transform3d(
+                      0.1,
+                      -.1,
+                      .1,
+                      new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-30)))),
+              new VisionPoseEstimatorIOPhoton(
+                  "BackLeftCamera",
+                  new Transform3d(
+                      -0.1,
+                      .1,
+                      .1,
+                      new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(150)))),
+              new VisionPoseEstimatorIOPhoton(
+                  "BackRightCamera",
+                  new Transform3d(
+                      -0.1,
+                      -.1,
+                      .1,
+                      new Rotation3d(
+                          0, Units.degreesToRadians(-45), Units.degreesToRadians(-150)))),
+            };
       }
       default -> {
         swerveIO = new SwerveIO() {};
+        visionIOs = new VisionPoseEstimatorIO[4];
         Arrays.fill(visionIOs, new VisionPoseEstimatorIO() {});
       }
     }
@@ -137,10 +176,13 @@ public class Robot extends LoggedRobot {
 
   public static volatile double simVoltage = 12;
 
+  public static Supplier<Pose2d> groundTruthPoseSupplier;
+
   @Override
   public void simulationPeriodic() {
     if (!Logger.hasReplaySource()) {
       RoboRioSim.setVInVoltage(simVoltage);
+      Logger.recordOutput("Sim/Ground truth pose", groundTruthPoseSupplier.get());
     }
   }
 

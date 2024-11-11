@@ -28,9 +28,11 @@ import com.ctre.phoenix6.sim.ChassisReference;
 import com.ctre.phoenix6.sim.Pigeon2SimState;
 import com.ctre.phoenix6.sim.TalonFXSimState;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
@@ -82,6 +84,8 @@ public class SwerveIOPhoenix implements SwerveIO {
   private final OdometryThread odometryThread;
   private final Pigeon2 gyro;
 
+  private SimThread simThread;
+
   public SwerveIOPhoenix() {
     var devices = new ParentDevice[13];
     var lowFreqSignals = new BaseStatusSignal[20];
@@ -112,7 +116,8 @@ public class SwerveIOPhoenix implements SwerveIO {
     ParentDevice.optimizeBusUtilizationForAll(4, devices);
 
     if (Robot.isSimulation()) {
-      new SimThread(modules, gyro).start();
+      simThread = new SimThread(modules, gyro);
+      simThread.start();
     }
     odometryThread.start();
   }
@@ -359,19 +364,11 @@ public class SwerveIOPhoenix implements SwerveIO {
                 },
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
-                getTimestamp());
+                Logger.getRealTimestamp() / 1e6);
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
         }
       }
-    }
-
-    private double getTimestamp() {
-      double sumTime = 0;
-      for (var signal : signals) {
-        sumTime += signal.getTimestamp().getTime();
-      }
-      return sumTime / signals.length;
     }
 
     OdometryFrame[] poll() {
@@ -416,6 +413,10 @@ public class SwerveIOPhoenix implements SwerveIO {
     }
   }
 
+  protected void resetGroundTruth(Pose2d pose) {
+    simThread.resetGroundTruthPose(pose);
+  }
+
   private static class SimThread {
     final SimModule[] simModules = new SimModule[4];
     final Pigeon2SimState gyroSimState;
@@ -428,9 +429,16 @@ public class SwerveIOPhoenix implements SwerveIO {
       gyroSimState = gyro.getSimState();
 
       notifier = new Notifier(this::run);
+
+      Robot.groundTruthPoseSupplier =
+          () -> {
+            synchronized (groundTruthOdometry) {
+              return groundTruthOdometry.getPoseMeters();
+            }
+          };
     }
 
-    private void start() {
+    void start() {
       for (SimModule module : simModules) {
         module.steerSim.setState((Math.random() * 2 - 1) * PI, 0);
         module.steerMotorSim.setRawRotorPosition(
@@ -446,6 +454,13 @@ public class SwerveIOPhoenix implements SwerveIO {
       notifier.startPeriodic(frequencySeconds);
     }
 
+    void resetGroundTruthPose(Pose2d pose) {
+      synchronized (groundTruthOdometry) {
+        groundTruthOdometry.resetPose(pose);
+        yawDeg = pose.getRotation().getDegrees();
+      }
+    }
+
     private final SwerveDriveKinematics kinematics =
         new SwerveDriveKinematics(
             new Translation2d(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
@@ -453,6 +468,20 @@ public class SwerveIOPhoenix implements SwerveIO {
             new Translation2d(-CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2),
             new Translation2d(
                 -CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2));
+    private final SwerveDriveOdometry groundTruthOdometry =
+        new SwerveDriveOdometry(
+            kinematics,
+            new Rotation2d(),
+            new SwerveModulePosition[] {
+              new SwerveModulePosition(),
+              new SwerveModulePosition(),
+              new SwerveModulePosition(),
+              new SwerveModulePosition()
+            },
+            new Pose2d(
+                Math.random() * 16,
+                Math.random() * 8,
+                new Rotation2d((Math.random() * 2 - 1) * PI)));
     private double yawDeg = 0;
     private double filteredCurrentDraw = 0;
     private double lastTime;
@@ -465,9 +494,11 @@ public class SwerveIOPhoenix implements SwerveIO {
       Robot.simVoltage = voltage;
       double instantaneousCurrentDraw = 0;
       SwerveModuleState[] moduleStates = new SwerveModuleState[4];
+      SwerveModulePosition[] modulePositions = new SwerveModulePosition[4];
       for (int i = 0; i < 4; i++) {
         instantaneousCurrentDraw += simModules[i].run(dt, voltage);
         moduleStates[i] = simModules[i].getModuleState();
+        modulePositions[i] = simModules[i].getModulePosition();
       }
       // On a real battery, the battery's internal capacitance absorbs large spikes in current,
       // but accurately simulating that is a PITA, so in order to simulate capacitance, the
@@ -479,6 +510,10 @@ public class SwerveIOPhoenix implements SwerveIO {
           Units.radiansToDegrees(
               kinematics.toChassisSpeeds(moduleStates).omegaRadiansPerSecond * dt);
       gyroSimState.setRawYaw(yawDeg);
+
+      synchronized (groundTruthOdometry) {
+        groundTruthOdometry.update(Rotation2d.fromDegrees(yawDeg), modulePositions);
+      }
 
       SignalLogger.writeDouble("Swerve Sim Thread/Time (ms)", dt * 1000);
       SignalLogger.writeDouble("Swerve Sim Thread/Frequency (hz)", 1.0 / dt);
@@ -550,6 +585,12 @@ public class SwerveIOPhoenix implements SwerveIO {
       SwerveModuleState getModuleState() {
         return new SwerveModuleState(
             driveWheelSim.getVel() * CONSTANTS.WHEEL_DIAMETER_METERS / 2,
+            new Rotation2d(steerSim.getAngularPositionRad()));
+      }
+
+      SwerveModulePosition getModulePosition() {
+        return new SwerveModulePosition(
+            driveWheelSim.getPos() * CONSTANTS.WHEEL_DIAMETER_METERS / 2,
             new Rotation2d(steerSim.getAngularPositionRad()));
       }
     }
