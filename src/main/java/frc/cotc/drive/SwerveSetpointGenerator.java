@@ -34,14 +34,14 @@ public class SwerveSetpointGenerator {
   private final SwerveDriveKinematics kinematics;
   private final Translation2d[] moduleLocations;
   private final DCMotor driveMotor;
-  private final double driveCurrentLimitAmps;
-  private final double maxDriveVelocity;
-  private final double maxSteerSpeedRadPerSec;
-  private final double massKg;
-  private final double moiKgMetersSquared;
-  private final double wheelRadiusMeters;
-  private final double wheelFrictionForce;
-  private final double maxTorqueFriction;
+  private final double driveCurrentLimitAmps,
+      maxDriveVelocity,
+      maxSteerSpeedRadPerSec,
+      massKg,
+      moiKgMetersSquared,
+      wheelRadiusMeters,
+      wheelFrictionForce,
+      maxTorqueFriction;
 
   public SwerveSetpointGenerator(
       final Translation2d[] moduleLocations,
