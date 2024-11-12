@@ -154,11 +154,13 @@ public class Swerve extends SubsystemBase {
     }
 
     var tagPoses = new ArrayList<Pose3d>();
+    var poseEstimates = new ArrayList<Pose3d>();
     for (int i = 0; i < visionIOs.length; i++) {
       visionIOs[i].updateInputs(visionInputs[i]);
       Logger.processInputs("Vision/" + i, visionInputs[i]);
 
       for (var poseEstimate : visionInputs[i].poseEstimates) {
+        // Discard if the pose is more than 5 cm off the ground
         if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .005)) {
           continue;
         }
@@ -166,11 +168,15 @@ public class Swerve extends SubsystemBase {
         poseEstimator.addVisionMeasurement(
             poseEstimate.estimatedPose().toPose2d(),
             poseEstimate.timestamp(),
-            new double[] {.1, .1, .1});
-        tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
+            getVisionStdDevs(poseEstimate));
+
+        poseEstimates.add(poseEstimate.estimatedPose());
+        var tagsUsedList = Arrays.asList(poseEstimate.tagsUsed());
+        tagPoses.addAll(tagsUsedList);
       }
     }
-    Logger.recordOutput("Swerve/Odometry/Vision tags used", tagPoses.toArray(new Pose3d[0]));
+    Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
+    Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
 
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
@@ -238,6 +244,11 @@ public class Swerve extends SubsystemBase {
       linearStdDevs * ySpeed + minimum,
       (linearStdDevs / drivebaseRadius) * yawSpeed + (minimum / drivebaseRadius)
     };
+  }
+
+  private double[] getVisionStdDevs(VisionPoseEstimatorIO.PoseEstimate poseEstimate) {
+    // TODO: Implement
+    return new double[] {.5, .5, .5};
   }
 
   public Command teleopDrive(

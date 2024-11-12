@@ -39,7 +39,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
 
     if (Robot.isSimulation()) {
       var cameraProps = new SimCameraProperties();
-      cameraProps.setCalibError(.1, .05);
+      cameraProps.setCalibError(.25, .1);
       cameraProps.setAvgLatencyMs(5);
       cameraProps.setLatencyStdDevMs(2);
       VisionSim.getInstance().addSimCamera(new PhotonCameraSim(camera, cameraProps), cameraPos);
