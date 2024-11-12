@@ -457,7 +457,6 @@ public class SwerveIOPhoenix implements SwerveIO {
     void resetGroundTruthPose(Pose2d pose) {
       synchronized (groundTruthOdometry) {
         groundTruthOdometry.resetPose(pose);
-        yawDeg = pose.getRotation().getDegrees();
       }
     }
 

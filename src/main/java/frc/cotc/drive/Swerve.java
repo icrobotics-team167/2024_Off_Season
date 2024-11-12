@@ -309,6 +309,11 @@ public class Swerve extends SubsystemBase {
   }
 
   public void resetForAuto(Pose2d pose) {
+    if (Robot.isSimulation()
+        && !Logger.hasReplaySource()
+        && swerveIO instanceof SwerveIOPhoenix phoenix) {
+      phoenix.resetGroundTruth(pose);
+    }
     swerveIO.resetGyro(pose.getRotation());
     xController.reset();
     yController.reset();
@@ -320,10 +325,5 @@ public class Swerve extends SubsystemBase {
             swerveInputs.odometryPositions.length - 4,
             swerveInputs.odometryPositions.length),
         pose);
-    if (Robot.isSimulation()
-        && !Logger.hasReplaySource()
-        && swerveIO instanceof SwerveIOPhoenix phoenix) {
-      phoenix.resetGroundTruth(pose);
-    }
   }
 }
