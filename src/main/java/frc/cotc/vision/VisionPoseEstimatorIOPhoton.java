@@ -10,7 +10,9 @@ package frc.cotc.vision;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.util.Units;
 import frc.cotc.Robot;
 import java.util.ArrayList;
 import org.photonvision.PhotonCamera;
@@ -29,13 +31,76 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
   private final PhotonCamera camera;
   private final PhotonPoseEstimator poseEstimator;
   private final Transform3d cameraPos;
+  private final VisionTuningAutoLogged tuning;
 
-  public VisionPoseEstimatorIOPhoton(String name, Transform3d position) {
+  public VisionPoseEstimatorIOPhoton(int id) {
+    String name;
+    Transform3d cameraPosition;
+    switch (id) {
+      case 0 -> {
+        name = "FrontLeftCamera";
+        cameraPosition =
+            new Transform3d(
+                .1,
+                .1,
+                .1,
+                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
+        tuning = new VisionTuningAutoLogged();
+        tuning.constantValue = .005;
+        tuning.relativeAreaScalar = .075;
+        tuning.dotProductScalar = .3;
+        tuning.tagCountExponent = 1.2;
+      }
+      case 1 -> {
+        name = "FrontRightCamera";
+        cameraPosition =
+            new Transform3d(
+                .1,
+                -.1,
+                .1,
+                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
+        tuning = new VisionTuningAutoLogged();
+        tuning.constantValue = .005;
+        tuning.relativeAreaScalar = .075;
+        tuning.dotProductScalar = .3;
+        tuning.tagCountExponent = 1.2;
+      }
+      case 2 -> {
+        name = "BackLeftCamera";
+        cameraPosition =
+            new Transform3d(
+                -.1,
+                .1,
+                .1,
+                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
+        tuning = new VisionTuningAutoLogged();
+        tuning.constantValue = .005;
+        tuning.relativeAreaScalar = .075;
+        tuning.dotProductScalar = .3;
+        tuning.tagCountExponent = 1.2;
+      }
+      case 3 -> {
+        name = "BackRightCamera";
+        cameraPosition =
+            new Transform3d(
+                -.1,
+                -.1,
+                .1,
+                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
+        tuning = new VisionTuningAutoLogged();
+        tuning.constantValue = .005;
+        tuning.relativeAreaScalar = .075;
+        tuning.dotProductScalar = .3;
+        tuning.tagCountExponent = 1.2;
+      }
+      default -> throw new IndexOutOfBoundsException();
+    }
+
     camera = new PhotonCamera(name);
     poseEstimator =
         new PhotonPoseEstimator(
-            tags, PhotonPoseEstimator.PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, position);
-    cameraPos = position;
+            tags, PhotonPoseEstimator.PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, cameraPosition);
+    cameraPos = cameraPosition;
 
     if (Robot.isSimulation()) {
       var cameraProps = new SimCameraProperties();
@@ -60,18 +125,28 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
           .update(result)
           .ifPresent(
               (estimate) -> {
-                var tagPoses = new Pose3d[estimate.targetsUsed.size()];
-                for (int i = 0; i < tagPoses.length; i++) {
-                  tagPoses[i] =
-                      estimate.estimatedPose.plus(
-                          cameraPos.plus(estimate.targetsUsed.get(i).bestCameraToTarget));
+                var tagRelativePositions = new Transform3d[estimate.targetsUsed.size()];
+                var tagAbsolutePoses = new Pose3d[estimate.targetsUsed.size()];
+                for (int i = 0; i < tagAbsolutePoses.length; i++) {
+                  tagRelativePositions[i] = estimate.targetsUsed.get(i).bestCameraToTarget;
+                  tagAbsolutePoses[i] =
+                      estimate.estimatedPose.plus(cameraPos.plus(tagRelativePositions[i]));
                 }
                 estimateList.add(
-                    new PoseEstimate(estimate.estimatedPose, estimate.timestampSeconds, tagPoses));
+                    new PoseEstimate(
+                        estimate.estimatedPose,
+                        estimate.timestampSeconds,
+                        tagAbsolutePoses,
+                        tagRelativePositions));
               });
     }
 
     inputs.poseEstimates = estimateList.toArray(new PoseEstimate[0]);
+  }
+
+  @Override
+  public VisionTuningAutoLogged getStdDevTuning() {
+    return tuning;
   }
 
   private static class VisionSim {

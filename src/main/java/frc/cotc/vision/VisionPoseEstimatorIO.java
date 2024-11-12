@@ -8,11 +8,21 @@
 package frc.cotc.vision;
 
 import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Transform3d;
 import java.util.ArrayList;
+import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 public interface VisionPoseEstimatorIO {
+  @AutoLog
+  class VisionTuning {
+    public double relativeAreaScalar = .075;
+    public double dotProductScalar = .3;
+    public double constantValue = .005;
+    public double tagCountExponent = 1.2;
+  }
+
   class VisionPoseEstimatorIOInputs implements LoggableInputs {
     public PoseEstimate[] poseEstimates = new PoseEstimate[0];
 
@@ -29,11 +39,16 @@ public interface VisionPoseEstimatorIO {
     }
   }
 
-  record PoseEstimate(Pose3d estimatedPose, double timestamp, Pose3d[] tagsUsed) {
+  record PoseEstimate(
+      Pose3d estimatedPose,
+      double timestamp,
+      Pose3d[] tagsUsed,
+      Transform3d[] tagRelativePositions) {
     public void toLog(LogTable table, int i) {
       table.put("PoseEstimates/" + i + "/estimatedPose", estimatedPose);
       table.put("PoseEstimates/" + i + "/timestamp", timestamp);
       table.put("PoseEstimates/" + i + "/tagsUsed", tagsUsed);
+      table.put("PoseEstimates/" + i + "/tagRelativePositions", tagRelativePositions);
     }
 
     public static PoseEstimate[] fromLog(LogTable table) {
@@ -48,8 +63,10 @@ public interface VisionPoseEstimatorIO {
 
         var estimatedPose = table.get("PoseEstimates/" + i + "/estimatedPose", Pose3d.kZero);
         var tagsUsed = table.get("PoseEstimates/" + i + "/tagsUsed", new Pose3d[0]);
+        var tagRelativePositions =
+            table.get("PoseEstimates/" + i + "/tagRelativePositions", new Transform3d[0]);
 
-        entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed));
+        entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed, tagRelativePositions));
       }
 
       return entries.toArray(new PoseEstimate[i + 1]);
@@ -57,4 +74,8 @@ public interface VisionPoseEstimatorIO {
   }
 
   default void updateInputs(VisionPoseEstimatorIOInputs inputs) {}
+
+  default VisionTuningAutoLogged getStdDevTuning() {
+    return new VisionTuningAutoLogged();
+  }
 }

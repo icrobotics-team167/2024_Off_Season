@@ -25,6 +25,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIO.VisionPoseEstimatorIOInputs;
+import frc.cotc.vision.VisionTuningAutoLogged;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.DoubleSupplier;
@@ -45,6 +46,7 @@ public class Swerve extends SubsystemBase {
   private final SwervePoseEstimator poseEstimator;
 
   private final VisionPoseEstimatorIO[] visionIOs;
+  private final VisionTuningAutoLogged[] visionTuning;
   private final VisionPoseEstimatorIOInputs[] visionInputs;
 
   private final PIDController xController, yController, yawController;
@@ -122,8 +124,10 @@ public class Swerve extends SubsystemBase {
                 swerveInputs.odometryPositions.length),
             new Pose2d());
     this.visionIOs = visionIOs;
+    visionTuning = new VisionTuningAutoLogged[visionIOs.length];
     visionInputs = new VisionPoseEstimatorIOInputs[visionIOs.length];
     for (int i = 0; i < visionIOs.length; i++) {
+      visionTuning[i] = visionIOs[i].getStdDevTuning();
       visionInputs[i] = new VisionPoseEstimatorIOInputs();
     }
 
@@ -168,7 +172,7 @@ public class Swerve extends SubsystemBase {
         poseEstimator.addVisionMeasurement(
             poseEstimate.estimatedPose().toPose2d(),
             poseEstimate.timestamp(),
-            getVisionStdDevs(poseEstimate));
+            getVisionStdDevs(poseEstimate, visionTuning[i]));
 
         poseEstimates.add(poseEstimate.estimatedPose());
         var tagsUsedList = Arrays.asList(poseEstimate.tagsUsed());
@@ -246,9 +250,33 @@ public class Swerve extends SubsystemBase {
     };
   }
 
-  private double[] getVisionStdDevs(VisionPoseEstimatorIO.PoseEstimate poseEstimate) {
-    // TODO: Implement
-    return new double[] {.5, .5, .5};
+  private double[] getVisionStdDevs(
+      VisionPoseEstimatorIO.PoseEstimate poseEstimate, VisionTuningAutoLogged tuningParams) {
+    double[] tagScores = new double[poseEstimate.tagsUsed().length];
+    for (int i = 0; i < tagScores.length; i++) {
+      var tagRelativePos = poseEstimate.tagRelativePositions()[i];
+
+      double tagDistanceMeters = tagRelativePos.getTranslation().getNorm();
+      double dotProduct =
+          Math.cos(tagRelativePos.getRotation().getY())
+              * Math.cos(tagRelativePos.getRotation().getZ());
+      double relativeArea = dotProduct / (tagDistanceMeters * tagDistanceMeters);
+
+      tagScores[i] =
+          tuningParams.relativeAreaScalar / relativeArea
+              + tuningParams.dotProductScalar * dotProduct;
+
+      tagScores[i] += tuningParams.constantValue;
+    }
+
+    double tagScoreSum = 0;
+    for (double score : tagScores) {
+      tagScoreSum += score;
+    }
+
+    var overallScore = tagScoreSum / Math.pow(tagScores.length, tuningParams.tagCountExponent);
+
+    return new double[] {overallScore, overallScore, overallScore};
   }
 
   public Command teleopDrive(

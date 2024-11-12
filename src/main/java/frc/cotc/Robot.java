@@ -10,9 +10,6 @@ package frc.cotc;
 import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
@@ -106,35 +103,10 @@ public class Robot extends LoggedRobot {
         swerveIO = new SwerveIOPhoenix();
         visionIOs =
             new VisionPoseEstimatorIO[] {
-              new VisionPoseEstimatorIOPhoton(
-                  "FrontLeftCamera",
-                  new Transform3d(
-                      0.1,
-                      .1,
-                      .1,
-                      new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)))),
-              new VisionPoseEstimatorIOPhoton(
-                  "FrontRightCamera",
-                  new Transform3d(
-                      0.1,
-                      -.1,
-                      .1,
-                      new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-30)))),
-              new VisionPoseEstimatorIOPhoton(
-                  "BackLeftCamera",
-                  new Transform3d(
-                      -0.1,
-                      .1,
-                      .1,
-                      new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(150)))),
-              new VisionPoseEstimatorIOPhoton(
-                  "BackRightCamera",
-                  new Transform3d(
-                      -0.1,
-                      -.1,
-                      .1,
-                      new Rotation3d(
-                          0, Units.degreesToRadians(-45), Units.degreesToRadians(-150)))),
+              new VisionPoseEstimatorIOPhoton(0),
+              new VisionPoseEstimatorIOPhoton(1),
+              new VisionPoseEstimatorIOPhoton(2),
+              new VisionPoseEstimatorIOPhoton(3)
             };
       }
       default -> {
