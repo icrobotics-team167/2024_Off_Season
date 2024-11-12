@@ -75,7 +75,7 @@ public class SwerveIOPhoenix implements SwerveIO {
             * Math.hypot(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2)
             * 1;
 
-    CONSTANTS.ANGULAR_SPEED_FUDGING = .6;
+    CONSTANTS.ANGULAR_SPEED_FUDGING = .5;
   }
 
   private final Module[] modules = new Module[4];

@@ -159,7 +159,7 @@ public class Swerve extends SubsystemBase {
       Logger.processInputs("Vision/" + i, visionInputs[i]);
 
       for (var poseEstimate : visionInputs[i].poseEstimates) {
-        if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .006)) {
+        if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .005)) {
           continue;
         }
 
