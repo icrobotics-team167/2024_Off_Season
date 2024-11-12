@@ -175,9 +175,21 @@ public class Swerve extends SubsystemBase {
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
   }
 
+  /**
+   * Estimate drive wheel slippage by comparing the actual wheel velocities to the idealized wheel
+   * velocities. If there is a significant deviation, then a wheel(s) is slipping, and we should
+   * raise the estimated standard deviation of the drivebase odometry to trust the wheel encoders
+   * less.
+   *
+   * <p>Algorithm from <a href="https://youtu.be/N6ogT5DjGOk">1690 Orbit's 2nd software session</a>
+   *
+   * @return An array of length 3, containing the estimated standard deviations in each axis (x, y,
+   *     yaw)
+   */
   private double[] getDriveStdDevs() {
-    var idealStates =
-        setpointGenerator.getKinematics().toSwerveModuleStates(getRobotChassisSpeeds());
+    var speeds = getRobotChassisSpeeds();
+    // Get idealized states from the current robot velocity.
+    var idealStates = setpointGenerator.getKinematics().toSwerveModuleStates(speeds);
 
     double squaredSum = 0;
     for (int i = 0; i < 4; i++) {
@@ -188,17 +200,44 @@ public class Swerve extends SubsystemBase {
       var idealVector =
           new Translation2d(idealStates[i].speedMetersPerSecond, idealStates[i].angle);
 
+      // Compare the state vectors and get the delta between them.
       var delta = measuredVector.getDistance(idealVector);
 
+      // Square the delta and add it to a sum
       squaredSum += delta * delta;
     }
 
-    // Sqrt of avg = standard deviation
-    // Minimum value is 1 cm deviation to prevent unwanted behavior from a 0 value
-    double linearStdDevs = Math.max(Math.sqrt(squaredSum / 4), .01);
-    double angularStdDevs = linearStdDevs / drivebaseRadius;
+    // Sqrt of avg of squared deltas = standard deviation
+    double linearStdDevs = Math.sqrt(squaredSum / 4);
 
-    return new double[] {linearStdDevs, linearStdDevs, angularStdDevs};
+    // Get the % speeds of each axis
+    // Minimum of 1% to avoid divide by 0 errors
+    var fieldSpeeds = toFieldRelative(speeds);
+    var xSpeed =
+        Math.max(Math.abs(fieldSpeeds.vxMetersPerSecond) / maxLinearSpeedMetersPerSec, .01);
+    var ySpeed =
+        Math.max(Math.abs(fieldSpeeds.vyMetersPerSecond) / maxLinearSpeedMetersPerSec, .01);
+    var yawSpeed =
+        Math.max(
+            Math.abs(fieldSpeeds.omegaRadiansPerSecond)
+                / (maxLinearSpeedMetersPerSec / drivebaseRadius),
+            .01);
+
+    // Normalize
+    var magnitude = Math.max(xSpeed, Math.max(ySpeed, yawSpeed));
+    xSpeed /= magnitude;
+    ySpeed /= magnitude;
+    yawSpeed /= magnitude;
+
+    // Scale each axis by the normalized % speed of each axis
+    // Assume a minimum of 5 mm deviation, due to mechanical slop
+    // Also prevents divide by 0 errors
+    var minimum = .005;
+    return new double[] {
+      linearStdDevs * xSpeed + minimum,
+      linearStdDevs * ySpeed + minimum,
+      (linearStdDevs / drivebaseRadius) * yawSpeed + (minimum / drivebaseRadius)
+    };
   }
 
   public Command teleopDrive(
@@ -302,6 +341,10 @@ public class Swerve extends SubsystemBase {
 
   private ChassisSpeeds toRobotRelative(ChassisSpeeds fieldRelative) {
     return ChassisSpeeds.fromFieldRelativeSpeeds(fieldRelative, swerveInputs.gyroYaw);
+  }
+
+  private ChassisSpeeds toFieldRelative(ChassisSpeeds robotRelative) {
+    return ChassisSpeeds.fromRobotRelativeSpeeds(robotRelative, swerveInputs.gyroYaw);
   }
 
   public Pose2d getPose() {
