@@ -67,6 +67,7 @@ public class Robot extends LoggedRobot {
         String logPath =
             LogFileUtil
                 .findReplayLog(); // Pull the replay log from AdvantageScope (or prompt the user)
+        // Note: User prompting will fail and crash on IntelliJ, so have the log open in AScope.
         Logger.setReplaySource(new WPILOGReader(logPath)); // Read replay log
         Logger.addDataReceiver(
             new WPILOGWriter(
