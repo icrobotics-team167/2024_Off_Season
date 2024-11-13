@@ -240,9 +240,9 @@ public class Swerve extends SubsystemBase {
     yawSpeed /= magnitude;
 
     // Scale each axis by the normalized % speed of each axis
-    // Assume a minimum of 5 mm deviation, due to mechanical slop
+    // Assume a minimum of 1 mm deviation, due to mechanical slop
     // Also prevents divide by 0 errors
-    var minimum = .005;
+    var minimum = .001;
     return new double[] {
       linearStdDevs * xSpeed + minimum,
       linearStdDevs * ySpeed + minimum,

@@ -478,8 +478,8 @@ public class SwerveIOPhoenix implements SwerveIO {
               new SwerveModulePosition()
             },
             new Pose2d(
-                Math.random() * 16,
-                Math.random() * 8,
+                Math.random() * 14 + 1,
+                Math.random() * 7 + 1,
                 new Rotation2d((Math.random() * 2 - 1) * PI)));
     private double yawDeg = 0;
     private double filteredCurrentDraw = 0;
