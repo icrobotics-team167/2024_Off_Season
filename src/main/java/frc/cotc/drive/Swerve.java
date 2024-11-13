@@ -356,6 +356,10 @@ public class Swerve extends SubsystemBase {
 
     double[] forceFeedforwards = new double[4];
     for (int i = 0; i < 4; i++) {
+      if (MathUtil.isNear(0, forceVectors[i].getNorm(), 1e-6)) {
+        forceFeedforwards[i] = 0;
+        continue;
+      }
       var scalar = forceVectors[i].getAngle().minus(setpoint.moduleStates()[i].angle).getCos();
       forceFeedforwards[i] = forceVectors[i].getNorm() * scalar;
       lastModuleForces[i] =
