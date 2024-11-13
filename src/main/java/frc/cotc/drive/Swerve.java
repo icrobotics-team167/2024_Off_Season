@@ -26,6 +26,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIO.VisionPoseEstimatorIOInputs;
+import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import frc.cotc.vision.VisionTuningAutoLogged;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -169,6 +170,9 @@ public class Swerve extends SubsystemBase {
           Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
     }
 
+    if (Robot.isSimulation() && !Logger.hasReplaySource()) {
+      VisionPoseEstimatorIOPhoton.VisionSim.getInstance().update();
+    }
     var tagPoses = new ArrayList<Pose3d>();
     var poseEstimates = new ArrayList<Pose3d>();
     for (int i = 0; i < visionIOs.length; i++) {

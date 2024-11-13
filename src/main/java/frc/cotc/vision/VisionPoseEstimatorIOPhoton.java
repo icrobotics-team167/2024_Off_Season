@@ -113,10 +113,6 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
 
   @Override
   public void updateInputs(VisionPoseEstimatorIOInputs inputs) {
-    if (Robot.isSimulation()) {
-      VisionSim.getInstance().update();
-    }
-
     var estimateList = new ArrayList<PoseEstimate>();
 
     var results = camera.getAllUnreadResults();
@@ -149,7 +145,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
     return tuning;
   }
 
-  private static class VisionSim {
+  public static class VisionSim {
     private static VisionSim visionSim;
 
     public static VisionSim getInstance() {
