@@ -429,6 +429,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       gyroSimState = gyro.getSimState();
 
       notifier = new Notifier(this::run);
+      notifier.setName("Phoenix Sim Thread");
 
       Robot.groundTruthPoseSupplier =
           () -> {
