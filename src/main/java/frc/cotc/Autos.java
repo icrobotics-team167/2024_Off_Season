@@ -37,18 +37,7 @@ public class Autos {
             (pose, starting) -> Logger.recordOutput("Choreo/Trajectory", pose.getPoses()));
     autoChooser = new AutoChooser(factory, "Auto Selector");
 
-    autoChooser.addAutoRoutine("Test", this::test);
     autoChooser.addAutoRoutine("Four Note", this::fourNoteAuto);
-  }
-
-  private Command test(AutoFactory factory) {
-    final var loop = factory.newLoop("Test");
-
-    final var path = factory.trajectory("Test", loop);
-
-    loop.enabled().onTrue(resetPose(path, loop).andThen(path.cmd()));
-
-    return loop.cmd();
   }
 
   private Command fourNoteAuto(AutoFactory factory) {

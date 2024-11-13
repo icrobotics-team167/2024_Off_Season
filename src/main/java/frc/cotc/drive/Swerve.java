@@ -39,7 +39,11 @@ public class Swerve extends SubsystemBase {
 
   private final SwerveSetpointGenerator setpointGenerator;
   private final SwerveSetpoint stopInXSetpoint;
-  private final double[] EMPTY_FORCES = new double[4];
+  private final double[] EMPTY_FEEDFORWARDS = new double[4];
+  private final Translation2d[] EMPTY_FORCES =
+      new Translation2d[] {
+        Translation2d.kZero, Translation2d.kZero, Translation2d.kZero, Translation2d.kZero
+      };
   private SwerveSetpoint lastSetpoint;
 
   private final double maxLinearSpeedMetersPerSec, drivebaseRadius, angularSpeedFudgeFactor;
@@ -112,8 +116,9 @@ public class Swerve extends SubsystemBase {
                       Math.atan2(
                           -CONSTANTS.TRACK_WIDTH_METERS / 2, -CONSTANTS.TRACK_LENGTH_METERS / 2)))
             },
-            EMPTY_FORCES);
-    lastSetpoint = new SwerveSetpoint(new ChassisSpeeds(), swerveInputs.moduleStates, EMPTY_FORCES);
+            EMPTY_FEEDFORWARDS);
+    lastSetpoint =
+        new SwerveSetpoint(new ChassisSpeeds(), swerveInputs.moduleStates, EMPTY_FEEDFORWARDS);
 
     poseEstimator =
         new SwervePoseEstimator(
@@ -135,10 +140,19 @@ public class Swerve extends SubsystemBase {
     yawController.enableContinuousInput(-PI, PI);
   }
 
+  private final SwerveModuleState[] lastModuleForces =
+      new SwerveModuleState[] {
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState()
+      };
+
   @Override
   public void periodic() {
     Logger.recordOutput("Swerve/Commanded speeds", lastSetpoint.chassisSpeeds());
     Logger.recordOutput("Swerve/Drive setpoint", lastSetpoint.moduleStates());
+    Logger.recordOutput("Swerve/Force feedforwards", lastModuleForces);
 
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
@@ -291,7 +305,7 @@ public class Swerve extends SubsystemBase {
   public Command stopInX() {
     return run(
         () -> {
-          swerveIO.drive(stopInXSetpoint, EMPTY_FORCES);
+          swerveIO.drive(stopInXSetpoint, EMPTY_FEEDFORWARDS);
           lastSetpoint = stopInXSetpoint;
         });
   }
@@ -305,7 +319,7 @@ public class Swerve extends SubsystemBase {
         });
   }
 
-  private void autoDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
+  private void autoDrive(ChassisSpeeds speeds, Translation2d[] forceFeedforwards) {
     // teleopDrive uses the current drive state for more responsiveness, autoDrive uses the
     // previous generated setpoint for more consistency
     drive(speeds, lastSetpoint, forceFeedforwards);
@@ -317,12 +331,12 @@ public class Swerve extends SubsystemBase {
         new SwerveSetpoint(
             setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates),
             swerveInputs.moduleStates,
-            EMPTY_FORCES),
+            EMPTY_FEEDFORWARDS),
         EMPTY_FORCES);
   }
 
   private void drive(
-      ChassisSpeeds speeds, SwerveSetpoint lastSetpoint, double[] forceFeedforwards) {
+      ChassisSpeeds speeds, SwerveSetpoint lastSetpoint, Translation2d[] forceVectors) {
     var translationalMagnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
     if (translationalMagnitude > maxLinearSpeedMetersPerSec) {
       speeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
@@ -339,12 +353,18 @@ public class Swerve extends SubsystemBase {
     var setpoint =
         setpointGenerator.generateSetpoint(
             lastSetpoint, speeds, RobotController.getBatteryVoltage());
+
+    double[] forceFeedforwards = new double[4];
+    for (int i = 0; i < 4; i++) {
+      var scalar = forceVectors[i].getAngle().minus(setpoint.moduleStates()[i].angle).getCos();
+      forceFeedforwards[i] = forceVectors[i].getNorm() * scalar;
+      lastModuleForces[i] =
+          new SwerveModuleState(
+              forceVectors[i].getNorm() * Math.abs(scalar) / 20, forceVectors[i].getAngle());
+    }
+
     swerveIO.drive(setpoint, forceFeedforwards);
     this.lastSetpoint = setpoint;
-  }
-
-  private void fieldOrientedDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
-    autoDrive(toRobotRelative(speeds), forceFeedforwards);
   }
 
   public void followTrajectory(Pose2d currentPose, SwerveSample sample) {
@@ -360,12 +380,11 @@ public class Swerve extends SubsystemBase {
 
     Logger.recordOutput("Choreo/Error", targetPose.minus(currentPose));
 
-    var forceVectors = new double[4];
+    var forceVectors = new Translation2d[4];
     for (int i = 0; i < 4; i++) {
       forceVectors[i] =
           new Translation2d(sample.moduleForcesX()[i], sample.moduleForcesY()[i])
-              .rotateBy(new Rotation2d(-sample.heading))
-              .getNorm();
+              .rotateBy(new Rotation2d(-sample.heading));
     }
 
     Logger.recordOutput("Choreo/Target Pose", targetPose);
@@ -373,7 +392,7 @@ public class Swerve extends SubsystemBase {
     Logger.recordOutput("Choreo/Feedback", toRobotRelative(feedback));
 
     var output = feedforward.plus(feedback);
-    fieldOrientedDrive(output, forceVectors);
+    autoDrive(toRobotRelative(output), forceVectors);
     Logger.recordOutput("Choreo/Output", toRobotRelative(output));
   }
 
