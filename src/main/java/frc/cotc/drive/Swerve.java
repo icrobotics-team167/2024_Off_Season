@@ -18,6 +18,7 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -118,10 +119,7 @@ public class Swerve extends SubsystemBase {
         new SwervePoseEstimator(
             setpointGenerator.getKinematics(),
             new Rotation2d(),
-            Arrays.copyOfRange(
-                swerveInputs.odometryPositions,
-                swerveInputs.odometryPositions.length - 4,
-                swerveInputs.odometryPositions.length),
+            getLatestModulePositions(),
             new Pose2d());
     this.visionIOs = visionIOs;
     visionTuning = new VisionTuningAutoLogged[visionIOs.length];
@@ -299,7 +297,12 @@ public class Swerve extends SubsystemBase {
   }
 
   public Command resetGyro() {
-    return runOnce(() -> swerveIO.resetGyro(poseEstimator.getEstimatedPosition().getRotation()));
+    return runOnce(
+        () -> {
+          var pose = poseEstimator.getEstimatedPosition();
+          swerveIO.resetGyro(poseEstimator.getEstimatedPosition().getRotation());
+          poseEstimator.resetPosition(pose.getRotation(), getLatestModulePositions(), pose);
+        });
   }
 
   private void autoDrive(ChassisSpeeds speeds, double[] forceFeedforwards) {
@@ -390,6 +393,13 @@ public class Swerve extends SubsystemBase {
     return poseEstimator.getEstimatedPosition();
   }
 
+  public SwerveModulePosition[] getLatestModulePositions() {
+    return Arrays.copyOfRange(
+        swerveInputs.odometryPositions,
+        swerveInputs.odometryPositions.length - 4,
+        swerveInputs.odometryPositions.length);
+  }
+
   public void resetForAuto(Pose2d pose) {
     if (Robot.isSimulation()
         && !Logger.hasReplaySource()
@@ -400,12 +410,6 @@ public class Swerve extends SubsystemBase {
     xController.reset();
     yController.reset();
     yawController.reset();
-    poseEstimator.resetPosition(
-        pose.getRotation(),
-        Arrays.copyOfRange(
-            swerveInputs.odometryPositions,
-            swerveInputs.odometryPositions.length - 4,
-            swerveInputs.odometryPositions.length),
-        pose);
+    poseEstimator.resetPosition(pose.getRotation(), getLatestModulePositions(), pose);
   }
 }
