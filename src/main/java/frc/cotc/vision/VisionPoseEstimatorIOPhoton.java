@@ -58,7 +58,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
                 .1,
                 -.1,
                 .1,
-                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
+                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-30)));
         tuning = new VisionTuningAutoLogged();
         tuning.constantValue = .005;
         tuning.relativeAreaScalar = .075;
@@ -72,7 +72,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
                 -.1,
                 .1,
                 .1,
-                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
+                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(150)));
         tuning = new VisionTuningAutoLogged();
         tuning.constantValue = .005;
         tuning.relativeAreaScalar = .075;
@@ -86,7 +86,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
                 -.1,
                 -.1,
                 .1,
-                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
+                new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-150)));
         tuning = new VisionTuningAutoLogged();
         tuning.constantValue = .005;
         tuning.relativeAreaScalar = .075;
