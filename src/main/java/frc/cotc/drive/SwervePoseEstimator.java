@@ -66,7 +66,7 @@ public class SwervePoseEstimator {
     odometry.resetPosition(gyroAngle, wheelPositions, poseMeters);
     odometryPoseBuffer.clear();
     visionUpdates.clear();
-    poseEstimate = odometry.getPoseMeters();
+    poseEstimate = poseMeters;
   }
 
   /**
