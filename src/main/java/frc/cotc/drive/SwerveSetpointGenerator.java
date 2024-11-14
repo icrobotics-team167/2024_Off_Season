@@ -486,13 +486,14 @@ public class SwerveSetpointGenerator {
       min_s = Math.min(min_s, s);
     }
 
-    ChassisSpeeds retSpeeds =
-        new ChassisSpeeds(
-            prevSetpoint.chassisSpeeds.vxMetersPerSecond + min_s * dx,
-            prevSetpoint.chassisSpeeds.vyMetersPerSecond + min_s * dy,
-            prevSetpoint.chassisSpeeds.omegaRadiansPerSecond + min_s * dtheta);
-    retSpeeds = ChassisSpeeds.discretize(retSpeeds, dt);
-    var retStates = kinematics.toSwerveModuleStates(retSpeeds);
+    var retStates =
+        kinematics.toSwerveModuleStates(
+            ChassisSpeeds.discretize(
+                new ChassisSpeeds(
+                    prevSetpoint.chassisSpeeds.vxMetersPerSecond + min_s * dx,
+                    prevSetpoint.chassisSpeeds.vyMetersPerSecond + min_s * dy,
+                    prevSetpoint.chassisSpeeds.omegaRadiansPerSecond + min_s * dtheta),
+                dt));
     var steerFeedforwards = new double[4];
     for (int i = 0; i < 4; ++i) {
       final var maybeOverride = overrideSteering.get(i);
@@ -516,6 +517,8 @@ public class SwerveSetpointGenerator {
       Logger.recordOutput(
           "Swerve/Setpoint Generator/Active constraints/" + i, activeConstraints[i]);
     }
-    return new SwerveSetpoint(retSpeeds, retStates, steerFeedforwards);
+    SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxDriveVelocity);
+
+    return new SwerveSetpoint(kinematics.toChassisSpeeds(retStates), retStates, steerFeedforwards);
   }
 }
