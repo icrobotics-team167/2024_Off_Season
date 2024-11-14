@@ -50,7 +50,7 @@ public class SwerveIOPhoenix implements SwerveIO {
   private static final SwerveModuleConstantsAutoLogged CONSTANTS;
   private static final double DRIVE_GEAR_RATIO;
   private static final double STEER_GEAR_RATIO;
-  private static final double WHEEL_CIRCUMFERENCE;
+  private static final double WHEEL_CIRCUMFERENCE_METERS;
 
   static {
     CONSTANTS = new SwerveModuleConstantsAutoLogged();
@@ -58,7 +58,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.TRACK_WIDTH_METERS = Units.inchesToMeters(22.75);
     CONSTANTS.TRACK_LENGTH_METERS = Units.inchesToMeters(22.75);
     CONSTANTS.WHEEL_DIAMETER_METERS = Units.inchesToMeters(4);
-    WHEEL_CIRCUMFERENCE = CONSTANTS.WHEEL_DIAMETER_METERS * PI;
+    WHEEL_CIRCUMFERENCE_METERS = CONSTANTS.WHEEL_DIAMETER_METERS * PI;
     CONSTANTS.WHEEL_COF = 1.5;
 
     DRIVE_GEAR_RATIO = (50.0 / 16.0) * (17.0 / 27.0) * (45.0 / 15.0);
@@ -140,35 +140,30 @@ public class SwerveIOPhoenix implements SwerveIO {
     var odometryData = odometryThread.poll();
 
     if (odometryData.length > 0) {
-      inputs.odometryTimestamps = new double[odometryData.length];
-      inputs.odometryYaws = new Rotation2d[odometryData.length];
-      inputs.odometryPositions = new SwerveModulePosition[odometryData.length * 4];
-      for (int i = 0; i < odometryData.length; i++) {
-        inputs.odometryTimestamps[i] = odometryData[i].timestampSeconds();
-        inputs.odometryYaws[i] = odometryData[i].gyroYaw();
-        System.arraycopy(odometryData[i].positions, 0, inputs.odometryPositions, i * 4, 4);
-      }
+      inputs.odometryFrames = odometryData;
     } else {
       // If the odometry thread doesn't have anything, fall back to getting the data directly
       // Slower but guaranteed
-      inputs.odometryTimestamps = new double[] {Logger.getRealTimestamp() / 1e6};
-      inputs.odometryYaws =
-          new Rotation2d[] {
-            Rotation2d.fromDegrees(
-                BaseStatusSignal.getLatencyCompensatedValueAsDouble(
-                    gyro.getYaw(), gyro.getAngularVelocityZWorld()))
-          };
-      inputs.odometryPositions = new SwerveModulePosition[4];
+      var positions = new SwerveModulePosition[4];
       for (int i = 0; i < 4; i++) {
-        inputs.odometryPositions[i] = modules[i].getPosition();
+        positions[i] = modules[i].getPosition();
       }
+      inputs.odometryFrames =
+          new OdometryFrame[] {
+            new OdometryFrame(
+                positions,
+                Rotation2d.fromDegrees(
+                    BaseStatusSignal.getLatencyCompensatedValueAsDouble(
+                        gyro.getYaw(), gyro.getAngularVelocityZWorld())),
+                Logger.getRealTimestamp() / 1e6)
+          };
     }
   }
 
   private SwerveModuleState getCurrentState(int id) {
     return new SwerveModuleState(
         BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[id * 8], signals[id * 8 + 3])
-            * WHEEL_CIRCUMFERENCE,
+            * WHEEL_CIRCUMFERENCE_METERS,
         Rotation2d.fromRotations(
             BaseStatusSignal.getLatencyCompensatedValueAsDouble(
                 signals[id * 8 + 1], signals[id * 8 + 2])));
@@ -220,7 +215,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = DRIVE_GEAR_RATIO;
-      driveConfig.MotionMagic.MotionMagicAcceleration = maxAccel / WHEEL_CIRCUMFERENCE;
+      driveConfig.MotionMagic.MotionMagicAcceleration = maxAccel / WHEEL_CIRCUMFERENCE_METERS;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
@@ -263,7 +258,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         steerConfig.Slot0.kD = 2;
       }
       driveConfig.Slot0.kA =
-          WHEEL_CIRCUMFERENCE
+          WHEEL_CIRCUMFERENCE_METERS
               * (CONSTANTS.MASS_KG / 4)
               * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)
               / CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
@@ -293,7 +288,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         desiredState.cosineScale(currentState.angle);
         driveMotor.setControl(
             driveControlRequest
-                .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE)
+                .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE_METERS)
                 .withFeedForward(
                     ((forceFeedforward * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)))
                         / CONSTANTS.DRIVE_MOTOR.KtNMPerAmp));
@@ -313,7 +308,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     SwerveModulePosition getPosition() {
       return new SwerveModulePosition(
-          driveMotor.getPosition().getValueAsDouble() * WHEEL_CIRCUMFERENCE,
+          driveMotor.getPosition().getValueAsDouble() * WHEEL_CIRCUMFERENCE_METERS,
           Rotation2d.fromRotations(encoder.getAbsolutePosition().getValueAsDouble()));
     }
 
@@ -383,9 +378,6 @@ public class SwerveIOPhoenix implements SwerveIO {
       return retFrames;
     }
 
-    record OdometryFrame(
-        SwerveModulePosition[] positions, Rotation2d gyroYaw, double timestampSeconds) {}
-
     record ModuleSignals(
         BaseStatusSignal drivePos,
         BaseStatusSignal driveVel,
@@ -398,7 +390,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       SwerveModulePosition poll() {
         return new SwerveModulePosition(
             BaseStatusSignal.getLatencyCompensatedValueAsDouble(drivePos, driveVel)
-                * WHEEL_CIRCUMFERENCE,
+                * WHEEL_CIRCUMFERENCE_METERS,
             Rotation2d.fromRotations(
                 BaseStatusSignal.getLatencyCompensatedValueAsDouble(steerPos, steerVel)));
       }

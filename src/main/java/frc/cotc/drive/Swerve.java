@@ -164,11 +164,8 @@ public class Swerve extends SubsystemBase {
     Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
     poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
-    for (int i = 0; i < swerveInputs.odometryTimestamps.length; i++) {
-      poseEstimator.updateWithTime(
-          swerveInputs.odometryTimestamps[i],
-          swerveInputs.odometryYaws[i],
-          Arrays.copyOfRange(swerveInputs.odometryPositions, i * 4, i * 4 + 4));
+    for (var frame : swerveInputs.odometryFrames) {
+      poseEstimator.updateWithTime(frame.timestamp(), frame.gyroYaw(), frame.positions());
     }
 
     if (Robot.isSimulation() && !Logger.hasReplaySource()) {
@@ -425,10 +422,11 @@ public class Swerve extends SubsystemBase {
   }
 
   public SwerveModulePosition[] getLatestModulePositions() {
-    return Arrays.copyOfRange(
-        swerveInputs.odometryPositions,
-        swerveInputs.odometryPositions.length - 4,
-        swerveInputs.odometryPositions.length);
+    if (swerveInputs.odometryFrames.length == 0) {
+      throw new IndexOutOfBoundsException(
+          "swerveInputs.odometryFrames.length was 0! This should not be possible.");
+    }
+    return swerveInputs.odometryFrames[swerveInputs.odometryFrames.length - 1].positions();
   }
 
   public void resetForAuto(Pose2d pose) {
