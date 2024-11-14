@@ -62,6 +62,7 @@ public class Swerve extends SubsystemBase {
     var CONSTANTS = driveIO.getConstants();
     swerveInputs = new SwerveIO.SwerveIOInputs();
     driveIO.updateInputs(swerveInputs);
+    Logger.processInputs("Swerve", swerveInputs);
     Logger.processInputs("Swerve/Constants", CONSTANTS);
 
     maxLinearSpeedMetersPerSec =

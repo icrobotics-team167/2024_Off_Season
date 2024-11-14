@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
+import frc.cotc.vision.VisionIOCountsAutoLogged;
 import frc.cotc.vision.VisionPoseEstimatorIO;
 import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
 import java.util.Arrays;
@@ -109,10 +110,16 @@ public class Robot extends LoggedRobot {
               new VisionPoseEstimatorIOPhoton(2),
               new VisionPoseEstimatorIOPhoton(3)
             };
+        var count = new VisionIOCountsAutoLogged();
+        count.cameraCount = visionIOs.length;
+        Logger.processInputs("Vision", count);
       }
       default -> {
+        var count = new VisionIOCountsAutoLogged();
+        Logger.processInputs("Vision", count);
+
         swerveIO = new SwerveIO() {};
-        visionIOs = new VisionPoseEstimatorIO[4];
+        visionIOs = new VisionPoseEstimatorIO[count.cameraCount];
         Arrays.fill(visionIOs, new VisionPoseEstimatorIO() {});
       }
     }

@@ -16,6 +16,11 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 public interface VisionPoseEstimatorIO {
   @AutoLog
+  class VisionIOCounts {
+    public int cameraCount;
+  }
+
+  @AutoLog
   class VisionTuning {
     public double relativeAreaScalar = .075;
     public double dotProductScalar = .3;
@@ -67,9 +72,11 @@ public interface VisionPoseEstimatorIO {
             table.get("PoseEstimates/" + i + "/tagRelativePositions", new Transform3d[0]);
 
         entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed, tagRelativePositions));
+
+        i++;
       }
 
-      return entries.toArray(new PoseEstimate[i + 1]);
+      return entries.toArray(new PoseEstimate[i]);
     }
   }
 

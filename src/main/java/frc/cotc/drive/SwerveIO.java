@@ -19,14 +19,14 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
 public interface SwerveIO {
   class SwerveIOInputs implements LoggableInputs {
     SwerveModuleState[] moduleStates = new SwerveModuleState[4];
-    Rotation2d gyroYaw;
+    Rotation2d gyroYaw = Rotation2d.kZero;
 
     // I wanted this to be a 2D array, so that one of the dimensions can be data ID and the other
     // dimension can be the module ID, but AK doesn't support 2D arrays
     // So the data is packed into a 1D array
-    SwerveModulePosition[] odometryPositions;
-    Rotation2d[] odometryYaws;
-    double[] odometryTimestamps;
+    SwerveModulePosition[] odometryPositions = new SwerveModulePosition[0];
+    Rotation2d[] odometryYaws = new Rotation2d[0];
+    double[] odometryTimestamps = new double[0];
 
     MotorCurrentDraws[] driveMotorCurrents = new MotorCurrentDraws[4];
     MotorCurrentDraws[] steerMotorCurrents = new MotorCurrentDraws[4];
@@ -46,13 +46,13 @@ public interface SwerveIO {
     public void fromLog(LogTable table) {
       moduleStates = table.get("ModuleStates", moduleStates);
       gyroYaw = table.get("GyroYaw", gyroYaw);
-      odometryPositions = table.get("OdometryPositions", odometryPositions);
-      odometryYaws = table.get("OdometryYaws", odometryYaws);
-      odometryTimestamps = table.get("OdometryTimestamps", odometryTimestamps);
+      odometryPositions = table.get("OdometryPositions", new SwerveModulePosition[0]);
+      odometryYaws = table.get("OdometryYaws", new Rotation2d[0]);
+      odometryTimestamps = table.get("OdometryTimestamps", new double[0]);
       driveMotorCurrents =
-          table.get("DriveMotorCurrents", MotorCurrentDraws.struct, driveMotorCurrents);
+          table.get("DriveMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws[4]);
       steerMotorCurrents =
-          table.get("SteerMotorCurrents", MotorCurrentDraws.struct, steerMotorCurrents);
+          table.get("SteerMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws[4]);
     }
   }
 
@@ -66,7 +66,7 @@ public interface SwerveIO {
     double WHEEL_COF;
 
     // Should have a gear reduction applied with .withReduction()
-    DCMotor DRIVE_MOTOR;
+    DCMotor DRIVE_MOTOR = DCMotor.getKrakenX60(1);
     double DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
 
     double MASS_KG;
