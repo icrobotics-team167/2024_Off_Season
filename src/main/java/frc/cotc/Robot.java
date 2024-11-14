@@ -20,12 +20,12 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
-import frc.cotc.vision.VisionIOCountsAutoLogged;
-import frc.cotc.vision.VisionPoseEstimatorIO;
-import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
+import frc.cotc.vision.FiducialPoseEstimatorIO;
+import frc.cotc.vision.FiducialPoseEstimatorIOPhoton;
 import java.util.Arrays;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.*;
+import org.littletonrobotics.junction.inputs.LoggableInputs;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
@@ -98,29 +98,42 @@ public class Robot extends LoggedRobot {
 
   private Swerve getSwerve(String mode) {
     SwerveIO swerveIO;
-    VisionPoseEstimatorIO[] visionIOs;
+    FiducialPoseEstimatorIO[] visionIOs;
+
+    var count =
+        new LoggableInputs() {
+          int cameraCount = 0;
+
+          @Override
+          public void toLog(LogTable table) {
+            table.put("cameraCount", cameraCount);
+          }
+
+          @Override
+          public void fromLog(LogTable table) {
+            cameraCount = table.get("cameraCount", 0);
+          }
+        };
 
     switch (mode) {
       case "REAL", "SIM" -> {
         swerveIO = new SwerveIOPhoenix();
         visionIOs =
-            new VisionPoseEstimatorIO[] {
-              new VisionPoseEstimatorIOPhoton(0),
-              new VisionPoseEstimatorIOPhoton(1),
-              new VisionPoseEstimatorIOPhoton(2),
-              new VisionPoseEstimatorIOPhoton(3)
+            new FiducialPoseEstimatorIO[] {
+              new FiducialPoseEstimatorIOPhoton(0),
+              new FiducialPoseEstimatorIOPhoton(1),
+              new FiducialPoseEstimatorIOPhoton(2),
+              new FiducialPoseEstimatorIOPhoton(3)
             };
-        var count = new VisionIOCountsAutoLogged();
         count.cameraCount = visionIOs.length;
         Logger.processInputs("Vision", count);
       }
       default -> {
-        var count = new VisionIOCountsAutoLogged();
         Logger.processInputs("Vision", count);
 
         swerveIO = new SwerveIO() {};
-        visionIOs = new VisionPoseEstimatorIO[count.cameraCount];
-        Arrays.fill(visionIOs, new VisionPoseEstimatorIO() {});
+        visionIOs = new FiducialPoseEstimatorIO[count.cameraCount];
+        Arrays.fill(visionIOs, new FiducialPoseEstimatorIO() {});
       }
     }
 

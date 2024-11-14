@@ -14,21 +14,16 @@ import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
-public interface VisionPoseEstimatorIO {
+public interface FiducialPoseEstimatorIO {
   @AutoLog
-  class VisionIOCounts {
-    public int cameraCount;
-  }
-
-  @AutoLog
-  class VisionTuning {
+  class FiducialStdDevTuning {
     public double relativeAreaScalar = .075;
     public double dotProductScalar = .3;
     public double constantValue = .005;
     public double tagCountExponent = 1.2;
   }
 
-  class VisionPoseEstimatorIOInputs implements LoggableInputs {
+  class FiducialPoseEstimatorIOInputs implements LoggableInputs {
     public PoseEstimate[] poseEstimates = new PoseEstimate[0];
 
     @Override
@@ -80,9 +75,9 @@ public interface VisionPoseEstimatorIO {
     }
   }
 
-  default void updateInputs(VisionPoseEstimatorIOInputs inputs) {}
+  default void updateInputs(FiducialPoseEstimatorIOInputs inputs) {}
 
-  default VisionTuningAutoLogged getStdDevTuning() {
-    return new VisionTuningAutoLogged();
+  default FiducialStdDevTuningAutoLogged getStdDevTuning() {
+    return new FiducialStdDevTuningAutoLogged();
   }
 }

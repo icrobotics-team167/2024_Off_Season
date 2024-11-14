@@ -24,10 +24,10 @@ import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
-import frc.cotc.vision.VisionPoseEstimatorIO;
-import frc.cotc.vision.VisionPoseEstimatorIO.VisionPoseEstimatorIOInputs;
-import frc.cotc.vision.VisionPoseEstimatorIOPhoton;
-import frc.cotc.vision.VisionTuningAutoLogged;
+import frc.cotc.vision.FiducialPoseEstimatorIO;
+import frc.cotc.vision.FiducialPoseEstimatorIO.FiducialPoseEstimatorIOInputs;
+import frc.cotc.vision.FiducialPoseEstimatorIOPhoton;
+import frc.cotc.vision.FiducialStdDevTuningAutoLogged;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.DoubleSupplier;
@@ -51,13 +51,13 @@ public class Swerve extends SubsystemBase {
 
   private final SwervePoseEstimator poseEstimator;
 
-  private final VisionPoseEstimatorIO[] visionIOs;
-  private final VisionTuningAutoLogged[] visionTuning;
-  private final VisionPoseEstimatorIOInputs[] visionInputs;
+  private final FiducialPoseEstimatorIO[] visionIOs;
+  private final FiducialStdDevTuningAutoLogged[] visionTuning;
+  private final FiducialPoseEstimatorIOInputs[] visionInputs;
 
   private final PIDController xController, yController, yawController;
 
-  public Swerve(SwerveIO driveIO, VisionPoseEstimatorIO[] visionIOs) {
+  public Swerve(SwerveIO driveIO, FiducialPoseEstimatorIO[] visionIOs) {
     this.swerveIO = driveIO;
     var CONSTANTS = driveIO.getConstants();
     swerveInputs = new SwerveIO.SwerveIOInputs();
@@ -129,11 +129,11 @@ public class Swerve extends SubsystemBase {
             getLatestModulePositions(),
             new Pose2d());
     this.visionIOs = visionIOs;
-    visionTuning = new VisionTuningAutoLogged[visionIOs.length];
-    visionInputs = new VisionPoseEstimatorIOInputs[visionIOs.length];
+    visionTuning = new FiducialStdDevTuningAutoLogged[visionIOs.length];
+    visionInputs = new FiducialPoseEstimatorIOInputs[visionIOs.length];
     for (int i = 0; i < visionIOs.length; i++) {
       visionTuning[i] = visionIOs[i].getStdDevTuning();
-      visionInputs[i] = new VisionPoseEstimatorIOInputs();
+      visionInputs[i] = new FiducialPoseEstimatorIOInputs();
     }
 
     xController = new PIDController(5, 0, 0);
@@ -172,7 +172,7 @@ public class Swerve extends SubsystemBase {
     }
 
     if (Robot.isSimulation() && !Logger.hasReplaySource()) {
-      VisionPoseEstimatorIOPhoton.VisionSim.getInstance().update();
+      FiducialPoseEstimatorIOPhoton.VisionSim.getInstance().update();
     }
     var tagPoses = new ArrayList<Pose3d>();
     var poseEstimates = new ArrayList<Pose3d>();
@@ -268,7 +268,8 @@ public class Swerve extends SubsystemBase {
   }
 
   private double[] getVisionStdDevs(
-      VisionPoseEstimatorIO.PoseEstimate poseEstimate, VisionTuningAutoLogged tuningParams) {
+      FiducialPoseEstimatorIO.PoseEstimate poseEstimate,
+      FiducialStdDevTuningAutoLogged tuningParams) {
     double[] tagScores = new double[poseEstimate.tagsUsed().length];
     for (int i = 0; i < tagScores.length; i++) {
       var tagRelativePos = poseEstimate.tagRelativePositions()[i];
@@ -279,6 +280,8 @@ public class Swerve extends SubsystemBase {
               * Math.cos(tagRelativePos.getRotation().getZ());
       double relativeArea = dotProduct / (tagDistanceMeters * tagDistanceMeters);
 
+      // This equation is asymptotic when distance and dot product are both 0, but that's a
+      // pretty much impossible situation so fuck it we ball
       tagScores[i] =
           tuningParams.relativeAreaScalar / relativeArea
               + tuningParams.dotProductScalar * dotProduct;

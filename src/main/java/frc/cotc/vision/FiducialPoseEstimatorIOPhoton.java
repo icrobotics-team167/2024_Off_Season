@@ -21,7 +21,7 @@ import org.photonvision.simulation.PhotonCameraSim;
 import org.photonvision.simulation.SimCameraProperties;
 import org.photonvision.simulation.VisionSystemSim;
 
-public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
+public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
   private static final AprilTagFieldLayout tags;
 
   static {
@@ -31,9 +31,9 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
   private final PhotonCamera camera;
   private final PhotonPoseEstimator poseEstimator;
   private final Transform3d cameraPos;
-  private final VisionTuningAutoLogged tuning;
+  private final FiducialStdDevTuningAutoLogged tuning;
 
-  public VisionPoseEstimatorIOPhoton(int id) {
+  public FiducialPoseEstimatorIOPhoton(int id) {
     String name;
     Transform3d cameraPosition;
     switch (id) {
@@ -45,7 +45,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
                 .1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
-        tuning = new VisionTuningAutoLogged();
+        tuning = new FiducialStdDevTuningAutoLogged();
         tuning.constantValue = .005;
         tuning.relativeAreaScalar = .075;
         tuning.dotProductScalar = .3;
@@ -59,7 +59,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
                 -.1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-30)));
-        tuning = new VisionTuningAutoLogged();
+        tuning = new FiducialStdDevTuningAutoLogged();
         tuning.constantValue = .005;
         tuning.relativeAreaScalar = .075;
         tuning.dotProductScalar = .3;
@@ -73,7 +73,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
                 .1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(150)));
-        tuning = new VisionTuningAutoLogged();
+        tuning = new FiducialStdDevTuningAutoLogged();
         tuning.constantValue = .005;
         tuning.relativeAreaScalar = .075;
         tuning.dotProductScalar = .3;
@@ -87,7 +87,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
                 -.1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-150)));
-        tuning = new VisionTuningAutoLogged();
+        tuning = new FiducialStdDevTuningAutoLogged();
         tuning.constantValue = .005;
         tuning.relativeAreaScalar = .075;
         tuning.dotProductScalar = .3;
@@ -112,7 +112,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
   }
 
   @Override
-  public void updateInputs(VisionPoseEstimatorIOInputs inputs) {
+  public void updateInputs(FiducialPoseEstimatorIOInputs inputs) {
     var estimateList = new ArrayList<PoseEstimate>();
 
     var results = camera.getAllUnreadResults();
@@ -141,7 +141,7 @@ public class VisionPoseEstimatorIOPhoton implements VisionPoseEstimatorIO {
   }
 
   @Override
-  public VisionTuningAutoLogged getStdDevTuning() {
+  public FiducialStdDevTuningAutoLogged getStdDevTuning() {
     return tuning;
   }
 
