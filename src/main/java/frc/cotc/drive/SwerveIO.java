@@ -40,8 +40,8 @@ public interface SwerveIO {
 
     @Override
     public void fromLog(LogTable table) {
-      moduleStates = table.get("ModuleStates", moduleStates);
-      gyroYaw = table.get("GyroYaw", gyroYaw);
+      moduleStates = table.get("ModuleStates", new SwerveModuleState[4]);
+      gyroYaw = table.get("GyroYaw", Rotation2d.kZero);
       odometryFrames = table.get("OdometryFrames", OdometryFrame.struct);
       driveMotorCurrents =
           table.get("DriveMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws[4]);
@@ -131,6 +131,9 @@ public interface SwerveIO {
     // when the bot is translating, but doesn't affect the limit when the bot isn't translating.
     // Scalar
     double ANGULAR_SPEED_FUDGING;
+
+    double DRIVE_STD_DEV_METERS;
+    double GYRO_STD_DEV_RAD;
   }
 
   /**

@@ -31,67 +31,54 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
   private final PhotonCamera camera;
   private final PhotonPoseEstimator poseEstimator;
   private final Transform3d cameraPos;
-  private final FiducialStdDevTuningAutoLogged tuning;
+  private final FiducialStdDevTuningAutoLogged tuning = new FiducialStdDevTuningAutoLogged();
 
   public FiducialPoseEstimatorIOPhoton(int id) {
     String name;
-    Transform3d cameraPosition;
     switch (id) {
       case 0 -> {
         name = "FrontLeftCamera";
-        cameraPosition =
+        cameraPos =
             new Transform3d(
                 .1,
                 .1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
-        tuning = new FiducialStdDevTuningAutoLogged();
-        tuning.constantValue = .005;
-        tuning.relativeAreaScalar = .075;
-        tuning.dotProductScalar = .3;
-        tuning.tagCountExponent = 1.2;
+        tuning.translationalScalar = 0.014656905;
+        tuning.translationalCountExponent = 2.41408;
       }
       case 1 -> {
         name = "FrontRightCamera";
-        cameraPosition =
+        cameraPos =
             new Transform3d(
                 .1,
                 -.1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-30)));
-        tuning = new FiducialStdDevTuningAutoLogged();
-        tuning.constantValue = .005;
-        tuning.relativeAreaScalar = .075;
-        tuning.dotProductScalar = .3;
-        tuning.tagCountExponent = 1.2;
+        tuning.translationalScalar = 0.014656905;
+        tuning.translationalCountExponent = 2.41408;
       }
       case 2 -> {
         name = "BackLeftCamera";
-        cameraPosition =
+        cameraPos =
             new Transform3d(
                 -.1,
                 .1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(150)));
-        tuning = new FiducialStdDevTuningAutoLogged();
-        tuning.constantValue = .005;
-        tuning.relativeAreaScalar = .075;
-        tuning.dotProductScalar = .3;
-        tuning.tagCountExponent = 1.2;
+        tuning.translationalScalar = 0.014656905;
+        tuning.translationalCountExponent = 2.41408;
       }
       case 3 -> {
         name = "BackRightCamera";
-        cameraPosition =
+        cameraPos =
             new Transform3d(
                 -.1,
                 -.1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-150)));
-        tuning = new FiducialStdDevTuningAutoLogged();
-        tuning.constantValue = .005;
-        tuning.relativeAreaScalar = .075;
-        tuning.dotProductScalar = .3;
-        tuning.tagCountExponent = 1.2;
+        tuning.translationalScalar = 0.014656905;
+        tuning.translationalCountExponent = 2.41408;
       }
       default -> throw new IndexOutOfBoundsException();
     }
@@ -99,8 +86,7 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
     camera = new PhotonCamera(name);
     poseEstimator =
         new PhotonPoseEstimator(
-            tags, PhotonPoseEstimator.PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, cameraPosition);
-    cameraPos = cameraPosition;
+            tags, PhotonPoseEstimator.PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, cameraPos);
 
     if (Robot.isSimulation()) {
       var cameraProps = new SimCameraProperties();
@@ -113,27 +99,34 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
 
   @Override
   public void updateInputs(FiducialPoseEstimatorIOInputs inputs) {
-    var estimateList = new ArrayList<PoseEstimate>();
+    inputs.hasNewData = false;
 
     var results = camera.getAllUnreadResults();
+    if (results.isEmpty()) {
+      return;
+    }
+
+    var estimateList = new ArrayList<PoseEstimate>();
     for (var result : results) {
       poseEstimator
           .update(result)
           .ifPresent(
               (estimate) -> {
-                var tagRelativePositions = new Transform3d[estimate.targetsUsed.size()];
+                inputs.hasNewData = true;
+
+                var tagDistances = new double[estimate.targetsUsed.size()];
                 var tagAbsolutePoses = new Pose3d[estimate.targetsUsed.size()];
                 for (int i = 0; i < tagAbsolutePoses.length; i++) {
-                  tagRelativePositions[i] = estimate.targetsUsed.get(i).bestCameraToTarget;
-                  tagAbsolutePoses[i] =
-                      estimate.estimatedPose.plus(cameraPos.plus(tagRelativePositions[i]));
+                  var tagRelativePos = estimate.targetsUsed.get(i).getBestCameraToTarget();
+                  tagDistances[i] = tagRelativePos.getTranslation().getNorm();
+                  tagAbsolutePoses[i] = estimate.estimatedPose.plus(cameraPos.plus(tagRelativePos));
                 }
                 estimateList.add(
                     new PoseEstimate(
                         estimate.estimatedPose,
                         estimate.timestampSeconds,
                         tagAbsolutePoses,
-                        tagRelativePositions));
+                        tagDistances));
               });
     }
 

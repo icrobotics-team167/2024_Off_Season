@@ -8,7 +8,6 @@
 package frc.cotc.vision;
 
 import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Transform3d;
 import java.util.ArrayList;
 import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
@@ -17,17 +16,21 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
 public interface FiducialPoseEstimatorIO {
   @AutoLog
   class FiducialStdDevTuning {
-    public double relativeAreaScalar = .075;
-    public double dotProductScalar = .3;
-    public double constantValue = .005;
-    public double tagCountExponent = 1.2;
+    public double translationalConstant = 0;
+    public double translationalScalar = 0.1;
+    public double translationalCountExponent = 1;
+    public double rotationalConstant = 0;
+    public double rotationalScalar = 0.1;
+    public double rotationalCountExponent = 1;
   }
 
   class FiducialPoseEstimatorIOInputs implements LoggableInputs {
+    public boolean hasNewData = false;
     public PoseEstimate[] poseEstimates = new PoseEstimate[0];
 
     @Override
     public void toLog(LogTable table) {
+      table.put("hasNewData", hasNewData);
       for (int i = 0; i < poseEstimates.length; i++) {
         poseEstimates[i].toLog(table, i);
       }
@@ -35,20 +38,18 @@ public interface FiducialPoseEstimatorIO {
 
     @Override
     public void fromLog(LogTable table) {
+      hasNewData = table.get("hasNewData", false);
       poseEstimates = PoseEstimate.fromLog(table);
     }
   }
 
   record PoseEstimate(
-      Pose3d estimatedPose,
-      double timestamp,
-      Pose3d[] tagsUsed,
-      Transform3d[] tagRelativePositions) {
+      Pose3d estimatedPose, double timestamp, Pose3d[] tagsUsed, double[] tagDistances) {
     public void toLog(LogTable table, int i) {
-      table.put("PoseEstimates/" + i + "/estimatedPose", estimatedPose);
-      table.put("PoseEstimates/" + i + "/timestamp", timestamp);
-      table.put("PoseEstimates/" + i + "/tagsUsed", tagsUsed);
-      table.put("PoseEstimates/" + i + "/tagRelativePositions", tagRelativePositions);
+      table.put("poseEstimates/" + i + "/estimatedPose", estimatedPose);
+      table.put("poseEstimates/" + i + "/timestamp", timestamp);
+      table.put("poseEstimates/" + i + "/tagsUsed", tagsUsed);
+      table.put("poseEstimates/" + i + "/tagDistances", tagDistances);
     }
 
     public static PoseEstimate[] fromLog(LogTable table) {
@@ -56,17 +57,16 @@ public interface FiducialPoseEstimatorIO {
 
       int i = 0;
       while (true) {
-        var timestamp = table.get("PoseEstimates/" + i + "/timestamp", -1.0);
+        var timestamp = table.get("poseEstimates/" + i + "/timestamp", -1.0);
         if (timestamp < 0) {
           break;
         }
 
-        var estimatedPose = table.get("PoseEstimates/" + i + "/estimatedPose", Pose3d.kZero);
-        var tagsUsed = table.get("PoseEstimates/" + i + "/tagsUsed", new Pose3d[0]);
-        var tagRelativePositions =
-            table.get("PoseEstimates/" + i + "/tagRelativePositions", new Transform3d[0]);
+        var estimatedPose = table.get("poseEstimates/" + i + "/estimatedPose", Pose3d.kZero);
+        var tagsUsed = table.get("poseEstimates/" + i + "/tagsUsed", new Pose3d[0]);
+        var tagDistances = table.get("poseEstimates/" + i + "/tagDistances", new double[0]);
 
-        entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed, tagRelativePositions));
+        entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed, tagDistances));
 
         i++;
       }

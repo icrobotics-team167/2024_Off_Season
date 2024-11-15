@@ -76,6 +76,9 @@ public class SwerveIOPhoenix implements SwerveIO {
             * 1;
 
     CONSTANTS.ANGULAR_SPEED_FUDGING = .45;
+
+    CONSTANTS.DRIVE_STD_DEV_METERS = .01;
+    CONSTANTS.GYRO_STD_DEV_RAD = .001;
   }
 
   private final Module[] modules = new Module[4];

@@ -47,7 +47,11 @@ public class Swerve extends SubsystemBase {
       };
   private SwerveSetpoint lastSetpoint;
 
-  private final double maxLinearSpeedMetersPerSec, drivebaseRadius, angularSpeedFudgeFactor;
+  private final double maxLinearSpeedMetersPerSec,
+      drivebaseRadius,
+      angularSpeedFudgeFactor,
+      driveStdDevMeters,
+      gyroStdDevRad;
 
   private final SwervePoseEstimator poseEstimator;
 
@@ -70,6 +74,8 @@ public class Swerve extends SubsystemBase {
     drivebaseRadius =
         Math.hypot(CONSTANTS.TRACK_WIDTH_METERS / 2, CONSTANTS.TRACK_LENGTH_METERS / 2);
     angularSpeedFudgeFactor = CONSTANTS.ANGULAR_SPEED_FUDGING;
+    driveStdDevMeters = CONSTANTS.DRIVE_STD_DEV_METERS;
+    gyroStdDevRad = CONSTANTS.GYRO_STD_DEV_RAD;
 
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);
     Logger.recordOutput("Swerve/Max Angular Speed", maxLinearSpeedMetersPerSec / drivebaseRadius);
@@ -177,6 +183,11 @@ public class Swerve extends SubsystemBase {
       visionIOs[i].updateInputs(visionInputs[i]);
       Logger.processInputs("Vision/" + i, visionInputs[i]);
 
+      if (!visionInputs[i].hasNewData) {
+        // If there's no new data, save some CPU
+        continue;
+      }
+
       for (var poseEstimate : visionInputs[i].poseEstimates) {
         // Discard if the pose is more than 5 cm off the ground
         if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .005)) {
@@ -189,8 +200,7 @@ public class Swerve extends SubsystemBase {
             getVisionStdDevs(poseEstimate, visionTuning[i]));
 
         poseEstimates.add(poseEstimate.estimatedPose());
-        var tagsUsedList = Arrays.asList(poseEstimate.tagsUsed());
-        tagPoses.addAll(tagsUsedList);
+        tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
       }
     }
     Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
@@ -241,59 +251,43 @@ public class Swerve extends SubsystemBase {
         Math.max(Math.abs(fieldSpeeds.vxMetersPerSecond) / maxLinearSpeedMetersPerSec, .01);
     var ySpeed =
         Math.max(Math.abs(fieldSpeeds.vyMetersPerSecond) / maxLinearSpeedMetersPerSec, .01);
-    var yawSpeed =
-        Math.max(
-            Math.abs(fieldSpeeds.omegaRadiansPerSecond)
-                / (maxLinearSpeedMetersPerSec / drivebaseRadius),
-            .01);
 
     // Normalize
-    var magnitude = Math.max(xSpeed, Math.max(ySpeed, yawSpeed));
+    var magnitude = Math.max(xSpeed, ySpeed);
     xSpeed /= magnitude;
     ySpeed /= magnitude;
-    yawSpeed /= magnitude;
 
     // Scale each axis by the normalized % speed of each axis
-    // Assume a minimum of 1 mm deviation, due to mechanical slop
-    // Also prevents divide by 0 errors
-    var minimum = .001;
+    // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
     return new double[] {
-      linearStdDevs * xSpeed + minimum,
-      linearStdDevs * ySpeed + minimum,
-      (linearStdDevs / drivebaseRadius) * yawSpeed + (minimum / drivebaseRadius)
+      linearStdDevs * xSpeed + driveStdDevMeters,
+      linearStdDevs * ySpeed + driveStdDevMeters,
+      gyroStdDevRad
     };
   }
 
   private double[] getVisionStdDevs(
       FiducialPoseEstimatorIO.PoseEstimate poseEstimate,
       FiducialStdDevTuningAutoLogged tuningParams) {
-    double[] tagScores = new double[poseEstimate.tagsUsed().length];
-    for (int i = 0; i < tagScores.length; i++) {
-      var tagRelativePos = poseEstimate.tagRelativePositions()[i];
-
-      double tagDistanceMeters = tagRelativePos.getTranslation().getNorm();
-      double dotProduct =
-          Math.cos(tagRelativePos.getRotation().getY())
-              * Math.cos(tagRelativePos.getRotation().getZ());
-      double relativeArea = dotProduct / (tagDistanceMeters * tagDistanceMeters);
-
-      // This equation is asymptotic when distance and dot product are both 0, but that's a
-      // pretty much impossible situation so fuck it we ball
-      tagScores[i] =
-          tuningParams.relativeAreaScalar / relativeArea
-              + tuningParams.dotProductScalar * dotProduct;
-
-      tagScores[i] += tuningParams.constantValue;
+    double translationalScoreSum = 0;
+    double rotationalScoreSum = 0;
+    for (var distanceMeters : poseEstimate.tagDistances()) {
+      translationalScoreSum += tuningParams.translationalScalar * distanceMeters * distanceMeters;
+      translationalScoreSum += tuningParams.translationalConstant;
+      rotationalScoreSum += tuningParams.rotationalScalar * distanceMeters * distanceMeters;
+      rotationalScoreSum += tuningParams.rotationalConstant;
     }
 
-    double tagScoreSum = 0;
-    for (double score : tagScores) {
-      tagScoreSum += score;
-    }
+    var translationalDivisor =
+        Math.pow(poseEstimate.tagDistances().length, tuningParams.translationalCountExponent);
+    var rotationalDivisor =
+        Math.pow(poseEstimate.tagDistances().length, tuningParams.rotationalCountExponent);
 
-    var overallScore = tagScoreSum / Math.pow(tagScores.length, tuningParams.tagCountExponent);
-
-    return new double[] {overallScore, overallScore, overallScore};
+    return new double[] {
+      translationalScoreSum / translationalDivisor,
+      translationalScoreSum / translationalDivisor,
+      rotationalScoreSum / rotationalDivisor
+    };
   }
 
   public Command teleopDrive(
