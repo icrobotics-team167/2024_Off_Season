@@ -23,6 +23,7 @@ import frc.cotc.drive.SwerveIOPhoenix;
 import frc.cotc.vision.FiducialPoseEstimatorIO;
 import frc.cotc.vision.FiducialPoseEstimatorIOPhoton;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.*;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
@@ -37,6 +38,8 @@ public class Robot extends LoggedRobot {
 
   @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
   public Robot() {
+    // If this is erroring, hit build
+    // Compiling auto-generates the BuildConstants file
     Logger.recordMetadata("Project", BuildConstants.MAVEN_NAME);
     Logger.recordMetadata("Git branch", BuildConstants.GIT_BRANCH);
     Logger.recordMetadata("Git commit date", BuildConstants.GIT_DATE);
@@ -65,9 +68,16 @@ public class Robot extends LoggedRobot {
       }
       case "REPLAY" -> {
         setUseTiming(false); // Run as fast as possible
-        String logPath =
-            LogFileUtil
-                .findReplayLog(); // Pull the replay log from AdvantageScope (or prompt the user)
+        String logPath;
+        try {
+          logPath =
+              LogFileUtil
+                  .findReplayLog(); // Pull the replay log from AdvantageScope (or prompt the user)
+        } catch (Exception e) {
+          throw new NoSuchElementException(
+              "Failed to ask the user for a log file! If you are using IntelliJ, please open the "
+                  + "log file in AdvantageScope and try again!");
+        }
         // Note: User prompting will fail and crash on IntelliJ, so have the log open in AScope.
         Logger.setReplaySource(new WPILOGReader(logPath)); // Read replay log
         Logger.addDataReceiver(
