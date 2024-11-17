@@ -101,6 +101,8 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
       cameraProps.setCalibError(.25, .1);
       cameraProps.setAvgLatencyMs(5);
       cameraProps.setLatencyStdDevMs(2);
+      cameraProps.setExposureTimeMs(5);
+      cameraProps.setFPS(40);
       VisionSim.getInstance().addSimCamera(new PhotonCameraSim(camera, cameraProps), cameraPos);
     }
   }
