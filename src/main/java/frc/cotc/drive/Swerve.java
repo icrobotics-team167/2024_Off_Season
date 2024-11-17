@@ -46,10 +46,9 @@ public class Swerve extends SubsystemBase {
       };
   private SwerveSetpoint lastSetpoint;
 
-  private final double maxLinearSpeedMetersPerSec,
-      drivebaseRadius,
-      maxAngularSpeedRadPerSec,
-      angularSpeedFudgeFactor;
+  private final double maxLinearSpeedMetersPerSec;
+  private final double maxAngularSpeedRadPerSec;
+  private final double angularSpeedFudgeFactor;
 
   private final SwervePoseEstimator poseEstimator;
 
@@ -68,9 +67,9 @@ public class Swerve extends SubsystemBase {
 
     maxLinearSpeedMetersPerSec =
         CONSTANTS.DRIVE_MOTOR.freeSpeedRadPerSec * (CONSTANTS.WHEEL_DIAMETER_METERS / 2);
-    drivebaseRadius =
-        Math.hypot(CONSTANTS.TRACK_WIDTH_METERS / 2, CONSTANTS.TRACK_LENGTH_METERS / 2);
-    maxAngularSpeedRadPerSec = maxLinearSpeedMetersPerSec / drivebaseRadius;
+    maxAngularSpeedRadPerSec =
+        maxLinearSpeedMetersPerSec
+            / Math.hypot(CONSTANTS.TRACK_WIDTH_METERS / 2, CONSTANTS.TRACK_LENGTH_METERS / 2);
     angularSpeedFudgeFactor = CONSTANTS.ANGULAR_SPEED_FUDGING;
 
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);
