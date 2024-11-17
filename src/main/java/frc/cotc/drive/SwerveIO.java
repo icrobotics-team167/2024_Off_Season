@@ -161,9 +161,6 @@ public interface SwerveIO {
     // when the bot is translating, but doesn't affect the limit when the bot isn't translating.
     // Scalar
     double ANGULAR_SPEED_FUDGING;
-
-    double DRIVE_STD_DEV_METERS;
-    double GYRO_STD_DEV_RAD;
   }
 
   /**

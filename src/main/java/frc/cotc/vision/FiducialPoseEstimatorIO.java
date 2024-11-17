@@ -9,22 +9,10 @@ package frc.cotc.vision;
 
 import edu.wpi.first.math.geometry.Pose3d;
 import java.util.ArrayList;
-import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 public interface FiducialPoseEstimatorIO {
-  @AutoLog
-  class FiducialStdDevTuning {
-    // The scalar needs to be several times larger than the actual values for a stable pose
-    // estimation
-    public double translationalScalar = 0.1;
-    // This can be roughly the same, but it should tend towards being smaller for more stability
-    public double translationalCountExponent = 1;
-    public double rotationalScalar = 0.1;
-    public double rotationalCountExponent = 1;
-  }
-
   class FiducialPoseEstimatorIOInputs implements LoggableInputs {
     public boolean hasNewData = false;
     public PoseEstimate[] poseEstimates = new PoseEstimate[0];
@@ -77,8 +65,4 @@ public interface FiducialPoseEstimatorIO {
   }
 
   default void updateInputs(FiducialPoseEstimatorIOInputs inputs) {}
-
-  default FiducialStdDevTuningAutoLogged getStdDevTuning() {
-    return new FiducialStdDevTuningAutoLogged();
-  }
 }

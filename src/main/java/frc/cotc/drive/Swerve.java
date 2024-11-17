@@ -27,7 +27,6 @@ import frc.cotc.Robot;
 import frc.cotc.vision.FiducialPoseEstimatorIO;
 import frc.cotc.vision.FiducialPoseEstimatorIO.FiducialPoseEstimatorIOInputs;
 import frc.cotc.vision.FiducialPoseEstimatorIOPhoton;
-import frc.cotc.vision.FiducialStdDevTuningAutoLogged;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.DoubleSupplier;
@@ -49,14 +48,12 @@ public class Swerve extends SubsystemBase {
 
   private final double maxLinearSpeedMetersPerSec,
       drivebaseRadius,
-      angularSpeedFudgeFactor,
-      driveStdDevMeters,
-      gyroStdDevRad;
+      maxAngularSpeedRadPerSec,
+      angularSpeedFudgeFactor;
 
   private final SwervePoseEstimator poseEstimator;
 
   private final FiducialPoseEstimatorIO[] visionIOs;
-  private final FiducialStdDevTuningAutoLogged[] visionTuning;
   private final FiducialPoseEstimatorIOInputs[] visionInputs;
 
   private final PIDController xController, yController, yawController;
@@ -73,12 +70,11 @@ public class Swerve extends SubsystemBase {
         CONSTANTS.DRIVE_MOTOR.freeSpeedRadPerSec * (CONSTANTS.WHEEL_DIAMETER_METERS / 2);
     drivebaseRadius =
         Math.hypot(CONSTANTS.TRACK_WIDTH_METERS / 2, CONSTANTS.TRACK_LENGTH_METERS / 2);
+    maxAngularSpeedRadPerSec = maxLinearSpeedMetersPerSec / drivebaseRadius;
     angularSpeedFudgeFactor = CONSTANTS.ANGULAR_SPEED_FUDGING;
-    driveStdDevMeters = CONSTANTS.DRIVE_STD_DEV_METERS;
-    gyroStdDevRad = CONSTANTS.GYRO_STD_DEV_RAD;
 
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);
-    Logger.recordOutput("Swerve/Max Angular Speed", maxLinearSpeedMetersPerSec / drivebaseRadius);
+    Logger.recordOutput("Swerve/Max Angular Speed", maxAngularSpeedRadPerSec);
 
     setpointGenerator =
         new SwerveSetpointGenerator(
@@ -135,10 +131,8 @@ public class Swerve extends SubsystemBase {
             getLatestModulePositions(),
             new Pose2d());
     this.visionIOs = visionIOs;
-    visionTuning = new FiducialStdDevTuningAutoLogged[visionIOs.length];
     visionInputs = new FiducialPoseEstimatorIOInputs[visionIOs.length];
     for (int i = 0; i < visionIOs.length; i++) {
-      visionTuning[i] = visionIOs[i].getStdDevTuning();
       visionInputs[i] = new FiducialPoseEstimatorIOInputs();
     }
 
@@ -164,9 +158,10 @@ public class Swerve extends SubsystemBase {
 
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
-    Logger.recordOutput("Swerve/Actual Speed", getRobotChassisSpeeds());
+    var actualSpeed = getRobotChassisSpeeds();
+    Logger.recordOutput("Swerve/Actual Speed", actualSpeed);
 
-    var driveStdDevs = getDriveStdDevs();
+    var driveStdDevs = getDriveStdDevs(actualSpeed);
     Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
     poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
@@ -197,7 +192,7 @@ public class Swerve extends SubsystemBase {
           continue;
         }
 
-        var stdDevs = getVisionStdDevs(poseEstimate, visionTuning[i]);
+        var stdDevs = getVisionStdDevs(poseEstimate, actualSpeed);
         Logger.recordOutput("Vision/Std Devs/" + i + "/" + j, stdDevs);
 
         poseEstimator.addVisionMeasurement(
@@ -227,10 +222,9 @@ public class Swerve extends SubsystemBase {
    * @return An array of length 3, containing the estimated standard deviations in each axis (x, y,
    *     yaw)
    */
-  private double[] getDriveStdDevs() {
-    var speeds = getRobotChassisSpeeds();
+  private double[] getDriveStdDevs(ChassisSpeeds robotRelativeSpeeds) {
     // Get idealized states from the current robot velocity.
-    var idealStates = setpointGenerator.getKinematics().toSwerveModuleStates(speeds);
+    var idealStates = setpointGenerator.getKinematics().toSwerveModuleStates(robotRelativeSpeeds);
 
     double squaredSum = 0;
     for (int i = 0; i < 4; i++) {
@@ -252,46 +246,49 @@ public class Swerve extends SubsystemBase {
     double linearStdDevs = Math.sqrt(squaredSum / 4);
 
     // Get the % speeds of each axis
-    // Minimum of 1% to avoid divide by 0 errors
-    var fieldSpeeds = toFieldRelative(speeds);
+    // Minimum of 25% to avoid divide by 0 errors and to prevent the scaled std dev from being
+    // too large
+    var fieldSpeeds = toFieldRelative(robotRelativeSpeeds);
     var xSpeed =
-        Math.max(Math.abs(fieldSpeeds.vxMetersPerSecond) / maxLinearSpeedMetersPerSec, .01);
+        Math.max(Math.abs(fieldSpeeds.vxMetersPerSecond) / maxLinearSpeedMetersPerSec, .25);
     var ySpeed =
-        Math.max(Math.abs(fieldSpeeds.vyMetersPerSecond) / maxLinearSpeedMetersPerSec, .01);
+        Math.max(Math.abs(fieldSpeeds.vyMetersPerSecond) / maxLinearSpeedMetersPerSec, .25);
 
-    // Normalize
-    var magnitude = Math.max(xSpeed, ySpeed);
-    xSpeed /= magnitude;
-    ySpeed /= magnitude;
+    // Normalize the smaller one to 100% and scale the other to match
+    var minMagnitude = Math.min(xSpeed, ySpeed);
+    xSpeed /= minMagnitude;
+    ySpeed /= minMagnitude;
 
-    // Scale each axis by the normalized % speed of each axis
+    // Scale each axis by the normalized (?) % speed of each axis
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {
-      linearStdDevs * xSpeed + driveStdDevMeters,
-      linearStdDevs * ySpeed + driveStdDevMeters,
-      gyroStdDevRad
-    };
+    return new double[] {(linearStdDevs + .005) * xSpeed, (linearStdDevs + .005) * ySpeed, .001};
   }
 
   private double[] getVisionStdDevs(
-      FiducialPoseEstimatorIO.PoseEstimate poseEstimate,
-      FiducialStdDevTuningAutoLogged tuningParams) {
+      FiducialPoseEstimatorIO.PoseEstimate poseEstimate, ChassisSpeeds driveSpeeds) {
     double translationalScoreSum = 0;
     double rotationalScoreSum = 0;
     for (var distanceMeters : poseEstimate.tagDistances()) {
-      translationalScoreSum += tuningParams.translationalScalar * distanceMeters * distanceMeters;
-      rotationalScoreSum += tuningParams.rotationalScalar * distanceMeters * distanceMeters;
+      translationalScoreSum += .125 * distanceMeters * distanceMeters;
+      rotationalScoreSum += .0125 * distanceMeters * distanceMeters;
     }
 
-    var translationalDivisor =
-        Math.pow(poseEstimate.tagDistances().length, tuningParams.translationalCountExponent);
-    var rotationalDivisor =
-        Math.pow(poseEstimate.tagDistances().length, tuningParams.rotationalCountExponent);
+    var translationalDivisor = Math.pow(poseEstimate.tagDistances().length, 5);
+    var rotationalDivisor = Math.pow(poseEstimate.tagDistances().length, 2);
+
+    var translationalVelMagnitude =
+        Math.hypot(driveSpeeds.vxMetersPerSecond, driveSpeeds.vyMetersPerSecond)
+            / maxLinearSpeedMetersPerSec;
+    var angularVelMagnitude =
+        Math.abs(driveSpeeds.omegaRadiansPerSecond) / maxAngularSpeedRadPerSec;
+
+    var translationalScalar = MathUtil.interpolate(1, 5, translationalVelMagnitude);
+    var rotationalScalar = MathUtil.interpolate(1, 5, angularVelMagnitude);
 
     return new double[] {
-      translationalScoreSum / translationalDivisor,
-      translationalScoreSum / translationalDivisor,
-      rotationalScoreSum / rotationalDivisor
+      translationalScoreSum * translationalScalar / translationalDivisor,
+      translationalScoreSum * translationalScalar / translationalDivisor,
+      rotationalScoreSum * rotationalScalar / rotationalDivisor
     };
   }
 
@@ -303,7 +300,7 @@ public class Swerve extends SubsystemBase {
                 new ChassisSpeeds(
                     xSupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
                     ySupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
-                    omegaSupplier.getAsDouble() * maxLinearSpeedMetersPerSec / drivebaseRadius)));
+                    omegaSupplier.getAsDouble() * maxAngularSpeedRadPerSec)));
   }
 
   public Command stopInX() {
@@ -330,13 +327,7 @@ public class Swerve extends SubsystemBase {
   }
 
   private void teleopDrive(ChassisSpeeds speeds) {
-    drive(
-        toRobotRelative(speeds),
-        new SwerveSetpoint(
-            setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates),
-            swerveInputs.moduleStates,
-            EMPTY_FEEDFORWARDS),
-        EMPTY_FORCES);
+    drive(toRobotRelative(speeds), lastSetpoint, EMPTY_FORCES);
   }
 
   private void drive(

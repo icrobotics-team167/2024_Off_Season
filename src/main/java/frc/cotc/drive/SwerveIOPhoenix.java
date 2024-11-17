@@ -76,9 +76,6 @@ public class SwerveIOPhoenix implements SwerveIO {
             * 1;
 
     CONSTANTS.ANGULAR_SPEED_FUDGING = .45;
-
-    CONSTANTS.DRIVE_STD_DEV_METERS = .01;
-    CONSTANTS.GYRO_STD_DEV_RAD = .001;
   }
 
   private final Module[] modules = new Module[4];
@@ -545,7 +542,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         driveWheelSim = new FOCMotorSim(CONSTANTS.DRIVE_MOTOR, .035);
         steerSim =
             new DCMotorSim(
-                LinearSystemId.createDCMotorSystem(DCMotor.getKrakenX60(1), .005, STEER_GEAR_RATIO),
+                LinearSystemId.createDCMotorSystem(DCMotor.getKrakenX60(1), .01, STEER_GEAR_RATIO),
                 DCMotor.getKrakenX60(1));
       }
 
