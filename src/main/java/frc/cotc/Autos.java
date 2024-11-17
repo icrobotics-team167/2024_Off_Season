@@ -10,24 +10,38 @@ package frc.cotc;
 import static edu.wpi.first.wpilibj2.command.Commands.*;
 
 import choreo.Choreo;
-import choreo.auto.AutoChooser;
+import choreo.auto.AutoChooser.AutoRoutineGenerator;
 import choreo.auto.AutoFactory;
 import choreo.auto.AutoLoop;
 import choreo.auto.AutoTrajectory;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.IterativeRobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.cotc.drive.Swerve;
+import java.util.HashMap;
+import java.util.Map;
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 public class Autos {
-  private final AutoChooser autoChooser;
   private final Swerve swerve;
+
+  private final AutoFactory factory;
+
+  private final LoggedDashboardChooser<String> selector;
+  private String lastAutoRoutineName;
+  private Command lastAutoRoutine;
+
+  private final String NONE_NAME = "Do Nothing";
+  private final HashMap<String, AutoRoutineGenerator> autoRoutines =
+      new HashMap<>(Map.of(NONE_NAME, AutoRoutineGenerator.NONE));
 
   public Autos(Swerve swerve) {
     this.swerve = swerve;
 
-    AutoFactory factory =
+    factory =
         Choreo.createAutoFactory(
             swerve,
             swerve::getPose,
@@ -35,9 +49,14 @@ public class Autos {
             Robot::isOnRed,
             new AutoFactory.AutoBindings(),
             (pose, starting) -> Logger.recordOutput("Choreo/Trajectory", pose.getPoses()));
-    autoChooser = new AutoChooser(factory, "Auto Selector");
 
-    autoChooser.addAutoRoutine("Four Note", this::fourNoteAuto);
+    selector = new LoggedDashboardChooser<>("Auto Chooser");
+    selector.addDefaultOption(NONE_NAME, NONE_NAME);
+
+    lastAutoRoutineName = NONE_NAME;
+    lastAutoRoutine = AutoRoutineGenerator.NONE.apply(factory);
+
+    addAuto("Four Note Auto", this::fourNoteAuto);
   }
 
   private Command fourNoteAuto(AutoFactory factory) {
@@ -86,12 +105,28 @@ public class Autos {
     return new Trigger(loop.getLoop(), () -> false);
   }
 
+  private void addAuto(
+      @SuppressWarnings("SameParameterValue") String name, AutoRoutineGenerator generator) {
+    autoRoutines.put(name, generator);
+    selector.addOption(name, name);
+  }
+
   public void update() {
-    autoChooser.update();
+    if (DriverStation.isDisabled() || IterativeRobotBase.isSimulation()) {
+      String selectStr = selector.get();
+      if (selectStr.equals(lastAutoRoutineName)) return;
+      if (!autoRoutines.containsKey(selectStr)) {
+        selectStr = NONE_NAME;
+        DriverStation.reportError(
+            "Selected an auto that isn't an option, falling back to \"" + NONE_NAME + "\"", false);
+      }
+      lastAutoRoutineName = selectStr;
+      lastAutoRoutine = autoRoutines.get(lastAutoRoutineName).apply(factory);
+    }
   }
 
   public Command getAuto() {
-    return autoChooser.getSelectedAutoRoutine();
+    return lastAutoRoutine;
   }
 
   private Command resetPose(AutoTrajectory path, AutoLoop loop) {
