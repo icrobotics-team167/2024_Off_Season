@@ -179,6 +179,7 @@ public class Swerve extends SubsystemBase {
     }
     var tagPoses = new ArrayList<Pose3d>();
     var poseEstimates = new ArrayList<Pose3d>();
+    var poseEstimateYaws = new ArrayList<Rotation2d>();
     for (int i = 0; i < visionIOs.length; i++) {
       visionIOs[i].updateInputs(visionInputs[i]);
       Logger.processInputs("Vision/" + i, visionInputs[i]);
@@ -188,22 +189,28 @@ public class Swerve extends SubsystemBase {
         continue;
       }
 
-      for (var poseEstimate : visionInputs[i].poseEstimates) {
-        // Discard if the pose is more than 5 cm off the ground
-        if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .005)) {
+      for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
+        var poseEstimate = visionInputs[i].poseEstimates[j];
+
+        // Discard if the pose is more than 2 cm off the ground
+        if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .05)) {
           continue;
         }
 
+        var stdDevs = getVisionStdDevs(poseEstimate, visionTuning[i]);
+        Logger.recordOutput("Vision/Std Devs/" + i + "/" + j, stdDevs);
+
         poseEstimator.addVisionMeasurement(
-            poseEstimate.estimatedPose().toPose2d(),
-            poseEstimate.timestamp(),
-            getVisionStdDevs(poseEstimate, visionTuning[i]));
+            poseEstimate.estimatedPose().toPose2d(), poseEstimate.timestamp(), stdDevs);
 
         poseEstimates.add(poseEstimate.estimatedPose());
+        poseEstimateYaws.add(new Rotation2d(poseEstimate.estimatedPose().getRotation().getZ()));
         tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
       }
     }
     Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
+    Logger.recordOutput(
+        "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
     Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
 
     Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
@@ -273,9 +280,7 @@ public class Swerve extends SubsystemBase {
     double rotationalScoreSum = 0;
     for (var distanceMeters : poseEstimate.tagDistances()) {
       translationalScoreSum += tuningParams.translationalScalar * distanceMeters * distanceMeters;
-      translationalScoreSum += tuningParams.translationalConstant;
       rotationalScoreSum += tuningParams.rotationalScalar * distanceMeters * distanceMeters;
-      rotationalScoreSum += tuningParams.rotationalConstant;
     }
 
     var translationalDivisor =

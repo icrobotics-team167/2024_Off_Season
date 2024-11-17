@@ -16,10 +16,11 @@ import org.littletonrobotics.junction.inputs.LoggableInputs;
 public interface FiducialPoseEstimatorIO {
   @AutoLog
   class FiducialStdDevTuning {
-    public double translationalConstant = 0;
+    // The scalar needs to be several times larger than the actual values for a stable pose
+    // estimation
     public double translationalScalar = 0.1;
+    // This can be roughly the same, but it should tend towards being smaller for more stability
     public double translationalCountExponent = 1;
-    public double rotationalConstant = 0;
     public double rotationalScalar = 0.1;
     public double rotationalCountExponent = 1;
   }

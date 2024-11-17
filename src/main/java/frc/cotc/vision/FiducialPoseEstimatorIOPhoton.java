@@ -44,8 +44,10 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
                 .1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(30)));
-        tuning.translationalScalar = 0.014656905;
-        tuning.translationalCountExponent = 2.41408;
+        tuning.translationalScalar = 0.125;
+        tuning.translationalCountExponent = 5;
+        tuning.rotationalScalar = 0.0125;
+        tuning.rotationalCountExponent = 2;
       }
       case 1 -> {
         name = "FrontRightCamera";
@@ -55,8 +57,10 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
                 -.1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-30)));
-        tuning.translationalScalar = 0.014656905;
-        tuning.translationalCountExponent = 2.41408;
+        tuning.translationalScalar = 0.125;
+        tuning.translationalCountExponent = 5;
+        tuning.rotationalScalar = 0.0125;
+        tuning.rotationalCountExponent = 2;
       }
       case 2 -> {
         name = "BackLeftCamera";
@@ -66,8 +70,10 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
                 .1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(150)));
-        tuning.translationalScalar = 0.014656905;
-        tuning.translationalCountExponent = 2.41408;
+        tuning.translationalScalar = 0.125;
+        tuning.translationalCountExponent = 5;
+        tuning.rotationalScalar = 0.0125;
+        tuning.rotationalCountExponent = 2;
       }
       case 3 -> {
         name = "BackRightCamera";
@@ -77,8 +83,10 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
                 -.1,
                 .1,
                 new Rotation3d(0, Units.degreesToRadians(-45), Units.degreesToRadians(-150)));
-        tuning.translationalScalar = 0.014656905;
-        tuning.translationalCountExponent = 2.41408;
+        tuning.translationalScalar = 0.125;
+        tuning.translationalCountExponent = 5;
+        tuning.rotationalScalar = 0.0125;
+        tuning.rotationalCountExponent = 2;
       }
       default -> throw new IndexOutOfBoundsException();
     }
