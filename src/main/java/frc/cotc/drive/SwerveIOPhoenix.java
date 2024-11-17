@@ -131,10 +131,17 @@ public class SwerveIOPhoenix implements SwerveIO {
     for (int i = 0; i < 4; i++) {
       inputs.moduleStates[i] = getCurrentState(i);
 
-      inputs.driveMotorCurrents[i] =
-          MotorCurrentDraws.fromSignals(signals[i * 8 + 4], signals[i * 8 + 5]);
-      inputs.steerMotorCurrents[i] =
-          MotorCurrentDraws.fromSignals(signals[i * 8 + 6], signals[i * 8 + 7]);
+      var driveStator = signals[i * 8 + 4];
+      var driveSupply = signals[i * 8 + 5];
+      var steerStator = signals[i * 8 + 6];
+      var steerSupply = signals[i * 8 + 7];
+      if (inputs.driveMotorCurrents[i] != null) {
+        inputs.driveMotorCurrents[i].mutateFromSignals(driveStator, driveSupply);
+        inputs.steerMotorCurrents[i].mutateFromSignals(steerStator, steerSupply);
+      } else {
+        inputs.driveMotorCurrents[i] = MotorCurrentDraws.fromSignals(driveStator, driveSupply);
+        inputs.steerMotorCurrents[i] = MotorCurrentDraws.fromSignals(steerStator, steerSupply);
+      }
     }
     inputs.gyroYaw =
         Rotation2d.fromDegrees(
