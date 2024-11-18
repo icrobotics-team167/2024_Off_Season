@@ -301,13 +301,6 @@ public class SwerveIOPhoenix implements SwerveIO {
               .withVelocity(Units.radiansToRotations(steerFeedforward)));
     }
 
-    private final TorqueCurrentFOC characterizationControlRequest = new TorqueCurrentFOC(0);
-
-    void driveCharacterization(double amps) {
-      steerMotor.setControl(steerControlRequest.withPosition(0));
-      driveMotor.setControl(characterizationControlRequest.withOutput(amps));
-    }
-
     SwerveModulePosition getPosition() {
       return new SwerveModulePosition(
           driveMotor.getPosition().getValueAsDouble() * WHEEL_CIRCUMFERENCE_METERS,
