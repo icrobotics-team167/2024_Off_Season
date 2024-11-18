@@ -280,7 +280,7 @@ public class SwerveSetpointGenerator {
       // It will (likely) be faster to stop the robot, rotate the modules in place to the complement
       // of the desired
       // angle, and accelerate again.
-      return generateSetpoint(prevSetpoint, new ChassisSpeeds(), dt);
+      return generateSetpoint(prevSetpoint, new ChassisSpeeds(), voltage, dt);
     }
 
     // Compute the deltas between start and goal. We can then interpolate from the start state to

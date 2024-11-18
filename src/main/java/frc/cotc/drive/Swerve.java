@@ -186,7 +186,7 @@ public class Swerve extends SubsystemBase {
       for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
         var poseEstimate = visionInputs[i].poseEstimates[j];
 
-        // Discard if the pose is more than 2 cm off the ground
+        // Discard if the pose is too far above/below the ground
         if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .05)) {
           continue;
         }
