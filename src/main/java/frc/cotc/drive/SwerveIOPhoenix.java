@@ -193,13 +193,6 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
-  public void driveCharacterization(double volts) {
-    for (int i = 0; i < 4; i++) {
-      modules[i].driveCharacterization(volts);
-    }
-  }
-
-  @Override
   public SwerveModuleConstantsAutoLogged getConstants() {
     return CONSTANTS;
   }

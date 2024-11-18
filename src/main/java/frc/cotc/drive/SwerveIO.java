@@ -188,6 +188,4 @@ public interface SwerveIO {
   default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint, double[] forceFeedforward) {}
 
   default void resetGyro(Rotation2d newYaw) {}
-
-  default void driveCharacterization(double volts) {}
 }
