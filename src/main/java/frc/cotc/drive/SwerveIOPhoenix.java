@@ -245,9 +245,9 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       var encoderConfig = new CANcoderConfiguration();
 
+      double driveKpMultiplier;
       if (Robot.isReal()) {
         driveConfig.Slot0.kV = 0;
-        driveConfig.Slot0.kP = 0;
 
         steerConfig.Slot0.kP = 0;
         steerConfig.Slot0.kD = 0;
@@ -258,17 +258,19 @@ public class SwerveIOPhoenix implements SwerveIO {
           case 2 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
           case 3 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
         }
+
+        driveKpMultiplier = 0;
       } else {
-        driveConfig.Slot0.kP = 700;
+        driveKpMultiplier = 80;
 
         steerConfig.Slot0.kP = 650;
         steerConfig.Slot0.kD = 2;
       }
       driveConfig.Slot0.kA =
-          WHEEL_CIRCUMFERENCE_METERS
-              * (CONSTANTS.MASS_KG / 4)
+          (CONSTANTS.MASS_KG / 4)
               * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)
               / CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
+      driveConfig.Slot0.kP = driveKpMultiplier * driveConfig.Slot0.kA;
 
       steerConfig.Slot0.kV = 12 / CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC;
 
@@ -539,7 +541,13 @@ public class SwerveIOPhoenix implements SwerveIO {
         steerMotorSim.Orientation = ChassisReference.Clockwise_Positive;
         encoderSim.Orientation = ChassisReference.CounterClockwise_Positive;
 
-        driveWheelSim = new FOCMotorSim(CONSTANTS.DRIVE_MOTOR, .035);
+        driveWheelSim =
+            new FOCMotorSim(
+                CONSTANTS.DRIVE_MOTOR,
+                CONSTANTS.MASS_KG
+                    * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)
+                    * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)
+                    / 4);
         steerSim =
             new DCMotorSim(
                 LinearSystemId.createDCMotorSystem(DCMotor.getKrakenX60(1), .01, STEER_GEAR_RATIO),
