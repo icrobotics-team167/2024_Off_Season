@@ -12,6 +12,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.PowerDistribution;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -184,6 +185,9 @@ public class Robot extends LoggedRobot {
   @Override
   public void simulationPeriodic() {
     if (!Logger.hasReplaySource()) {
+      if (simVoltage < RobotController.getBrownoutVoltage()) {
+        throw new RuntimeException("Voltage too low! Terminating program to simulate brownout.");
+      }
       RoboRioSim.setVInVoltage(simVoltage);
       Logger.recordOutput("Sim/Ground truth pose", groundTruthPoseSupplier.get());
     }

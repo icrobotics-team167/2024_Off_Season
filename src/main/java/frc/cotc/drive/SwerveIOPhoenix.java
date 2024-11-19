@@ -481,7 +481,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       double currentTime = Logger.getRealTimestamp() / 1e6;
       double dt = currentTime - lastTime;
 
-      double voltage = Math.max(12.3 - (.018 * filteredCurrentDraw), 6);
+      double voltage = 12.3 - (.02 * filteredCurrentDraw);
       Robot.simVoltage = voltage;
       double instantaneousCurrentDraw = 0;
       SwerveModuleState[] moduleStates = new SwerveModuleState[4];
@@ -495,7 +495,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       // but accurately simulating that is a PITA, so in order to simulate capacitance, the
       // current draw is run through a simple low pass filter to smooth out the current draw.
       // Without this, large current spikes can trigger the TalonFX over-voltage protection.
-      filteredCurrentDraw += (instantaneousCurrentDraw - filteredCurrentDraw) * (dt * 10);
+      filteredCurrentDraw += (instantaneousCurrentDraw - filteredCurrentDraw) * (dt * 15);
 
       yawDeg +=
           Units.radiansToDegrees(
