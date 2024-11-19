@@ -179,9 +179,13 @@ public class SwerveIOPhoenix implements SwerveIO {
   @Override
   public void drive(SwerveSetpoint setpoint, double[] forceFeedforward) {
     for (int i = 0; i < 4; i++) {
+      var currentState = getCurrentState(i);
+      if (DriverStation.isDisabled()) {
+        currentState.speedMetersPerSecond = 0;
+      }
       modules[i].run(
           setpoint.moduleStates()[i],
-          getCurrentState(i),
+          currentState,
           setpoint.steerFeedforwards()[i],
           forceFeedforward[i]);
     }

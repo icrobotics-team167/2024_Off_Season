@@ -303,11 +303,11 @@ public class Swerve extends SubsystemBase {
   }
 
   public Command stopInX() {
-    return run(
-        () -> {
+    return run(() -> {
           swerveIO.drive(stopInXSetpoint, EMPTY_FEEDFORWARDS);
           lastSetpoint = stopInXSetpoint;
-        });
+        })
+        .ignoringDisable(true);
   }
 
   public Command resetGyro() {
