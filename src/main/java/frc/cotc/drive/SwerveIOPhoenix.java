@@ -63,7 +63,6 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     DRIVE_GEAR_RATIO = (50.0 / 16.0) * (17.0 / 27.0) * (45.0 / 15.0);
     CONSTANTS.DRIVE_MOTOR = DCMotor.getKrakenX60Foc(1).withReduction(DRIVE_GEAR_RATIO);
-    CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS = 100;
 
     STEER_GEAR_RATIO = 150.0 / 7.0;
     CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC =
@@ -76,6 +75,16 @@ public class SwerveIOPhoenix implements SwerveIO {
             * 1;
 
     CONSTANTS.ANGULAR_SPEED_FUDGING = .45;
+
+    CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS =
+        Math.min(
+            CONSTANTS.DRIVE_MOTOR.getCurrent(
+                    CONSTANTS.WHEEL_COF
+                        * ((CONSTANTS.MASS_KG / 4) * 9.81)
+                        * CONSTANTS.WHEEL_DIAMETER_METERS
+                        / 2)
+                + 10,
+            100);
   }
 
   private final Module[] modules = new Module[4];
@@ -481,7 +490,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       double currentTime = Logger.getRealTimestamp() / 1e6;
       double dt = currentTime - lastTime;
 
-      double voltage = 12.3 - (.02 * filteredCurrentDraw);
+      double voltage = 12.3 - (.018 * filteredCurrentDraw);
       Robot.simVoltage = voltage;
       double instantaneousCurrentDraw = 0;
       SwerveModuleState[] moduleStates = new SwerveModuleState[4];
@@ -495,7 +504,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       // but accurately simulating that is a PITA, so in order to simulate capacitance, the
       // current draw is run through a simple low pass filter to smooth out the current draw.
       // Without this, large current spikes can trigger the TalonFX over-voltage protection.
-      filteredCurrentDraw += (instantaneousCurrentDraw - filteredCurrentDraw) * (dt * 15);
+      filteredCurrentDraw += (instantaneousCurrentDraw - filteredCurrentDraw) * (dt * 12.5);
 
       yawDeg +=
           Units.radiansToDegrees(
