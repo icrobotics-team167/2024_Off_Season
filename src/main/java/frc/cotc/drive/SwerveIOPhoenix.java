@@ -256,8 +256,8 @@ public class SwerveIOPhoenix implements SwerveIO {
       } else {
         driveKpMultiplier = 80;
 
-        steerConfig.Slot0.kP = 650;
-        steerConfig.Slot0.kD = 2;
+        steerConfig.Slot0.kP = 700;
+        steerConfig.Slot0.kD = 3.5;
       }
       driveConfig.Slot0.kA =
           (CONSTANTS.MASS_KG / 4)
