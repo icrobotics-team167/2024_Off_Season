@@ -221,14 +221,20 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerMotor = new TalonFX(id * 3 + 1, Robot.CANIVORE_NAME);
       encoder = new CANcoder(id * 3 + 2, Robot.CANIVORE_NAME);
 
-      var wheelForce =
-          CONSTANTS.DRIVE_MOTOR.getTorque(CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS)
-              / (CONSTANTS.WHEEL_DIAMETER_METERS / 2);
-      var maxAccel = 4 * wheelForce / CONSTANTS.MASS_KG;
+      var wheelForceNewtonsPerAmp =
+          CONSTANTS.DRIVE_MOTOR.KtNMPerAmp / (CONSTANTS.WHEEL_DIAMETER_METERS / 2);
+      var maxCurrentAccelMetersPerSecSquared =
+          4
+              * wheelForceNewtonsPerAmp
+              * CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS
+              / CONSTANTS.MASS_KG;
+      var maxTractionAccelMetersPerSecSquared = CONSTANTS.WHEEL_COF * 9.81;
 
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = DRIVE_GEAR_RATIO;
-      driveConfig.MotionMagic.MotionMagicAcceleration = maxAccel / WHEEL_CIRCUMFERENCE_METERS;
+      driveConfig.MotionMagic.MotionMagicAcceleration =
+          Math.min(maxCurrentAccelMetersPerSecSquared, maxTractionAccelMetersPerSecSquared)
+              / WHEEL_CIRCUMFERENCE_METERS;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
@@ -273,9 +279,7 @@ public class SwerveIOPhoenix implements SwerveIO {
         steerConfig.Slot0.kD = 3.5;
       }
       driveConfig.Slot0.kA =
-          (CONSTANTS.MASS_KG / 4)
-              * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)
-              / CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
+          WHEEL_CIRCUMFERENCE_METERS / (4 * wheelForceNewtonsPerAmp / CONSTANTS.MASS_KG);
       driveConfig.Slot0.kP = driveKpMultiplier * driveConfig.Slot0.kA;
 
       steerConfig.Slot0.kV = 12 / CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC;
@@ -300,7 +304,6 @@ public class SwerveIOPhoenix implements SwerveIO {
           && MathUtil.isNear(0, currentState.speedMetersPerSecond, 1e-3)) {
         driveMotor.setControl(brakeControlRequest);
       } else {
-        desiredState.cosineScale(currentState.angle);
         driveMotor.setControl(
             driveControlRequest
                 .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE_METERS)
@@ -514,9 +517,6 @@ public class SwerveIOPhoenix implements SwerveIO {
       synchronized (groundTruthOdometry) {
         groundTruthOdometry.update(Rotation2d.fromDegrees(yawDeg), modulePositions);
       }
-
-      SignalLogger.writeDouble("Swerve Sim Thread/Time (ms)", dt * 1000);
-      SignalLogger.writeDouble("Swerve Sim Thread/Frequency (hz)", 1.0 / dt);
 
       lastTime = currentTime;
 
