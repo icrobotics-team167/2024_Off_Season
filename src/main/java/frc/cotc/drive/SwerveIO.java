@@ -74,7 +74,7 @@ public interface SwerveIO {
       var list = new ArrayList<OdometryFrame>();
       int i = 0;
       while (true) {
-        var timestamp = table.get("OdometryFrames/" + i + "/timestamp", -1);
+        var timestamp = table.get("OdometryFrames/" + i + "/timestamp", -1.0);
         if (timestamp < 0) {
           break;
         }
@@ -188,4 +188,8 @@ public interface SwerveIO {
   default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint, double[] forceFeedforward) {}
 
   default void resetGyro(Rotation2d newYaw) {}
+
+  default void initSysId() {}
+
+  default void steerCharacterization(double volts) {}
 }

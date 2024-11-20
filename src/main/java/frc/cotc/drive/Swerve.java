@@ -7,10 +7,14 @@
 
 package frc.cotc.drive;
 
+import static edu.wpi.first.units.Units.*;
+import static edu.wpi.first.wpilibj2.command.Commands.sequence;
+import static edu.wpi.first.wpilibj2.command.Commands.waitSeconds;
 import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import choreo.trajectory.SwerveSample;
+import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -23,6 +27,7 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.cotc.Robot;
 import frc.cotc.vision.FiducialPoseEstimatorIO;
 import frc.cotc.vision.FiducialPoseEstimatorIO.FiducialPoseEstimatorIOInputs;
@@ -392,6 +397,30 @@ public class Swerve extends SubsystemBase {
     var output = feedforward.plus(feedback);
     autoDrive(toRobotRelative(output), forceVectors);
     Logger.recordOutput("Choreo/Output", toRobotRelative(output));
+  }
+
+  public Command steerCharacterize() {
+    var sysId =
+        new SysIdRoutine(
+            new SysIdRoutine.Config(
+                Volts.of(1).per(Second),
+                Volts.of(6),
+                Seconds.of(12),
+                state -> SignalLogger.writeString("SysIDState", state.toString())),
+            new SysIdRoutine.Mechanism(
+                voltage -> swerveIO.steerCharacterization(voltage.baseUnitMagnitude()),
+                null,
+                this));
+
+    return sequence(
+        runOnce(swerveIO::initSysId),
+        sysId.quasistatic(SysIdRoutine.Direction.kForward),
+        waitSeconds(1),
+        sysId.quasistatic(SysIdRoutine.Direction.kReverse),
+        waitSeconds(1),
+        sysId.dynamic(SysIdRoutine.Direction.kForward),
+        waitSeconds(1),
+        sysId.dynamic(SysIdRoutine.Direction.kReverse));
   }
 
   private ChassisSpeeds getRobotChassisSpeeds() {

@@ -11,7 +11,6 @@ import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
-import com.ctre.phoenix6.SignalLogger;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
@@ -201,6 +200,23 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
+  public void initSysId() {
+    var signalsToSpeedUp = new BaseStatusSignal[8];
+    for (int i = 0; i < 4; i++) {
+      signalsToSpeedUp[i * 2] = modules[i].steerMotor.getPosition(false);
+      signalsToSpeedUp[i * 2 + 1] = signals[i * 8 + 2];
+    }
+    BaseStatusSignal.setUpdateFrequencyForAll(250, signalsToSpeedUp);
+  }
+
+  @Override
+  public void steerCharacterization(double volts) {
+    for (var module : modules) {
+      module.steerCharacterize(volts);
+    }
+  }
+
+  @Override
   public void resetGyro(Rotation2d newYaw) {
     gyro.setYaw(newYaw.getDegrees());
   }
@@ -275,14 +291,14 @@ public class SwerveIOPhoenix implements SwerveIO {
       } else {
         driveKpMultiplier = 80;
 
-        steerConfig.Slot0.kP = 700;
-        steerConfig.Slot0.kD = 3.5;
+        steerConfig.Slot0.kP = 600;
+        steerConfig.Slot0.kD = 2.5;
       }
       driveConfig.Slot0.kA =
           WHEEL_CIRCUMFERENCE_METERS / (4 * wheelForceNewtonsPerAmp / CONSTANTS.MASS_KG);
       driveConfig.Slot0.kP = driveKpMultiplier * driveConfig.Slot0.kA;
 
-      steerConfig.Slot0.kV = 12 / CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC;
+      steerConfig.Slot0.kV = 12 / Units.radiansToRotations(CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC);
 
       driveMotor.getConfigurator().apply(driveConfig);
       steerMotor.getConfigurator().apply(steerConfig);
@@ -315,6 +331,13 @@ public class SwerveIOPhoenix implements SwerveIO {
           steerControlRequest
               .withPosition(desiredState.angle.getRotations())
               .withVelocity(Units.radiansToRotations(steerFeedforward)));
+    }
+
+    private final VoltageOut steerCharacterization = new VoltageOut(0).withEnableFOC(false);
+
+    void steerCharacterize(double volts) {
+      driveMotor.setControl(brakeControlRequest);
+      steerMotor.setControl(steerCharacterization.withOutput(volts));
     }
 
     SwerveModulePosition getPosition() {
@@ -549,7 +572,8 @@ public class SwerveIOPhoenix implements SwerveIO {
                     / 4);
         steerSim =
             new DCMotorSim(
-                LinearSystemId.createDCMotorSystem(DCMotor.getKrakenX60(1), .01, STEER_GEAR_RATIO),
+                LinearSystemId.createDCMotorSystem(
+                    DCMotor.getKrakenX60(1), .0025, STEER_GEAR_RATIO),
                 DCMotor.getKrakenX60(1));
       }
 
