@@ -22,7 +22,18 @@ public interface SwerveIO {
     SwerveModuleState[] moduleStates = new SwerveModuleState[4];
     Rotation2d gyroYaw = Rotation2d.kZero;
 
-    OdometryFrame[] odometryFrames = new OdometryFrame[0];
+    OdometryFrame[] odometryFrames =
+        new OdometryFrame[] {
+          new OdometryFrame(
+              new SwerveModulePosition[] {
+                new SwerveModulePosition(),
+                new SwerveModulePosition(),
+                new SwerveModulePosition(),
+                new SwerveModulePosition()
+              },
+              Rotation2d.kZero,
+              -1.0)
+        };
 
     MotorCurrentDraws[] driveMotorCurrents = new MotorCurrentDraws[4];
     MotorCurrentDraws[] steerMotorCurrents = new MotorCurrentDraws[4];
