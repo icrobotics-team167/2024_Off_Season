@@ -170,6 +170,9 @@ public class Swerve extends SubsystemBase {
     poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
     for (var frame : swerveInputs.odometryFrames) {
+      if (frame.timestamp() < 0) {
+        break;
+      }
       poseEstimator.updateWithTime(frame.timestamp(), frame.gyroYaw(), frame.positions());
     }
 
