@@ -8,9 +8,9 @@
 package frc.cotc.superstructure;
 
 import edu.wpi.first.wpilibj2.command.Command;
-import frc.cotc.util.Mechanism;
+import frc.cotc.util.Supersystem;
 
-public class Superstructure extends Mechanism {
+public class Superstructure extends Supersystem {
   private final Pivot pivot;
 
   public Superstructure(PivotIO pivotIO) {

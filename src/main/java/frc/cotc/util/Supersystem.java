@@ -7,10 +7,7 @@
 
 package frc.cotc.util;
 
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.ProxyCommand;
-import edu.wpi.first.wpilibj2.command.Subsystem;
+import edu.wpi.first.wpilibj2.command.*;
 
 /**
  * A class that allows for the nesting of {@link Subsystem}s.
@@ -19,7 +16,7 @@ import edu.wpi.first.wpilibj2.command.Subsystem;
  * command compositions, giving the flexibility and mutexing of having multiple split subsystems but
  * the simplicity of having only 1 subsystem to deal with.
  *
- * <p>By wrapping a command with {@link Mechanism#expose(Command internalCommand)}, the {@link
+ * <p>By wrapping a command with {@link Supersystem#expose(Command internalCommand)}, the {@link
  * CommandScheduler} can know the hierarchy of nested resources, making sure that if a {@link
  * Command} uses a nested Subsystem, that Subsystem and the parent Mechanism can be reserved for
  * mutexing, while the other Subsystems in the nest are free to do their own things.
@@ -27,10 +24,10 @@ import edu.wpi.first.wpilibj2.command.Subsystem;
  * <p><b><i><u>NESTED SUBSYSTEMS MUST BE PRIVATE FIELDS. PUBLICLY ACCESSIBLE SUBSYSTEMS HAVE
  * ENTIRELY UNDEFINED BEHAVIOR.
  */
-public abstract class Mechanism implements Subsystem {
+public abstract class Supersystem extends SubsystemBase {
   /**
    * Wraps a {@link Command} such that from the outside, it only looks like a Command that only
-   * requires this {@link Mechanism}. This allows commands and command compositions involving nested
+   * requires this {@link Supersystem}. This allows commands and command compositions involving nested
    * {@link Subsystem}s to be accessible safely.
    *
    * <p><b><i><u>ALL PUBLIC FACING COMMANDS MUST BE RUN THROUGH THIS METHOD. PUBLICLY ACCESSIBLE
