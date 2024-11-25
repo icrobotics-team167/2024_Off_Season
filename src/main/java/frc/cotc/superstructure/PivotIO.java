@@ -54,10 +54,6 @@ public interface PivotIO {
 
   default void updateInputs(PivotIOInputs inputs) {}
 
-  default void aimAtAngle(double angleRad) {
-    aimAtAngle(angleRad, 0);
-  }
-
   default void aimAtAngle(double angleRad, double velRadPerSec) {}
 
   default void runVel(double velRadPerSec) {}

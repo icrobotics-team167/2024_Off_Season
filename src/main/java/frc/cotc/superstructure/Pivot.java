@@ -23,10 +23,10 @@ public class Pivot extends SubsystemBase {
   }
 
   public Command subwooferAim() {
-    return run(() -> pivotIO.aimAtAngle(Units.degreesToRadians(49)));
+    return run(() -> pivotIO.aimAtAngle(Units.degreesToRadians(49), 0));
   }
 
   public Command aimAtAngle(double angleRad) {
-    return run(() -> pivotIO.aimAtAngle(angleRad));
+    return run(() -> pivotIO.aimAtAngle(angleRad, 0));
   }
 }
