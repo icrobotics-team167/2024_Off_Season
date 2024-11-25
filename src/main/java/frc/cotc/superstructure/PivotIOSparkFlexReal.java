@@ -83,12 +83,10 @@ public class PivotIOSparkFlexReal extends PivotIOSparkFlexAbstract {
 
   @Override
   void updateCurrents(MotorCurrentDraws left, MotorCurrentDraws right) {
-    double leftStatorAmps = leftMotor.getOutputCurrent();
-    double leftDutyCycle = leftMotor.getAppliedOutput();
-    left.mutate(leftStatorAmps, leftStatorAmps * Math.abs(leftDutyCycle));
-    double rightStatorAmps = leftMotor.getOutputCurrent();
-    double rightDutyCycle = leftMotor.getAppliedOutput();
-    left.mutate(rightStatorAmps, rightStatorAmps * Math.abs(rightDutyCycle));
+    left.statorCurrent = leftMotor.getOutputCurrent();
+    left.supplyCurrent = left.statorCurrent * leftMotor.getAppliedOutput();
+    right.statorCurrent = rightMotor.getOutputCurrent();
+    right.supplyCurrent = right.statorCurrent * rightMotor.getAppliedOutput();
   }
 
   private double getAbsoluteAngleRad() {

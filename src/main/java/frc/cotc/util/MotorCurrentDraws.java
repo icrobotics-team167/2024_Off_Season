@@ -15,15 +15,13 @@ public class MotorCurrentDraws {
   public double statorCurrent;
   public double supplyCurrent;
 
+  public MotorCurrentDraws() {
+    this(0, 0);
+  }
+
   public MotorCurrentDraws(double stator, double supply) {
     statorCurrent = stator;
     supplyCurrent = supply;
-  }
-
-  /** MUTABLE SHIT IS VERY FOOT-GUN-Y. BE CAREFUL. */
-  public void mutate(double stator, double supply) {
-    this.statorCurrent = stator;
-    this.supplyCurrent = supply;
   }
 
   public static MotorCurrentDraws fromSignals(
@@ -33,7 +31,8 @@ public class MotorCurrentDraws {
 
   /** MUTABLE SHIT IS VERY FOOT-GUN-Y. BE CAREFUL. */
   public void mutateFromSignals(BaseStatusSignal statorSignal, BaseStatusSignal supplySignal) {
-    mutate(statorSignal.getValueAsDouble(), supplySignal.getValueAsDouble());
+    statorCurrent = statorSignal.getValueAsDouble();
+    supplyCurrent = supplySignal.getValueAsDouble();
   }
 
   public static Struct<MotorCurrentDraws> struct =

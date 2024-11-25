@@ -27,8 +27,8 @@ import edu.wpi.first.wpilibj2.command.*;
 public abstract class Supersystem extends SubsystemBase {
   /**
    * Wraps a {@link Command} such that from the outside, it only looks like a Command that only
-   * requires this {@link Supersystem}. This allows commands and command compositions involving nested
-   * {@link Subsystem}s to be accessible safely.
+   * requires this {@link Supersystem}. This allows commands and command compositions involving
+   * nested {@link Subsystem}s to be accessible safely.
    *
    * <p><b><i><u>ALL PUBLIC FACING COMMANDS MUST BE RUN THROUGH THIS METHOD. PUBLICLY ACCESSIBLE
    * COMMANDS FROM A NESTED SUBSYSTEM NOT WRAPPED BY THIS METHOD IS ENTIRELY UNDEFINED

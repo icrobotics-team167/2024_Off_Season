@@ -19,8 +19,8 @@ public interface PivotIO {
     double rightAngleRad;
     double rightVelRadPerSec;
 
-    MotorCurrentDraws leftMotorCurrents = new MotorCurrentDraws(0, 0);
-    MotorCurrentDraws rightMotorCurrents = new MotorCurrentDraws(0, 0);
+    MotorCurrentDraws leftMotorCurrents = new MotorCurrentDraws();
+    MotorCurrentDraws rightMotorCurrents = new MotorCurrentDraws();
 
     @Override
     public void toLog(LogTable table) {
@@ -39,9 +39,9 @@ public interface PivotIO {
       rightAngleRad = table.get("rightAngleRad", 0.0);
       rightVelRadPerSec = table.get("rightVelRadPerSec", 0.0);
       leftMotorCurrents =
-          table.get("leftMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws(0, 0));
+          table.get("leftMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws());
       rightMotorCurrents =
-          table.get("rightMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws(0, 0));
+          table.get("rightMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws());
     }
   }
 

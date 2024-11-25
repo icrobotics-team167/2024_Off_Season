@@ -85,11 +85,9 @@ public class PivotIOSparkFlexSim extends PivotIOSparkFlexAbstract {
 
   @Override
   void updateCurrents(MotorCurrentDraws left, MotorCurrentDraws right) {
-    double leftStatorAmps = leftArmSim.getCurrentDrawAmps();
-    double leftDutyCycle = leftArmSim.getInput(0) / 12;
-    left.mutate(leftStatorAmps, leftStatorAmps * Math.abs(leftDutyCycle));
-    double rightStatorAmps = leftArmSim.getCurrentDrawAmps();
-    double rightDutyCycle = leftArmSim.getInput(0) / 12;
-    left.mutate(rightStatorAmps, rightStatorAmps * Math.abs(rightDutyCycle));
+    left.statorCurrent = leftArmSim.getCurrentDrawAmps();
+    left.supplyCurrent = left.statorCurrent * (leftArmSim.getInput(0) / 12);
+    right.statorCurrent = rightArmSim.getCurrentDrawAmps();
+    right.supplyCurrent = right.statorCurrent * (rightArmSim.getInput(0) / 12);
   }
 }
