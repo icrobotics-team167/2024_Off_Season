@@ -25,6 +25,7 @@ import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
 import frc.cotc.Robot;
 
+// See README.md
 @SuppressWarnings("removal")
 public class PivotIOSparkFlex implements PivotIO {
   static final double gearRatio = 400;
