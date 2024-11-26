@@ -117,6 +117,9 @@ public class PivotIOSparkFlex implements PivotIO {
                   CONSTANTS.maxAngleRad,
                   true,
                   startAngle);
+
+      leftMotorSim = new SparkSim(leftMotor, motor);
+      rightMotorSim = new SparkSim(rightMotor, motor);
     }
 
     leftEncoder.setPosition(getAbsoluteAngleRad());
