@@ -7,8 +7,10 @@
 
 package frc.cotc.superstructure;
 
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
+import frc.cotc.util.MiscStructs;
 import frc.cotc.util.MotorCurrentDraws;
-import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
@@ -45,16 +47,41 @@ public interface FlywheelIO {
     }
   }
 
-  @AutoLog
-  class FlywheelIOConstants {
-    double maxVelMetersPerSec;
+  class FlywheelIOControllers implements LoggableInputs {
+    SimpleMotorFeedforward topFF;
+    SimpleMotorFeedforward bottomFF;
+
+    PIDController topController;
+    PIDController bottomController;
+
+    @Override
+    public void toLog(LogTable table) {
+      table.put("topFF", SimpleMotorFeedforward.struct, topFF);
+      table.put("bottomFF", SimpleMotorFeedforward.struct, bottomFF);
+      table.put("topController", MiscStructs.pidControllerStruct, topController);
+      table.put("bottomController", MiscStructs.pidControllerStruct, bottomController);
+    }
+
+    @Override
+    public void fromLog(LogTable table) {
+      topFF =
+          table.get("topFF", SimpleMotorFeedforward.struct, new SimpleMotorFeedforward(0, 1, .1));
+      bottomFF =
+          table.get(
+              "bottomFF", SimpleMotorFeedforward.struct, new SimpleMotorFeedforward(0, 1, .1));
+      topController =
+          table.get("topController", MiscStructs.pidControllerStruct, new PIDController(1, 0, 0));
+      bottomController =
+          table.get(
+              "bottomController", MiscStructs.pidControllerStruct, new PIDController(1, 0, 0));
+    }
   }
 
-  default FlywheelIOConstantsAutoLogged getConstants() {
-    return new FlywheelIOConstantsAutoLogged();
+  default FlywheelIOControllers getControllers() {
+    return new FlywheelIOControllers();
   }
 
   default void updateInputs(FlywheelIOInputs inputs) {}
 
-  default void runVel(double topVelMetersPerSec, double bottomVelMetersPerSec) {}
+  default void run(double topVolts, double bottomVolts) {}
 }

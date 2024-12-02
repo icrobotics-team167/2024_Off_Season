@@ -19,8 +19,8 @@ public interface PivotIO {
     double rightAngleRad;
     double rightVelRadPerSec;
 
-    MotorCurrentDraws leftMotorCurrents = new MotorCurrentDraws();
-    MotorCurrentDraws rightMotorCurrents = new MotorCurrentDraws();
+    MotorCurrentDraws leftCurrentDraws = new MotorCurrentDraws();
+    MotorCurrentDraws rightCurrentDraws = new MotorCurrentDraws();
 
     @Override
     public void toLog(LogTable table) {
@@ -28,8 +28,8 @@ public interface PivotIO {
       table.put("leftVelRadPerSec", leftVelRadPerSec);
       table.put("rightAngleRad", rightAngleRad);
       table.put("rightVelRadPerSec", rightVelRadPerSec);
-      table.put("leftMotorCurrents", MotorCurrentDraws.struct, leftMotorCurrents);
-      table.put("rightMotorCurrents", MotorCurrentDraws.struct, rightMotorCurrents);
+      table.put("leftMotorCurrents", MotorCurrentDraws.struct, leftCurrentDraws);
+      table.put("rightMotorCurrents", MotorCurrentDraws.struct, rightCurrentDraws);
     }
 
     @Override
@@ -38,9 +38,9 @@ public interface PivotIO {
       leftVelRadPerSec = table.get("leftVelRadPerSec", 0.0);
       rightAngleRad = table.get("rightAngleRad", 0.0);
       rightVelRadPerSec = table.get("rightVelRadPerSec", 0.0);
-      leftMotorCurrents =
+      leftCurrentDraws =
           table.get("leftMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws());
-      rightMotorCurrents =
+      rightCurrentDraws =
           table.get("rightMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws());
     }
   }
@@ -50,6 +50,10 @@ public interface PivotIO {
     double maxSpeedRadPerSec;
     double maxAngleRad;
     double minAngleRad;
+  }
+
+  default PivotIOConstantsAutoLogged getConstants() {
+    return new PivotIOConstantsAutoLogged();
   }
 
   default void updateInputs(PivotIOInputs inputs) {}

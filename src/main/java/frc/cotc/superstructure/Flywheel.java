@@ -8,5 +8,26 @@
 package frc.cotc.superstructure;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import org.littletonrobotics.junction.Logger;
 
-public class Flywheel extends SubsystemBase {}
+public class Flywheel extends SubsystemBase {
+  private final FlywheelIO io;
+  private final FlywheelIO.FlywheelIOInputs inputs = new FlywheelIO.FlywheelIOInputs();
+  private final FlywheelIO.FlywheelIOControllers controllers;
+
+  public Flywheel(FlywheelIO io) {
+    this.io = io;
+    controllers = io.getControllers();
+    Logger.processInputs("Superstructure/Flywheels/Constants", controllers);
+  }
+
+  @Override
+  public void periodic() {
+    io.updateInputs(inputs);
+    Logger.processInputs("Superstructure/Flywheels", inputs);
+  }
+
+  private void runVel(double topVelMetersPerSec, double bottomVelMetersPerSec) {
+    
+  }
+}

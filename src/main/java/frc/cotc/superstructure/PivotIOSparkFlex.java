@@ -7,6 +7,8 @@
 
 package frc.cotc.superstructure;
 
+import static frc.cotc.util.SparkUtils.configureSpark;
+
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkFlex;
@@ -28,15 +30,7 @@ import frc.cotc.Robot;
 // See README.md
 @SuppressWarnings("removal")
 public class PivotIOSparkFlex implements PivotIO {
-  static final double gearRatio = 400;
-  static final DCMotor motor = DCMotor.getNeoVortex(1);
-  static final PivotIOConstantsAutoLogged CONSTANTS = new PivotIOConstantsAutoLogged();
-
-  static {
-    CONSTANTS.maxAngleRad = Units.degreesToRadians(90);
-    CONSTANTS.minAngleRad = 0;
-    CONSTANTS.maxSpeedRadPerSec = motor.freeSpeedRadPerSec / gearRatio;
-  }
+  private final PivotIOConstantsAutoLogged CONSTANTS = new PivotIOConstantsAutoLogged();
 
   private final PIDController differentialPID;
   private final ArmFeedforward armFeedforward;
@@ -55,6 +49,12 @@ public class PivotIOSparkFlex implements PivotIO {
   private SparkSim rightMotorSim;
 
   public PivotIOSparkFlex() {
+    CONSTANTS.maxAngleRad = Units.degreesToRadians(90);
+    CONSTANTS.minAngleRad = 0;
+    var motor = DCMotor.getNeoVortex(1);
+    double gearRatio = 400;
+    CONSTANTS.maxSpeedRadPerSec = motor.freeSpeedRadPerSec / gearRatio;
+
     // TODO: Configure CAN IDs
     leftMotor = new SparkFlex(15, SparkLowLevel.MotorType.kBrushless);
     rightMotor = new SparkFlex(16, SparkLowLevel.MotorType.kBrushless);
@@ -70,14 +70,18 @@ public class PivotIOSparkFlex implements PivotIO {
     leftEncoder = leftMotor.getEncoder();
     rightEncoder = rightMotor.getEncoder();
 
-    leftMotor.configure(
-        config,
-        SparkBase.ResetMode.kResetSafeParameters,
-        SparkBase.PersistMode.kNoPersistParameters);
-    rightMotor.configure(
-        config,
-        SparkBase.ResetMode.kResetSafeParameters,
-        SparkBase.PersistMode.kNoPersistParameters);
+    configureSpark(
+        () ->
+            leftMotor.configure(
+                config,
+                SparkBase.ResetMode.kResetSafeParameters,
+                SparkBase.PersistMode.kNoPersistParameters));
+    configureSpark(
+        () ->
+            rightMotor.configure(
+                config,
+                SparkBase.ResetMode.kResetSafeParameters,
+                SparkBase.PersistMode.kNoPersistParameters));
 
     angleEncoder = new DutyCycleEncoder(0);
 
@@ -127,18 +131,23 @@ public class PivotIOSparkFlex implements PivotIO {
   }
 
   @Override
+  public PivotIOConstantsAutoLogged getConstants() {
+    return CONSTANTS;
+  }
+
+  @Override
   public void updateInputs(PivotIOInputs inputs) {
     inputs.leftAngleRad = leftEncoder.getPosition();
     inputs.leftVelRadPerSec = leftEncoder.getVelocity();
     inputs.rightAngleRad = rightEncoder.getPosition();
     inputs.rightVelRadPerSec = rightEncoder.getVelocity();
 
-    inputs.leftMotorCurrents.statorCurrent = leftMotor.getOutputCurrent();
-    inputs.leftMotorCurrents.supplyCurrent =
-        inputs.leftMotorCurrents.statorCurrent * Math.abs(leftMotor.getAppliedOutput());
-    inputs.rightMotorCurrents.statorCurrent = rightMotor.getOutputCurrent();
-    inputs.rightMotorCurrents.supplyCurrent =
-        inputs.rightMotorCurrents.statorCurrent * Math.abs(rightMotor.getAppliedOutput());
+    inputs.leftCurrentDraws.statorCurrent = leftMotor.getOutputCurrent();
+    inputs.leftCurrentDraws.supplyCurrent =
+        inputs.leftCurrentDraws.statorCurrent * Math.abs(leftMotor.getAppliedOutput());
+    inputs.rightCurrentDraws.statorCurrent = rightMotor.getOutputCurrent();
+    inputs.rightCurrentDraws.supplyCurrent =
+        inputs.rightCurrentDraws.statorCurrent * Math.abs(rightMotor.getAppliedOutput());
   }
 
   private final PIDController leftPosController = new PIDController(5, 0, 0);
@@ -207,7 +216,7 @@ public class PivotIOSparkFlex implements PivotIO {
                 + rightVelController.calculate(currentVelRadPerSec, velRadPerSec),
             -batteryVoltage,
             batteryVoltage);
-    rightMotor.setVoltage(voltage);
+    rightMotor.setVoltage(-voltage);
     if (Robot.isSimulation()) {
       rightArmSim.setInputVoltage(voltage);
       rightArmSim.update(Robot.defaultPeriodSecs);
