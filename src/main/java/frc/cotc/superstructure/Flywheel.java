@@ -36,11 +36,16 @@ public class Flywheel extends SubsystemBase {
 
     io.run(
         calculate(
-            topVelMetersPerSec, inputs.topVelMetersPerSec, CONSTANTS.topTolerance, CONSTANTS.topKv),
+            topVelMetersPerSec,
+            inputs.topVelMetersPerSec,
+            CONSTANTS.topTolerance,
+            CONSTANTS.topKs,
+            CONSTANTS.topKv),
         calculate(
             bottomVelMetersPerSec,
             inputs.bottomVelMetersPerSec,
             CONSTANTS.bottomTolerance,
+            CONSTANTS.bottomKs,
             CONSTANTS.bottomKv));
   }
 
@@ -49,12 +54,12 @@ public class Flywheel extends SubsystemBase {
    * discrete control. This is a hybrid controller, using bang-bang when outside a tolerance and
    * lerping to a steady state feedforward when within the tolerance.
    */
-  private double calculate(double target, double current, double tolerance, double kv) {
+  private double calculate(double target, double current, double tolerance, double ks, double kv) {
     if (target > current) {
       // The t value in MathUtil.interpolate is clamped to [0,1]
-      return MathUtil.interpolate(target * kv, 12, (target - current) / tolerance);
+      return MathUtil.interpolate(target * kv, 12, (target - current) / tolerance) + ks;
     } else {
-      return MathUtil.interpolate(target * kv, -12, (current - target) / tolerance);
+      return MathUtil.interpolate(target * kv, -12, (current - target) / tolerance) - ks;
     }
   }
 }

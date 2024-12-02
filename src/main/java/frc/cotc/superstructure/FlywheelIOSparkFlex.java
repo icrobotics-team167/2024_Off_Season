@@ -66,6 +66,8 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
     CONSTANTS = new FlywheelIOConstantsAutoLogged();
     CONSTANTS.topTolerance = .1;
     CONSTANTS.bottomTolerance = .1;
+    CONSTANTS.topKs = 0;
+    CONSTANTS.bottomKs = 0;
     CONSTANTS.topKv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
     CONSTANTS.bottomKv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
 

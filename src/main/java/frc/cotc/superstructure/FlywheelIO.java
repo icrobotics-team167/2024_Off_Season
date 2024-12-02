@@ -48,8 +48,10 @@ public interface FlywheelIO {
   @AutoLog
   class FlywheelIOConstants {
     double topTolerance;
+    double topKs;
     double topKv;
     double bottomTolerance;
+    double bottomKs;
     double bottomKv;
   }
 
