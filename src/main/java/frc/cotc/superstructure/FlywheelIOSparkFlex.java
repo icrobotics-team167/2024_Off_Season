@@ -14,8 +14,6 @@ import com.revrobotics.spark.SparkLowLevel;
 import com.revrobotics.spark.SparkSim;
 import com.revrobotics.spark.config.SparkFlexConfig;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
@@ -24,7 +22,7 @@ import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.cotc.Robot;
 
 public class FlywheelIOSparkFlex implements FlywheelIO {
-  private final FlywheelIOControllers CONSTANTS;
+  private final FlywheelIOConstantsAutoLogged CONSTANTS;
   private final double wheelDiameterMeters;
 
   private final SparkFlex top;
@@ -65,11 +63,11 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
     topEncoder = top.getEncoder();
     bottomEncoder = bottom.getEncoder();
 
-    CONSTANTS = new FlywheelIOControllers();
-    CONSTANTS.topFF = new SimpleMotorFeedforward(0, 1, .1);
-    CONSTANTS.bottomFF = new SimpleMotorFeedforward(0, 1, .1);
-    CONSTANTS.topController = new PIDController(5, 0, 0);
-    CONSTANTS.bottomController = new PIDController(5, 0, 0);
+    CONSTANTS = new FlywheelIOConstantsAutoLogged();
+    CONSTANTS.topTolerance = .1;
+    CONSTANTS.bottomTolerance = .1;
+    CONSTANTS.topKv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
+    CONSTANTS.bottomKv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
 
     if (Robot.isSimulation()) {
       topMotorSim = new SparkSim(top, motor);
@@ -81,7 +79,7 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
   }
 
   @Override
-  public FlywheelIOControllers getControllers() {
+  public FlywheelIOConstantsAutoLogged getControllers() {
     return CONSTANTS;
   }
 
