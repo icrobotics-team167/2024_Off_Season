@@ -36,12 +36,13 @@ public class Flywheel extends SubsystemBase {
 
   private void runVel(
       double topVelMetersPerSec, double bottomVelMetersPerSec, double guideVelMetersPerSec) {
-    topVelMetersPerSec =
-        MathUtil.clamp(topVelMetersPerSec, -12 / CONSTANTS.topKv, 12 / CONSTANTS.topKv);
-    bottomVelMetersPerSec =
-        MathUtil.clamp(bottomVelMetersPerSec, -12 / CONSTANTS.bottomKv, 12 / CONSTANTS.bottomKv);
-    guideVelMetersPerSec =
-        MathUtil.clamp(guideVelMetersPerSec, -12 / CONSTANTS.guideKv, 12 / CONSTANTS.guideKv);
+    // Clamp velocities to max achievable
+    double topMaxVel = (12 - CONSTANTS.topKs) / CONSTANTS.topKv;
+    topVelMetersPerSec = MathUtil.clamp(topVelMetersPerSec, -topMaxVel, topMaxVel);
+    double bottomMaxVel = (12 - CONSTANTS.bottomKs) / CONSTANTS.bottomKv;
+    bottomVelMetersPerSec = MathUtil.clamp(bottomVelMetersPerSec, -bottomMaxVel, bottomMaxVel);
+    double guideMaxVel = (12 - CONSTANTS.guideKs) / CONSTANTS.guideKv;
+    guideVelMetersPerSec = MathUtil.clamp(guideVelMetersPerSec, -guideMaxVel, guideMaxVel);
 
     io.run(
         calculate(
@@ -68,13 +69,18 @@ public class Flywheel extends SubsystemBase {
    * A bang-bang controller is mathematically optimal assuming continuous control, but we have
    * discrete control. This is a hybrid controller, using bang-bang when outside a tolerance and
    * lerping to a steady state feedforward when within the tolerance.
+   *
+   * <p>This is almost equivalent to an FF+P controller with a huge P gain, but I feel like tuning a
+   * tolerance value is easier to understand the behavior of than a huge P gain.
    */
-  private double calculate(double target, double current, double tolerance, double ks, double kv) {
+  private double calculate(double target, double current, double tolerance, double kS, double kv) {
+    double steadyStateVoltage = target * kv + kS * Math.signum(target);
     if (target > current) {
       // The t value in MathUtil.interpolate is clamped to [0,1]
-      return MathUtil.interpolate(target * kv, 12, (target - current) / tolerance) + ks;
+      // So if the error is greater than the tolerance t is clamped to 1
+      return MathUtil.interpolate(steadyStateVoltage, 12, (target - current) / tolerance);
     } else {
-      return MathUtil.interpolate(target * kv, -12, (current - target) / tolerance) - ks;
+      return MathUtil.interpolate(steadyStateVoltage, -12, (current - target) / tolerance);
     }
   }
 }
