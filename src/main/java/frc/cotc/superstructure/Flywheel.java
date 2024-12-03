@@ -8,6 +8,7 @@
 package frc.cotc.superstructure;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import org.littletonrobotics.junction.Logger;
 
@@ -18,7 +19,7 @@ public class Flywheel extends SubsystemBase {
 
   public Flywheel(FlywheelIO io) {
     this.io = io;
-    CONSTANTS = io.getControllers();
+    CONSTANTS = io.getConstants();
     Logger.processInputs("Superstructure/Flywheels/Constants", CONSTANTS);
   }
 
@@ -28,11 +29,19 @@ public class Flywheel extends SubsystemBase {
     Logger.processInputs("Superstructure/Flywheels", inputs);
   }
 
-  private void runVel(double topVelMetersPerSec, double bottomVelMetersPerSec) {
+  public Command spinUp(
+      double topVelMetersPerSec, double bottomVelMetersPerSec, double guideWheelsMetersPerSec) {
+    return run(() -> runVel(topVelMetersPerSec, bottomVelMetersPerSec, guideWheelsMetersPerSec));
+  }
+
+  private void runVel(
+      double topVelMetersPerSec, double bottomVelMetersPerSec, double guideVelMetersPerSec) {
     topVelMetersPerSec =
         MathUtil.clamp(topVelMetersPerSec, -12 / CONSTANTS.topKv, 12 / CONSTANTS.topKv);
     bottomVelMetersPerSec =
         MathUtil.clamp(bottomVelMetersPerSec, -12 / CONSTANTS.bottomKv, 12 / CONSTANTS.bottomKv);
+    guideVelMetersPerSec =
+        MathUtil.clamp(guideVelMetersPerSec, -12 / CONSTANTS.guideKv, 12 / CONSTANTS.guideKv);
 
     io.run(
         calculate(
@@ -46,7 +55,13 @@ public class Flywheel extends SubsystemBase {
             inputs.bottomVelMetersPerSec,
             CONSTANTS.bottomTolerance,
             CONSTANTS.bottomKs,
-            CONSTANTS.bottomKv));
+            CONSTANTS.bottomKv),
+        calculate(
+            guideVelMetersPerSec,
+            inputs.guideVelMetersPerSec,
+            CONSTANTS.guideTolerance,
+            CONSTANTS.guideKs,
+            CONSTANTS.guideKv));
   }
 
   /**

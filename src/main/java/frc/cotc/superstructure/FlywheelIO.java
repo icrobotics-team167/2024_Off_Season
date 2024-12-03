@@ -18,9 +18,12 @@ public interface FlywheelIO {
     double topVelMetersPerSec;
     double bottomPosMeters;
     double bottomVelMetersPerSec;
+    double guidePosMeters;
+    double guideVelMetersPerSec;
 
     MotorCurrentDraws topCurrentDraws = new MotorCurrentDraws();
     MotorCurrentDraws bottomCurrentDraws = new MotorCurrentDraws();
+    MotorCurrentDraws guideCurrentDraws = new MotorCurrentDraws();
 
     @Override
     public void toLog(LogTable table) {
@@ -28,8 +31,11 @@ public interface FlywheelIO {
       table.put("topVelMetersPerSec", topVelMetersPerSec);
       table.put("bottomPosMeters", bottomPosMeters);
       table.put("bottomVelMetersPerSec", bottomVelMetersPerSec);
+      table.put("guidePosMeters", guidePosMeters);
+      table.put("guideVelMetersPerSec", guideVelMetersPerSec);
       table.put("topCurrentDraws", MotorCurrentDraws.struct, topCurrentDraws);
       table.put("bottomCurrentDraws", MotorCurrentDraws.struct, bottomCurrentDraws);
+      table.put("guideCurrentDraws", MotorCurrentDraws.struct, guideCurrentDraws);
     }
 
     @Override
@@ -38,10 +44,14 @@ public interface FlywheelIO {
       topVelMetersPerSec = table.get("topVelMetersPerSec", 0.0);
       bottomPosMeters = table.get("bottomPosMeters", 0.0);
       bottomVelMetersPerSec = table.get("bottomVelMetersPerSec", 0.0);
+      guidePosMeters = table.get("guidePosMeters", 0.0);
+      guideVelMetersPerSec = table.get("guideVelMetersPerSec", 0.0);
       topCurrentDraws =
           table.get("topCurrentDraws", MotorCurrentDraws.struct, new MotorCurrentDraws());
       bottomCurrentDraws =
           table.get("bottomCurrentDraws", MotorCurrentDraws.struct, new MotorCurrentDraws());
+      guideCurrentDraws =
+          table.get("guideCurrentDraws", MotorCurrentDraws.struct, new MotorCurrentDraws());
     }
   }
 
@@ -53,13 +63,16 @@ public interface FlywheelIO {
     double bottomTolerance;
     double bottomKs;
     double bottomKv;
+    double guideTolerance;
+    double guideKs;
+    double guideKv;
   }
 
-  default FlywheelIOConstantsAutoLogged getControllers() {
+  default FlywheelIOConstantsAutoLogged getConstants() {
     return new FlywheelIOConstantsAutoLogged();
   }
 
   default void updateInputs(FlywheelIOInputs inputs) {}
 
-  default void run(double topVolts, double bottomVolts) {}
+  default void run(double topVolts, double bottomVolts, double guideVolts) {}
 }

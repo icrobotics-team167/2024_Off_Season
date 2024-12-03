@@ -7,6 +7,8 @@
 
 package frc.cotc.superstructure;
 
+import static frc.cotc.util.SparkUtils.configureSpark;
+
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkFlex;
@@ -27,19 +29,24 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
 
   private final SparkFlex top;
   private final SparkFlex bottom;
+  private final SparkFlex guide;
   private final RelativeEncoder topEncoder;
   private final RelativeEncoder bottomEncoder;
+  private final RelativeEncoder guideEncoder;
 
   private SparkSim topMotorSim;
   private DCMotorSim topSim;
   private SparkSim bottomMotorSim;
   private DCMotorSim bottomSim;
+  private SparkSim guideMotorSim;
+  private DCMotorSim guideSim;
 
   public FlywheelIOSparkFlex() {
     var motor = DCMotor.getNeoVortex(1);
 
-    top = new SparkFlex(17, SparkLowLevel.MotorType.kBrushless);
-    bottom = new SparkFlex(18, SparkLowLevel.MotorType.kBrushless);
+    top = new SparkFlex(22, SparkLowLevel.MotorType.kBrushless);
+    bottom = new SparkFlex(26, SparkLowLevel.MotorType.kBrushless);
+    guide = new SparkFlex(21, SparkLowLevel.MotorType.kBrushless);
 
     wheelDiameterMeters = Units.inchesToMeters(4);
 
@@ -51,37 +58,54 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
     config.encoder.uvwAverageDepth(2);
     config.encoder.positionConversionFactor(wheelDiameterMeters * Math.PI);
     config.encoder.velocityConversionFactor(wheelDiameterMeters * Math.PI / 60);
-    top.configure(
-        config,
-        SparkBase.ResetMode.kResetSafeParameters,
-        SparkBase.PersistMode.kNoPersistParameters);
-    bottom.configure(
-        config,
-        SparkBase.ResetMode.kResetSafeParameters,
-        SparkBase.PersistMode.kNoPersistParameters);
+    configureSpark(
+        () ->
+            top.configure(
+                config,
+                SparkBase.ResetMode.kResetSafeParameters,
+                SparkBase.PersistMode.kNoPersistParameters));
+    configureSpark(
+        () ->
+            bottom.configure(
+                config,
+                SparkBase.ResetMode.kResetSafeParameters,
+                SparkBase.PersistMode.kNoPersistParameters));
+    configureSpark(
+        () ->
+            guide.configure(
+                config,
+                SparkBase.ResetMode.kResetSafeParameters,
+                SparkBase.PersistMode.kNoPersistParameters));
 
     topEncoder = top.getEncoder();
     bottomEncoder = bottom.getEncoder();
+    guideEncoder = guide.getEncoder();
 
+    double kv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
     CONSTANTS = new FlywheelIOConstantsAutoLogged();
     CONSTANTS.topTolerance = .1;
     CONSTANTS.bottomTolerance = .1;
+    CONSTANTS.guideTolerance = .1;
     CONSTANTS.topKs = 0;
     CONSTANTS.bottomKs = 0;
-    CONSTANTS.topKv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
-    CONSTANTS.bottomKv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
+    CONSTANTS.guideKs = 0;
+    CONSTANTS.topKv = kv;
+    CONSTANTS.bottomKv = kv;
+    CONSTANTS.guideKv = kv;
 
     if (Robot.isSimulation()) {
       topMotorSim = new SparkSim(top, motor);
       bottomMotorSim = new SparkSim(bottom, motor);
+      guideMotorSim = new SparkSim(guide, motor);
 
-      topSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(motor, 1, 1), motor);
-      bottomSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(motor, 1, 1), motor);
+      topSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(kv, .01), motor);
+      bottomSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(kv, .01), motor);
+      guideSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(kv, .01), motor);
     }
   }
 
   @Override
-  public FlywheelIOConstantsAutoLogged getControllers() {
+  public FlywheelIOConstantsAutoLogged getConstants() {
     return CONSTANTS;
   }
 
@@ -101,9 +125,10 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
   }
 
   @Override
-  public void run(double topVolts, double bottomVolts) {
+  public void run(double topVolts, double bottomVolts, double guideVolts) {
     top.setVoltage(topVolts);
     bottom.setVoltage(bottomVolts);
+    guide.setVoltage(guideVolts);
 
     if (Robot.isSimulation()) {
       double voltage = RobotController.getBatteryVoltage();
@@ -115,10 +140,17 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
           voltage,
           Robot.defaultPeriodSecs);
 
-      bottomSim.setInputVoltage(MathUtil.clamp(topVolts, -voltage, voltage));
+      bottomSim.setInputVoltage(MathUtil.clamp(bottomVolts, -voltage, voltage));
       bottomSim.update(Robot.defaultPeriodSecs);
       bottomMotorSim.iterate(
           bottomSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
+          voltage,
+          Robot.defaultPeriodSecs);
+
+      guideSim.setInputVoltage(MathUtil.clamp(guideVolts, -voltage, voltage));
+      guideSim.update(Robot.defaultPeriodSecs);
+      guideMotorSim.iterate(
+          guideSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
           voltage,
           Robot.defaultPeriodSecs);
     }
