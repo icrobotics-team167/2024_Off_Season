@@ -17,22 +17,6 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.cotc.Robot;
 import org.littletonrobotics.junction.Logger;
 
-/**
- * Compiling will throw warnings about deprecation. The feedforward calculate methods that use
- * doubles instead of the Units API are deprecated (See <a
- * href="https://github.com/wpilibsuite/allwpilib/issues/7280">allwpilib#7280</a> and <a
- * href="https://github.com/wpilibsuite/allwpilib/pull/6647#discussion_r1633591865">Tyler's comment
- * in allwpilib#6647</a>) for reasoning) but we want to avoid using the Units API at all costs.
- * Unlike the C++ Units API which has 0 runtime performance costs due to being optimized out during
- * compile time, the Java Units API imposes a heavy memory cost as each use of the Units API adds 1
- * object allocation, which very rapidly adds up to hundreds of allocations per tick, which is very
- * bad for the extremely RAM-constrained RoboRIO.
- *
- * <p>2027 cannot come fast enough.
- *
- * <p>Tada
- */
-@SuppressWarnings("removal")
 public class Pivot extends SubsystemBase {
   private final PivotIO io;
   private final PivotIO.PivotIOInputs inputs = new PivotIO.PivotIOInputs();
@@ -96,6 +80,22 @@ public class Pivot extends SubsystemBase {
     runVel(state.velocity + anglePID.calculate(currentState.position, state.position));
   }
 
+  /**
+   * Compiling will throw warnings about deprecation. The feedforward calculate methods that use
+   * doubles instead of the Units API are deprecated (See <a
+   * href="https://github.com/wpilibsuite/allwpilib/issues/7280">allwpilib#7280</a> and <a
+   * href="https://github.com/wpilibsuite/allwpilib/pull/6647#discussion_r1633591865">Tyler's comment
+   * in allwpilib#6647</a>) for reasoning) but we want to avoid using the Units API at all costs.
+   * Unlike the C++ Units API which has 0 runtime performance costs due to being optimized out during
+   * compile time, the Java Units API imposes a heavy memory cost as each use of the Units API adds 1
+   * object allocation, which very rapidly adds up to hundreds of allocations per tick, which is very
+   * bad for the extremely RAM-constrained RoboRIO.
+   *
+   * <p>2027 cannot come fast enough.
+   *
+   * <p>Tada
+   */
+  @SuppressWarnings("removal")
   private void runVel(double velRadPerSec) {
     double diffControl = diffPID.calculate(inputs.leftAngleRad - inputs.rightAngleRad, 0);
     io.run(
