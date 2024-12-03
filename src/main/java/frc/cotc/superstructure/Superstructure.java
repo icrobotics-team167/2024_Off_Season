@@ -31,10 +31,12 @@ public class Superstructure extends Supersystem {
               }
             })
         .whileTrue(speakerShot());
+
+    setDefaultCommand(rest());
   }
 
   public Command rest() {
-    return expose(pivot.holdAngle());
+    return expose(pivot.minAngle());
   }
 
   private Command speakerShot() {

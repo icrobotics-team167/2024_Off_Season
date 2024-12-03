@@ -50,6 +50,17 @@ public interface PivotIO {
     double maxSpeedRadPerSec;
     double maxAngleRad;
     double minAngleRad;
+
+    double kS;
+    double kG;
+    double kV;
+    double kA;
+    double angleKp;
+    double angleKd;
+    double velKp;
+    double diffKp;
+    double diffKi;
+    double diffKd;
   }
 
   default PivotIOConstantsAutoLogged getConstants() {
@@ -58,7 +69,5 @@ public interface PivotIO {
 
   default void updateInputs(PivotIOInputs inputs) {}
 
-  default void aimAtAngle(double angleRad, double velRadPerSec) {}
-
-  default void runVel(double velRadPerSec) {}
+  default void run(double leftVolts, double rightVolts) {}
 }

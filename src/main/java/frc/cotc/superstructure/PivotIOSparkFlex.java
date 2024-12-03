@@ -17,24 +17,15 @@ import com.revrobotics.spark.SparkSim;
 import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkFlexConfig;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.ArmFeedforward;
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.system.plant.DCMotor;
-import edu.wpi.first.math.trajectory.ExponentialProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
 import frc.cotc.Robot;
 
-// See README.md
-@SuppressWarnings("removal")
 public class PivotIOSparkFlex implements PivotIO {
   private final PivotIOConstantsAutoLogged CONSTANTS = new PivotIOConstantsAutoLogged();
-
-  private final PIDController differentialPID;
-  private final ArmFeedforward armFeedforward;
-  private final ExponentialProfile profile;
 
   private final SparkFlex leftMotor;
   private final RelativeEncoder leftEncoder;
@@ -85,15 +76,6 @@ public class PivotIOSparkFlex implements PivotIO {
 
     angleEncoder = new DutyCycleEncoder(0);
 
-    double kv = gearRatio / motor.KvRadPerSecPerVolt;
-    double ka = .01;
-    differentialPID = new PIDController(1, 0, 0);
-    armFeedforward = new ArmFeedforward(0, 0.16, kv, ka);
-
-    // Not quite 12v, need some control headroom
-    profile =
-        new ExponentialProfile(ExponentialProfile.Constraints.fromCharacteristics(11, kv, ka));
-
     if (Robot.isSimulation()) {
       double massKg = Units.lbsToKilograms(22);
       double comDistanceMeters = Units.inchesToMeters(15);
@@ -139,8 +121,8 @@ public class PivotIOSparkFlex implements PivotIO {
   public void updateInputs(PivotIOInputs inputs) {
     inputs.leftAngleRad = leftEncoder.getPosition();
     inputs.leftVelRadPerSec = leftEncoder.getVelocity();
-    inputs.rightAngleRad = rightEncoder.getPosition();
-    inputs.rightVelRadPerSec = rightEncoder.getVelocity();
+    inputs.rightAngleRad = -rightEncoder.getPosition();
+    inputs.rightVelRadPerSec = -rightEncoder.getVelocity();
 
     inputs.leftCurrentDraws.statorCurrent = leftMotor.getOutputCurrent();
     inputs.leftCurrentDraws.supplyCurrent =
@@ -150,75 +132,18 @@ public class PivotIOSparkFlex implements PivotIO {
         inputs.rightCurrentDraws.statorCurrent * Math.abs(rightMotor.getAppliedOutput());
   }
 
-  private final PIDController leftPosController = new PIDController(5, 0, 0);
-  private final PIDController rightPosController = new PIDController(5, 0, 0);
-
   @Override
-  public void aimAtAngle(double angleRad, double velRadPerSec) {
-    var leftPos = leftEncoder.getPosition();
-    var rightPos = rightEncoder.getPosition();
-    var leftVel = leftEncoder.getVelocity();
-    var rightVel = rightEncoder.getVelocity();
+  public void run(double leftVolts, double rightVolts) {
+    leftMotor.setVoltage(leftVolts);
+    rightMotor.setVoltage(-rightVolts);
 
-    var state =
-        profile.calculate(
-            Robot.defaultPeriodSecs,
-            new ExponentialProfile.State((leftPos + rightPos) / 2, (leftVel + rightVel) / 2),
-            new ExponentialProfile.State(angleRad, velRadPerSec));
-
-    var leftPID = leftPosController.calculate(leftPos, state.position);
-    var rightPID = rightPosController.calculate(rightPos, state.position);
-    var diffControl = differentialPID.calculate(leftPos - rightPos, 0);
-
-    runLeft(leftPos, leftVel, state.velocity + leftPID + diffControl);
-    runRight(rightPos, rightVel, state.velocity + rightPID - diffControl);
-  }
-
-  @Override
-  public void runVel(double velRadPerSec) {
-    var leftPos = leftEncoder.getPosition();
-    var rightPos = rightEncoder.getPosition();
-
-    var diffControl =
-        differentialPID.calculate(leftEncoder.getPosition() - rightEncoder.getPosition(), 0);
-    runLeft(leftPos, leftEncoder.getVelocity(), velRadPerSec + diffControl);
-    runRight(rightPos, rightEncoder.getVelocity(), velRadPerSec - diffControl);
-  }
-
-  private final PIDController leftVelController = new PIDController(5, 0, 0);
-
-  private void runLeft(double leftPos, double currentVelRadPerSec, double velRadPerSec) {
-    double batteryVoltage = RobotController.getBatteryVoltage();
-    double voltage =
-        MathUtil.clamp(
-            armFeedforward.calculate(
-                    leftPos, currentVelRadPerSec, velRadPerSec, Robot.defaultPeriodSecs)
-                + leftVelController.calculate(currentVelRadPerSec, velRadPerSec),
-            -batteryVoltage,
-            batteryVoltage);
-    leftMotor.setVoltage(voltage);
     if (Robot.isSimulation()) {
-      leftArmSim.setInputVoltage(voltage);
+      var batteryVoltage = RobotController.getBatteryVoltage();
+      leftArmSim.setInputVoltage(MathUtil.clamp(leftVolts, -batteryVoltage, batteryVoltage));
       leftArmSim.update(Robot.defaultPeriodSecs);
       leftMotorSim.iterate(
           leftArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
-    }
-  }
-
-  private final PIDController rightVelController = new PIDController(5, 0, 0);
-
-  private void runRight(double rightPos, double currentVelRadPerSec, double velRadPerSec) {
-    double batteryVoltage = RobotController.getBatteryVoltage();
-    double voltage =
-        MathUtil.clamp(
-            armFeedforward.calculate(
-                    rightPos, currentVelRadPerSec, velRadPerSec, Robot.defaultPeriodSecs)
-                + rightVelController.calculate(currentVelRadPerSec, velRadPerSec),
-            -batteryVoltage,
-            batteryVoltage);
-    rightMotor.setVoltage(-voltage);
-    if (Robot.isSimulation()) {
-      rightArmSim.setInputVoltage(voltage);
+      rightArmSim.setInputVoltage(MathUtil.clamp(rightVolts, -batteryVoltage, batteryVoltage));
       rightArmSim.update(Robot.defaultPeriodSecs);
       rightMotorSim.iterate(
           rightArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
