@@ -43,7 +43,6 @@ import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.cotc.Robot;
 import frc.cotc.util.FOCMotorSim;
 import frc.cotc.util.MotorCurrentDraws;
-import org.littletonrobotics.junction.Logger;
 
 public class SwerveIOPhoenix implements SwerveIO {
   private static final SwerveModuleConstantsAutoLogged CONSTANTS;
@@ -170,7 +169,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(
                         gyro.getYaw(), gyro.getAngularVelocityZWorld())),
-                Logger.getRealTimestamp() / 1e6)
+                RobotController.getFPGATime() / 1e6)
           };
     }
   }
@@ -393,7 +392,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                 },
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
-                Logger.getRealTimestamp() / 1e6);
+                RobotController.getFPGATime() / 1e6);
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
         }
@@ -476,7 +475,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       double frequencySeconds = 1.0 / 2000;
 
       // Minus one iteration to prevent divide by 0 errors later
-      lastTime = (Logger.getRealTimestamp() / 1e6) - frequencySeconds;
+      lastTime = (RobotController.getFPGATime() / 1e6) - frequencySeconds;
 
       notifier.startPeriodic(frequencySeconds);
     }
@@ -513,7 +512,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     private double lastTime;
 
     private void run() {
-      double currentTime = Logger.getRealTimestamp() / 1e6;
+      double currentTime = RobotController.getFPGATime() / 1e6;
       double dt = currentTime - lastTime;
 
       double voltage = 12.3 - (.018 * filteredCurrentDraw);
