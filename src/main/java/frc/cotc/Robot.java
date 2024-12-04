@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
+import frc.cotc.superstructure.*;
 import frc.cotc.vision.FiducialPoseEstimatorIO;
 import frc.cotc.vision.FiducialPoseEstimatorIOPhoton;
 import java.util.Arrays;
@@ -37,6 +38,12 @@ public class Robot extends LoggedRobot {
 
   private final Autos autos;
 
+  private enum Mode {
+    REAL,
+    SIM,
+    REPLAY
+  }
+
   @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
   public Robot() {
     // If this is erroring, hit build
@@ -49,11 +56,11 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
-    String mode = Robot.isReal() ? "REAL" : "SIM";
-    //    String mode = "REPLAY";
+    Mode mode = Robot.isReal() ? Mode.REAL : Mode.REPLAY;
+    // Mode mode = Mode.REPLAY;
 
     switch (mode) {
-      case "REAL" -> {
+      case REAL -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
         //noinspection resource
@@ -61,13 +68,13 @@ public class Robot extends LoggedRobot {
             1, PowerDistribution.ModuleType.kRev); // Enables power distribution logging
         SignalLogger.start(); // Start logging Phoenix CAN signals
       }
-      case "SIM" -> {
+      case SIM -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to the project's logs folder
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
 
         SignalLogger.start(); // Start logging Phoenix CAN signals
       }
-      case "REPLAY" -> {
+      case REPLAY -> {
         setUseTiming(false); // Run as fast as possible
         String logPath;
         try {
@@ -85,11 +92,27 @@ public class Robot extends LoggedRobot {
             new WPILOGWriter(
                 LogFileUtil.addPathSuffix(logPath, "_replay"))); // Save outputs to a new log
       }
+      default -> throw new IllegalStateException("mode was null. what.");
     }
 
     Logger.start();
 
     Swerve swerve = getSwerve(mode);
+
+    Superstructure superstructure;
+    switch (mode) {
+      case REAL, SIM ->
+          superstructure =
+              new Superstructure(
+                  new PivotIOSparkFlex(),
+                  new FlywheelIOSparkFlex(),
+                  () -> swerve.getPose().getTranslation());
+      case REPLAY ->
+          superstructure =
+              new Superstructure(
+                  new PivotIO() {}, new FlywheelIO() {}, () -> swerve.getPose().getTranslation());
+      default -> throw new IllegalStateException("mode was null. what.");
+    }
 
     CommandJoystick primaryLeft = new CommandJoystick(0);
     CommandJoystick primaryRight = new CommandJoystick(1);
@@ -104,10 +127,12 @@ public class Robot extends LoggedRobot {
     RobotModeTriggers.disabled().or(primaryLeft.button(3)).whileTrue(swerve.stopInX());
     RobotModeTriggers.teleop().onTrue(swerve.resetGyro());
 
+    superstructure.setDefaultCommand(superstructure.rest());
+
     autos = new Autos(swerve);
   }
 
-  private Swerve getSwerve(String mode) {
+  private Swerve getSwerve(Mode mode) {
     SwerveIO swerveIO;
     FiducialPoseEstimatorIO[] visionIOs;
 
@@ -127,7 +152,7 @@ public class Robot extends LoggedRobot {
         };
 
     switch (mode) {
-      case "REAL", "SIM" -> {
+      case REAL, SIM -> {
         swerveIO = new SwerveIOPhoenix();
         visionIOs =
             new FiducialPoseEstimatorIO[] {
@@ -139,13 +164,14 @@ public class Robot extends LoggedRobot {
         count.cameraCount = visionIOs.length;
         Logger.processInputs("Vision", count);
       }
-      default -> {
+      case REPLAY -> {
         Logger.processInputs("Vision", count);
 
         swerveIO = new SwerveIO() {};
         visionIOs = new FiducialPoseEstimatorIO[count.cameraCount];
         Arrays.fill(visionIOs, new FiducialPoseEstimatorIO() {});
       }
+      default -> throw new IllegalStateException("mode was null. what.");
     }
 
     return new Swerve(swerveIO, visionIOs);
