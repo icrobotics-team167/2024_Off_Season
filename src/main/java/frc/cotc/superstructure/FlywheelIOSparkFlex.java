@@ -7,10 +7,9 @@
 
 package frc.cotc.superstructure;
 
-import static frc.cotc.util.SparkUtils.configureSpark;
+import static frc.cotc.util.SparkUtils.configureSparks;
 
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel;
 import com.revrobotics.spark.SparkSim;
@@ -58,24 +57,7 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
     config.encoder.uvwAverageDepth(2);
     config.encoder.positionConversionFactor(wheelDiameterMeters * Math.PI);
     config.encoder.velocityConversionFactor(wheelDiameterMeters * Math.PI / 60);
-    configureSpark(
-        () ->
-            top.configure(
-                config,
-                SparkBase.ResetMode.kResetSafeParameters,
-                SparkBase.PersistMode.kNoPersistParameters));
-    configureSpark(
-        () ->
-            bottom.configure(
-                config,
-                SparkBase.ResetMode.kResetSafeParameters,
-                SparkBase.PersistMode.kNoPersistParameters));
-    configureSpark(
-        () ->
-            guide.configure(
-                config,
-                SparkBase.ResetMode.kResetSafeParameters,
-                SparkBase.PersistMode.kNoPersistParameters));
+    configureSparks(config, top, bottom, guide);
 
     topEncoder = top.getEncoder();
     bottomEncoder = bottom.getEncoder();
@@ -115,6 +97,8 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
     inputs.bottomPosMeters = bottomEncoder.getPosition();
     inputs.topVelMetersPerSec = topEncoder.getVelocity();
     inputs.bottomVelMetersPerSec = bottomEncoder.getVelocity();
+    inputs.guidePosMeters = guideEncoder.getPosition();
+    inputs.guideVelMetersPerSec = guideEncoder.getVelocity();
 
     inputs.topCurrentDraws.statorCurrent = top.getOutputCurrent();
     inputs.topCurrentDraws.supplyCurrent =
@@ -122,6 +106,9 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
     inputs.bottomCurrentDraws.statorCurrent = bottom.getOutputCurrent();
     inputs.bottomCurrentDraws.supplyCurrent =
         inputs.bottomCurrentDraws.statorCurrent * Math.abs(bottom.getAppliedOutput());
+    inputs.guideCurrentDraws.statorCurrent = guide.getOutputCurrent();
+    inputs.guideCurrentDraws.supplyCurrent =
+        inputs.guideCurrentDraws.statorCurrent * Math.abs(guide.getAppliedOutput());
   }
 
   @Override

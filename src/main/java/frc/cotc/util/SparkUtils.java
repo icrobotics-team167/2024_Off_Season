@@ -8,8 +8,9 @@
 package frc.cotc.util;
 
 import com.revrobotics.REVLibError;
+import com.revrobotics.spark.SparkBase;
+import com.revrobotics.spark.config.SparkBaseConfig;
 import edu.wpi.first.wpilibj.DriverStation;
-import java.util.function.Supplier;
 
 public final class SparkUtils {
   private SparkUtils() {}
@@ -22,12 +23,27 @@ public final class SparkUtils {
    * trust that especially since the last attempt at fixing the "configs doesn't actually apply"
    * problem didn't work.
    */
-  public static void configureSpark(Supplier<REVLibError> config) {
+  public static void configureSpark(SparkBaseConfig config, SparkBase spark) {
     for (int i = 0; i < 5; i++) {
-      if (config.get() == REVLibError.kOk) {
+      if (spark.configure(
+              config,
+              SparkBase.ResetMode.kResetSafeParameters,
+              SparkBase.PersistMode.kNoPersistParameters)
+          == REVLibError.kOk) {
         return;
       }
     }
-    DriverStation.reportWarning("Failed to configure spark!", true);
+    DriverStation.reportWarning("Failed to configure spark ID: " + spark.getDeviceId() + "!", true);
+  }
+
+  /**
+   * Batch configures multiple Spark motors with the same config.
+   *
+   * @see SparkUtils#configureSpark(SparkBaseConfig, SparkBase)
+   */
+  public static void configureSparks(SparkBaseConfig config, SparkBase... sparks) {
+    for (var spark : sparks) {
+      configureSpark(config, spark);
+    }
   }
 }

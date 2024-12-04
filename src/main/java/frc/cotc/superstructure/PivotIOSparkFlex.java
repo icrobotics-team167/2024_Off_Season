@@ -7,10 +7,9 @@
 
 package frc.cotc.superstructure;
 
-import static frc.cotc.util.SparkUtils.configureSpark;
+import static frc.cotc.util.SparkUtils.configureSparks;
 
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel;
 import com.revrobotics.spark.SparkSim;
@@ -39,6 +38,8 @@ public class PivotIOSparkFlex implements PivotIO {
   private SingleJointedArmSim rightArmSim;
   private SparkSim rightMotorSim;
 
+  private final double startAngle;
+
   public PivotIOSparkFlex() {
     CONSTANTS.maxAngleRad = Units.degreesToRadians(90);
     CONSTANTS.minAngleRad = 0;
@@ -58,21 +59,10 @@ public class PivotIOSparkFlex implements PivotIO {
     config.encoder.positionConversionFactor(2 * Math.PI / gearRatio);
     config.encoder.velocityConversionFactor(2 * Math.PI / (gearRatio * 60));
 
+    configureSparks(config, leftMotor, rightMotor);
+
     leftEncoder = leftMotor.getEncoder();
     rightEncoder = rightMotor.getEncoder();
-
-    configureSpark(
-        () ->
-            leftMotor.configure(
-                config,
-                SparkBase.ResetMode.kResetSafeParameters,
-                SparkBase.PersistMode.kNoPersistParameters));
-    configureSpark(
-        () ->
-            rightMotor.configure(
-                config,
-                SparkBase.ResetMode.kResetSafeParameters,
-                SparkBase.PersistMode.kNoPersistParameters));
 
     angleEncoder = new DutyCycleEncoder(0);
 
@@ -108,8 +98,7 @@ public class PivotIOSparkFlex implements PivotIO {
       rightMotorSim = new SparkSim(rightMotor, motor);
     }
 
-    leftEncoder.setPosition(getAbsoluteAngleRad());
-    rightEncoder.setPosition(getAbsoluteAngleRad());
+    startAngle = getAbsoluteAngleRad();
   }
 
   @Override
@@ -119,9 +108,9 @@ public class PivotIOSparkFlex implements PivotIO {
 
   @Override
   public void updateInputs(PivotIOInputs inputs) {
-    inputs.leftAngleRad = leftEncoder.getPosition();
+    inputs.leftAngleRad = startAngle + leftEncoder.getPosition();
     inputs.leftVelRadPerSec = leftEncoder.getVelocity();
-    inputs.rightAngleRad = -rightEncoder.getPosition();
+    inputs.rightAngleRad = startAngle - rightEncoder.getPosition();
     inputs.rightVelRadPerSec = -rightEncoder.getVelocity();
 
     inputs.leftCurrentDraws.statorCurrent = leftMotor.getOutputCurrent();
