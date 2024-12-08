@@ -11,7 +11,6 @@ import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.PowerDistribution;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -28,6 +27,7 @@ import java.util.NoSuchElementException;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.*;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
+import org.littletonrobotics.junction.inputs.LoggedPowerDistribution;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
@@ -56,9 +56,7 @@ public class Robot extends LoggedRobot {
       case "REAL" -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
-        //noinspection resource
-        new PowerDistribution(
-            1, PowerDistribution.ModuleType.kRev); // Enables power distribution logging
+        LoggedPowerDistribution.getInstance(); // Enables power distribution logging
         SignalLogger.start(); // Start logging Phoenix CAN signals
       }
       case "SIM" -> {
