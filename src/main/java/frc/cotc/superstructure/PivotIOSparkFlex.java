@@ -106,8 +106,23 @@ public class PivotIOSparkFlex implements PivotIO {
     return CONSTANTS;
   }
 
+  private double leftSimVolts;
+  private double rightSimVolts;
+
   @Override
   public void updateInputs(PivotIOInputs inputs) {
+    if (Robot.isSimulation()) {
+      var batteryVoltage = RobotController.getBatteryVoltage();
+      leftArmSim.setInputVoltage(MathUtil.clamp(leftSimVolts, -batteryVoltage, batteryVoltage));
+      leftArmSim.update(Robot.defaultPeriodSecs);
+      leftMotorSim.iterate(
+          leftArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
+      rightArmSim.setInputVoltage(MathUtil.clamp(rightSimVolts, -batteryVoltage, batteryVoltage));
+      rightArmSim.update(Robot.defaultPeriodSecs);
+      rightMotorSim.iterate(
+          rightArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
+    }
+
     inputs.leftAngleRad = startAngle + leftEncoder.getPosition();
     inputs.leftVelRadPerSec = leftEncoder.getVelocity();
     inputs.rightAngleRad = startAngle - rightEncoder.getPosition();
@@ -127,15 +142,8 @@ public class PivotIOSparkFlex implements PivotIO {
     rightMotor.setVoltage(-rightVolts);
 
     if (Robot.isSimulation()) {
-      var batteryVoltage = RobotController.getBatteryVoltage();
-      leftArmSim.setInputVoltage(MathUtil.clamp(leftVolts, -batteryVoltage, batteryVoltage));
-      leftArmSim.update(Robot.defaultPeriodSecs);
-      leftMotorSim.iterate(
-          leftArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
-      rightArmSim.setInputVoltage(MathUtil.clamp(rightVolts, -batteryVoltage, batteryVoltage));
-      rightArmSim.update(Robot.defaultPeriodSecs);
-      rightMotorSim.iterate(
-          rightArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
+      leftSimVolts = leftVolts;
+      rightSimVolts = rightVolts;
     }
   }
 

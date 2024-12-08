@@ -102,7 +102,7 @@ public class Robot extends LoggedRobot {
       case REAL, SIM ->
           superstructure =
               new Superstructure(
-                  new PivotIO() {},
+                  new PivotIOSparkFlex(),
                   new FlywheelIOSparkFlex(),
                   () -> swerve.getPose().getTranslation());
       case REPLAY ->
