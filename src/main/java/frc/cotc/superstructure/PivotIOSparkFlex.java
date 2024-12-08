@@ -126,7 +126,7 @@ public class PivotIOSparkFlex implements PivotIO {
     inputs.leftAngleRad = startAngle + leftEncoder.getPosition();
     inputs.leftVelRadPerSec = leftEncoder.getVelocity();
     inputs.rightAngleRad = startAngle - rightEncoder.getPosition();
-    inputs.rightVelRadPerSec = -rightEncoder.getVelocity();
+    inputs.rightVelRadPerSec = rightEncoder.getVelocity();
 
     inputs.leftCurrentDraws.statorCurrent = leftMotor.getOutputCurrent();
     inputs.leftCurrentDraws.supplyCurrent =
