@@ -12,17 +12,16 @@ import static edu.wpi.first.wpilibj2.command.Commands.*;
 import choreo.Choreo;
 import choreo.auto.AutoChooser.AutoRoutineGenerator;
 import choreo.auto.AutoFactory;
-import choreo.auto.AutoLoop;
+import choreo.auto.AutoRoutine;
 import choreo.auto.AutoTrajectory;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.IterativeRobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.cotc.drive.Swerve;
 import java.util.HashMap;
 import java.util.Map;
-import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 public class Autos {
@@ -43,49 +42,48 @@ public class Autos {
 
     factory =
         Choreo.createAutoFactory(
-            swerve,
             swerve::getPose,
             swerve::followTrajectory,
             Robot::isOnRed,
-            new AutoFactory.AutoBindings(),
-            (pose, starting) -> Logger.recordOutput("Choreo/Trajectory", pose.getPoses()));
+            swerve,
+            new AutoFactory.AutoBindings());
 
     selector = new LoggedDashboardChooser<>("Auto Chooser");
     selector.addDefaultOption(NONE_NAME, NONE_NAME);
 
     lastAutoRoutineName = NONE_NAME;
-    lastAutoRoutine = AutoRoutineGenerator.NONE.apply(factory);
+    lastAutoRoutine = AutoRoutineGenerator.NONE.apply(factory).cmd();
 
     addAuto("Four Note Auto", this::fourNoteAuto);
   }
 
-  private Command fourNoteAuto(AutoFactory factory) {
-    final var loop = factory.newLoop("Four Note Auto");
+  private AutoRoutine fourNoteAuto(AutoFactory factory) {
+    final var routine = factory.newRoutine("Four Note Auto");
 
-    final var speakerToC1 = factory.trajectory("speakerToC1", loop);
-    final var C1ToSpeaker = factory.trajectory("C1ToSpeaker", loop);
-    final var C1ToC2 = factory.trajectory("C1ToC2", loop);
-    final var speakerToC2 = factory.trajectory("speakerToC2", loop);
-    final var C2ToSpeaker = factory.trajectory("C2ToSpeaker", loop);
-    final var C2ToC3 = factory.trajectory("C2ToC3", loop);
-    final var speakerToC3 = factory.trajectory("speakerToC3", loop);
-    final var C3ToSpeaker = factory.trajectory("C3ToSpeaker", loop);
+    final var speakerToC1 = routine.trajectory("speakerToC1");
+    final var C1ToSpeaker = routine.trajectory("C1ToSpeaker");
+    final var C1ToC2 = routine.trajectory("C1ToC2");
+    final var speakerToC2 = routine.trajectory("speakerToC2");
+    final var C2ToSpeaker = routine.trajectory("C2ToSpeaker");
+    final var C2ToC3 = routine.trajectory("C2ToC3");
+    final var speakerToC3 = routine.trajectory("speakerToC3");
+    final var C3ToSpeaker = routine.trajectory("C3ToSpeaker");
 
     // Score and then go to C1
-    loop.enabled().onTrue(resetPose(speakerToC1, loop).andThen(speakerToC1.cmd()));
+    routine.running().onTrue(resetPose(speakerToC1, routine).andThen(speakerToC1.cmd()));
 
     // Go score if it has C1, skip to C2 if it doesn't
-    speakerToC1.done().and(hasGamePiece(loop)).onTrue(C1ToSpeaker.cmd());
-    speakerToC1.done().and(noGamePiece(loop)).onTrue(C1ToC2.cmd());
+    speakerToC1.done().and(hasGamePiece(routine)).onTrue(C1ToSpeaker.cmd());
+    speakerToC1.done().and(noGamePiece(routine)).onTrue(C1ToC2.cmd());
 
     // Once it scores C1, go to C2
     C1ToSpeaker.done().onTrue(speakerToC2.cmd());
 
     // Go score if it has C2, skip to C3 if it doesn't
-    speakerToC2.done().and(hasGamePiece(loop)).onTrue(C2ToSpeaker.cmd());
-    speakerToC2.done().and(noGamePiece(loop)).onTrue(C2ToC3.cmd());
-    C1ToC2.done().and(hasGamePiece(loop)).onTrue(C2ToSpeaker.cmd());
-    C1ToC2.done().and(noGamePiece(loop)).onTrue(C2ToC3.cmd());
+    speakerToC2.done().and(hasGamePiece(routine)).onTrue(C2ToSpeaker.cmd());
+    speakerToC2.done().and(noGamePiece(routine)).onTrue(C2ToC3.cmd());
+    C1ToC2.done().and(hasGamePiece(routine)).onTrue(C2ToSpeaker.cmd());
+    C1ToC2.done().and(noGamePiece(routine)).onTrue(C2ToC3.cmd());
 
     // Once it scores C2, go to C3
     C2ToSpeaker.done().onTrue(speakerToC3.cmd());
@@ -94,15 +92,15 @@ public class Autos {
     speakerToC3.done().onTrue(C3ToSpeaker.cmd());
     C2ToC3.done().onTrue(C3ToSpeaker.cmd());
 
-    return loop.cmd();
+    return routine;
   }
 
-  private Trigger hasGamePiece(AutoLoop loop) {
-    return new Trigger(loop.getLoop(), () -> true);
+  private Trigger hasGamePiece(AutoRoutine routine) {
+    return routine.observe(() -> true);
   }
 
-  private Trigger noGamePiece(AutoLoop loop) {
-    return new Trigger(loop.getLoop(), () -> false);
+  private Trigger noGamePiece(AutoRoutine routine) {
+    return routine.observe(() -> false);
   }
 
   private void addAuto(
@@ -111,17 +109,23 @@ public class Autos {
     selector.addOption(name, name);
   }
 
+  private final Alert invalidAutoWarning =
+      new Alert(
+          "Selected an auto that isn't an option, falling back to \"" + NONE_NAME + "\"",
+          Alert.AlertType.kWarning);
+
   public void update() {
-    if (DriverStation.isDisabled() || IterativeRobotBase.isSimulation()) {
+    if (DriverStation.isDisabled() && DriverStation.getAlliance().isPresent()) {
       String selectStr = selector.get();
       if (selectStr.equals(lastAutoRoutineName)) return;
       if (!autoRoutines.containsKey(selectStr)) {
         selectStr = NONE_NAME;
-        DriverStation.reportError(
-            "Selected an auto that isn't an option, falling back to \"" + NONE_NAME + "\"", false);
+        invalidAutoWarning.set(true);
+      } else {
+        invalidAutoWarning.set(false);
       }
       lastAutoRoutineName = selectStr;
-      lastAutoRoutine = autoRoutines.get(lastAutoRoutineName).apply(factory);
+      lastAutoRoutine = autoRoutines.get(lastAutoRoutineName).apply(factory).cmd();
     }
   }
 
@@ -129,7 +133,7 @@ public class Autos {
     return lastAutoRoutine;
   }
 
-  private Command resetPose(AutoTrajectory path, AutoLoop loop) {
+  private Command resetPose(AutoTrajectory path, AutoRoutine loop) {
     return runOnce(
         () ->
             swerve.resetForAuto(
