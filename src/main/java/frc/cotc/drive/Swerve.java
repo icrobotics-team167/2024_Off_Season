@@ -24,7 +24,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -153,6 +153,14 @@ public class Swerve extends SubsystemBase {
 
   private ChassisSpeeds robotRelativeSpeeds = new ChassisSpeeds();
   private ChassisSpeeds fieldRelativeSpeeds = new ChassisSpeeds();
+  private Pose2d poseEstimate = new Pose2d();
+
+  private final Alert invalidOdometryWarning =
+      new Alert("Swerve: Invalid odometry data!", Alert.AlertType.kWarning);
+  private final Alert outOfOrderOdometryWarning =
+      new Alert(
+          "Swerve: Odometry data was out of order! Expected latest data last.",
+          Alert.AlertType.kWarning);
 
   @Override
   public void periodic() {
@@ -181,13 +189,15 @@ public class Swerve extends SubsystemBase {
     double lastTimestamp = -1;
     for (var frame : swerveInputs.odometryFrames) {
       if (frame.timestamp() < 0) {
-        DriverStation.reportError("Swerve: Invalid odometry data!", false);
+        invalidOdometryWarning.set(true);
         break;
       }
+      invalidOdometryWarning.set(false);
       if (frame.timestamp() < lastTimestamp) {
-        DriverStation.reportError("Swerve: Odometry data was out of order!", false);
+        outOfOrderOdometryWarning.set(true);
         break;
       }
+      outOfOrderOdometryWarning.set(false);
       poseEstimator.updateWithTime(frame.timestamp(), frame.gyroYaw(), frame.positions());
       lastTimestamp = frame.timestamp();
     }
@@ -231,7 +241,8 @@ public class Swerve extends SubsystemBase {
         "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
     Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
 
-    Logger.recordOutput("Swerve/Odometry/Final Position", getPose());
+    poseEstimate = poseEstimator.getEstimatedPosition();
+    Logger.recordOutput("Swerve/Odometry/Final Position", poseEstimate);
   }
 
   /**
@@ -346,9 +357,9 @@ public class Swerve extends SubsystemBase {
   public Command resetGyro() {
     return runOnce(
         () -> {
-          var pose = poseEstimator.getEstimatedPosition();
-          swerveIO.resetGyro(poseEstimator.getEstimatedPosition().getRotation());
-          poseEstimator.resetPosition(pose.getRotation(), getLatestModulePositions(), pose);
+          swerveIO.resetGyro(poseEstimate.getRotation());
+          poseEstimator.resetPosition(
+              poseEstimate.getRotation(), getLatestModulePositions(), poseEstimate);
         });
   }
 
@@ -394,18 +405,18 @@ public class Swerve extends SubsystemBase {
     this.lastSetpoint = setpoint;
   }
 
-  public void followTrajectory(Pose2d currentPose, SwerveSample sample) {
+  public void followTrajectory(SwerveSample sample) {
     var feedforward = new ChassisSpeeds(sample.vx, sample.vy, sample.omega);
 
     var targetPose = new Pose2d(sample.x, sample.y, new Rotation2d(sample.heading));
     var feedback =
         new ChassisSpeeds(
-            xController.calculate(currentPose.getX(), targetPose.getX()),
-            yController.calculate(currentPose.getY(), targetPose.getY()),
+            xController.calculate(poseEstimate.getX(), targetPose.getX()),
+            yController.calculate(poseEstimate.getY(), targetPose.getY()),
             yawController.calculate(
-                currentPose.getRotation().getRadians(), targetPose.getRotation().getRadians()));
+                poseEstimate.getRotation().getRadians(), targetPose.getRotation().getRadians()));
 
-    Logger.recordOutput("Choreo/Error", targetPose.minus(currentPose));
+    Logger.recordOutput("Choreo/Error", targetPose.minus(poseEstimate));
 
     var forceVectors = new Translation2d[4];
     for (int i = 0; i < 4; i++) {
@@ -454,16 +465,16 @@ public class Swerve extends SubsystemBase {
     return setpointGenerator.getKinematics().toChassisSpeeds(swerveInputs.moduleStates);
   }
 
-  public Pose2d getPose() {
-    return poseEstimator.getEstimatedPosition();
-  }
-
   public SwerveModulePosition[] getLatestModulePositions() {
     if (swerveInputs.odometryFrames.length == 0) {
       throw new IndexOutOfBoundsException(
           "swerveInputs.odometryFrames.length was 0! This should not be possible.");
     }
     return swerveInputs.odometryFrames[swerveInputs.odometryFrames.length - 1].positions();
+  }
+
+  public Pose2d getPose() {
+    return poseEstimate;
   }
 
   public void resetForAuto(Pose2d pose) {
