@@ -65,12 +65,12 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
 
     double kv = 12 / ((wheelDiameterMeters / 2) * motor.freeSpeedRadPerSec);
     CONSTANTS = new FlywheelIOConstantsAutoLogged();
-    CONSTANTS.topTolerance = .1;
-    CONSTANTS.bottomTolerance = .1;
-    CONSTANTS.guideTolerance = .1;
-    CONSTANTS.topKs = 0;
-    CONSTANTS.bottomKs = 0;
-    CONSTANTS.guideKs = 0;
+    CONSTANTS.topTolerance = 1;
+    CONSTANTS.bottomTolerance = 1;
+    CONSTANTS.guideTolerance = 1;
+    CONSTANTS.topKs = 0.1;
+    CONSTANTS.bottomKs = 0.1;
+    CONSTANTS.guideKs = 0.1;
     CONSTANTS.topKv = kv;
     CONSTANTS.bottomKv = kv;
     CONSTANTS.guideKv = kv;
@@ -80,9 +80,15 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
       bottomMotorSim = new SparkSim(bottom, motor);
       guideMotorSim = new SparkSim(guide, motor);
 
-      topSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(kv, .01), motor);
-      bottomSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(kv, .01), motor);
-      guideSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(kv, .01), motor);
+      topSim =
+          new DCMotorSim(
+              LinearSystemId.createDCMotorSystem(12 / motor.freeSpeedRadPerSec, .01), motor);
+      bottomSim =
+          new DCMotorSim(
+              LinearSystemId.createDCMotorSystem(12 / motor.freeSpeedRadPerSec, .01), motor);
+      guideSim =
+          new DCMotorSim(
+              LinearSystemId.createDCMotorSystem(12 / motor.freeSpeedRadPerSec, .01), motor);
     }
   }
 
@@ -93,6 +99,10 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
 
   @Override
   public void updateInputs(FlywheelIOInputs inputs) {
+    if (Robot.isSimulation()) {
+      updateSim();
+    }
+
     inputs.topPosMeters = topEncoder.getPosition();
     inputs.bottomPosMeters = bottomEncoder.getPosition();
     inputs.topVelMetersPerSec = topEncoder.getVelocity();
@@ -111,6 +121,10 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
         inputs.guideCurrentDraws.statorCurrent * Math.abs(guide.getAppliedOutput());
   }
 
+  private double topCommandedVolts;
+  private double bottomCommandedVolts;
+  private double guideCommandedVolts;
+
   @Override
   public void run(double topVolts, double bottomVolts, double guideVolts) {
     top.setVoltage(topVolts);
@@ -118,28 +132,40 @@ public class FlywheelIOSparkFlex implements FlywheelIO {
     guide.setVoltage(guideVolts);
 
     if (Robot.isSimulation()) {
-      double voltage = RobotController.getBatteryVoltage();
-
-      topSim.setInputVoltage(MathUtil.clamp(topVolts, -voltage, voltage));
-      topSim.update(Robot.defaultPeriodSecs);
-      topMotorSim.iterate(
-          topSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
-          voltage,
-          Robot.defaultPeriodSecs);
-
-      bottomSim.setInputVoltage(MathUtil.clamp(bottomVolts, -voltage, voltage));
-      bottomSim.update(Robot.defaultPeriodSecs);
-      bottomMotorSim.iterate(
-          bottomSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
-          voltage,
-          Robot.defaultPeriodSecs);
-
-      guideSim.setInputVoltage(MathUtil.clamp(guideVolts, -voltage, voltage));
-      guideSim.update(Robot.defaultPeriodSecs);
-      guideMotorSim.iterate(
-          guideSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
-          voltage,
-          Robot.defaultPeriodSecs);
+      topCommandedVolts = topVolts;
+      bottomCommandedVolts = bottomVolts;
+      guideCommandedVolts = guideVolts;
     }
+  }
+
+  private void updateSim() {
+    double busVoltage = RobotController.getBatteryVoltage();
+
+    topSim.setInputVoltage(
+        MathUtil.clamp(topCommandedVolts, -busVoltage, busVoltage)
+            - CONSTANTS.topKs * Math.signum(topSim.getAngularVelocityRadPerSec()));
+    topSim.update(Robot.defaultPeriodSecs);
+    topMotorSim.iterate(
+        topSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
+        busVoltage,
+        Robot.defaultPeriodSecs);
+
+    bottomSim.setInputVoltage(
+        MathUtil.clamp(bottomCommandedVolts, -busVoltage, busVoltage)
+            - CONSTANTS.bottomKs * Math.signum(bottomSim.getAngularVelocityRadPerSec()));
+    bottomSim.update(Robot.defaultPeriodSecs);
+    bottomMotorSim.iterate(
+        bottomSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
+        busVoltage,
+        Robot.defaultPeriodSecs);
+
+    guideSim.setInputVoltage(
+        MathUtil.clamp(guideCommandedVolts, -busVoltage, busVoltage)
+            - CONSTANTS.guideKs * Math.signum(guideSim.getAngularVelocityRadPerSec()));
+    guideSim.update(Robot.defaultPeriodSecs);
+    guideMotorSim.iterate(
+        guideSim.getAngularVelocityRadPerSec() * wheelDiameterMeters / 2,
+        busVoltage,
+        Robot.defaultPeriodSecs);
   }
 }

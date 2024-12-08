@@ -56,7 +56,7 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
-    Mode mode = Robot.isReal() ? Mode.REAL : Mode.REPLAY;
+    Mode mode = Robot.isReal() ? Mode.REAL : Mode.SIM;
     // Mode mode = Mode.REPLAY;
 
     switch (mode) {
@@ -104,7 +104,7 @@ public class Robot extends LoggedRobot {
       case REAL, SIM ->
           superstructure =
               new Superstructure(
-                  new PivotIOSparkFlex(),
+                  new PivotIO() {},
                   new FlywheelIOSparkFlex(),
                   () -> swerve.getPose().getTranslation());
       case REPLAY ->
@@ -114,8 +114,8 @@ public class Robot extends LoggedRobot {
       default -> throw new IllegalStateException("mode was null. what.");
     }
 
-    CommandJoystick primaryLeft = new CommandJoystick(0);
-    CommandJoystick primaryRight = new CommandJoystick(1);
+    var primaryLeft = new CommandJoystick(0);
+    var primaryRight = new CommandJoystick(1);
 
     // Robot wants +X fwd, +Y left
     // Sticks are +X right +Y back

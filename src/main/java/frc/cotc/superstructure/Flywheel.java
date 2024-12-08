@@ -31,7 +31,8 @@ public class Flywheel extends SubsystemBase {
 
   public Command spinUp(
       double topVelMetersPerSec, double bottomVelMetersPerSec, double guideWheelsMetersPerSec) {
-    return run(() -> runVel(topVelMetersPerSec, bottomVelMetersPerSec, guideWheelsMetersPerSec));
+    return run(() -> runVel(topVelMetersPerSec, bottomVelMetersPerSec, guideWheelsMetersPerSec))
+        .finallyDo(() -> runVel(0, 0, 0));
   }
 
   private void runVel(
@@ -44,25 +45,35 @@ public class Flywheel extends SubsystemBase {
     double guideMaxVel = (12 - CONSTANTS.guideKs) / CONSTANTS.guideKv;
     guideVelMetersPerSec = MathUtil.clamp(guideVelMetersPerSec, -guideMaxVel, guideMaxVel);
 
-    io.run(
+    Logger.recordOutput("Superstructure/Flywheel/Target Velocities/Top", topVelMetersPerSec);
+    Logger.recordOutput("Superstructure/Flywheel/Target Velocities/Bottom", bottomVelMetersPerSec);
+    Logger.recordOutput("Superstructure/Flywheel/Target Velocities/Guide", guideVelMetersPerSec);
+
+    double topVoltage =
         calculate(
             topVelMetersPerSec,
             inputs.topVelMetersPerSec,
             CONSTANTS.topTolerance,
             CONSTANTS.topKs,
-            CONSTANTS.topKv),
+            CONSTANTS.topKv);
+    double bottomVoltage =
         calculate(
             bottomVelMetersPerSec,
             inputs.bottomVelMetersPerSec,
             CONSTANTS.bottomTolerance,
             CONSTANTS.bottomKs,
-            CONSTANTS.bottomKv),
+            CONSTANTS.bottomKv);
+    double guideVoltage =
         calculate(
             guideVelMetersPerSec,
             inputs.guideVelMetersPerSec,
             CONSTANTS.guideTolerance,
             CONSTANTS.guideKs,
-            CONSTANTS.guideKv));
+            CONSTANTS.guideKv);
+    Logger.recordOutput("Superstructure/Flywheel/Control Outputs/Top", topVoltage);
+    Logger.recordOutput("Superstructure/Flywheel/Control Outputs/Bottom", bottomVoltage);
+    Logger.recordOutput("Superstructure/Flywheel/Control Outputs/Guide", guideVoltage);
+    io.run(topVoltage, bottomVoltage, guideVoltage);
   }
 
   /**
@@ -75,12 +86,14 @@ public class Flywheel extends SubsystemBase {
    */
   private double calculate(double target, double current, double tolerance, double kS, double kv) {
     double steadyStateVoltage = target * kv + kS * Math.signum(target);
-    if (target > current) {
-      // The t value in MathUtil.interpolate is clamped to [0,1]
-      // So if the error is greater than the tolerance t is clamped to 1
-      return MathUtil.interpolate(steadyStateVoltage, 12, (target - current) / tolerance);
+    double accelVoltage = 12 * Math.signum(target);
+    if (Math.signum(target) == Math.signum(current) && Math.abs(current) > Math.abs(target)) {
+      return steadyStateVoltage;
+    } else if (MathUtil.isNear(target, current, tolerance)) {
+      return MathUtil.interpolate(
+          steadyStateVoltage, accelVoltage, Math.abs((target - current) / tolerance));
     } else {
-      return MathUtil.interpolate(steadyStateVoltage, -12, (current - target) / tolerance);
+      return accelVoltage;
     }
   }
 }
