@@ -59,6 +59,8 @@ public class Swerve extends SubsystemBase {
 
   private final PIDController xController, yController, yawController;
 
+  private final RepulsorFieldPlanner repulsorFieldPlanner = new RepulsorFieldPlanner();
+
   public Swerve(SwerveIO driveIO, FiducialPoseEstimatorIO[] visionIOs) {
     this.swerveIO = driveIO;
     var CONSTANTS = driveIO.getConstants();
@@ -76,6 +78,8 @@ public class Swerve extends SubsystemBase {
 
     Logger.recordOutput("Swerve/Max Linear Speed", maxLinearSpeedMetersPerSec);
     Logger.recordOutput("Swerve/Max Angular Speed", maxAngularSpeedRadPerSec);
+
+    Logger.recordOutput("Swerve/Vector field", repulsorFieldPlanner.getArrows());
 
     setpointGenerator =
         new SwerveSetpointGenerator(
@@ -243,6 +247,13 @@ public class Swerve extends SubsystemBase {
 
     poseEstimate = poseEstimator.getEstimatedPosition();
     Logger.recordOutput("Swerve/Odometry/Final Position", poseEstimate);
+
+    Logger.recordOutput(
+        "Swerve/Repulsor trajectory",
+        repulsorFieldPlanner
+            .getTrajectory(
+                poseEstimate.getTranslation(), maxLinearSpeedMetersPerSec * Robot.defaultPeriodSecs)
+            .toArray(new Translation2d[0]));
   }
 
   /**
