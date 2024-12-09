@@ -7,12 +7,14 @@
 
 package frc.cotc.superstructure;
 
+import frc.cotc.util.AKitIO;
 import frc.cotc.util.MotorCurrentDraws;
 import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
-public interface FlywheelIO {
+public interface FlywheelIO
+    extends AKitIO<FlywheelIOConstantsAutoLogged, FlywheelIO.FlywheelIOInputs> {
   class FlywheelIOInputs implements LoggableInputs {
     double topPosMeters;
     double topVelMetersPerSec;

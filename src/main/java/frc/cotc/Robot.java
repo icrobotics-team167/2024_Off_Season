@@ -17,6 +17,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
 import frc.cotc.drive.SwerveIOPhoenix;
@@ -99,16 +100,10 @@ public class Robot extends LoggedRobot {
 
     Superstructure superstructure;
     switch (mode) {
-      case REAL, SIM ->
-          superstructure =
-              new Superstructure(
-                  new PivotIOSparkFlex(),
-                  new FlywheelIOSparkFlex(),
-                  () -> swerve.getPose().getTranslation());
-      case REPLAY ->
-          superstructure =
-              new Superstructure(
-                  new PivotIO() {}, new FlywheelIO() {}, () -> swerve.getPose().getTranslation());
+      case REAL ->
+          superstructure = new Superstructure(new PivotIOSparkFlex(), new FlywheelIOSparkFlex());
+      case SIM -> superstructure = new Superstructure(new PivotIOSim(), new FlywheelIOSim());
+      case REPLAY -> superstructure = new Superstructure(new PivotIO() {}, new FlywheelIO() {});
       default -> throw new IllegalStateException("mode was null. what.");
     }
 
@@ -126,6 +121,16 @@ public class Robot extends LoggedRobot {
     RobotModeTriggers.teleop().onTrue(swerve.resetGyro());
 
     superstructure.setDefaultCommand(superstructure.rest());
+    new Trigger(
+            () -> {
+              double fieldWidthMeters = 16.54;
+              if (Robot.isOnRed()) {
+                return swerve.getPose().getX() > (fieldWidthMeters / 2);
+              } else {
+                return swerve.getPose().getX() < (fieldWidthMeters / 2);
+              }
+            })
+        .whileTrue(superstructure.subwooferAim());
 
     autos = new Autos(swerve);
   }

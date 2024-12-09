@@ -7,11 +7,11 @@
 
 package frc.cotc.superstructure;
 
+import static edu.wpi.first.wpilibj2.command.Commands.parallel;
+
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
-import frc.cotc.Robot;
 import frc.cotc.util.Supersystem;
 import java.util.function.Supplier;
 
@@ -19,32 +19,21 @@ public class Superstructure extends Supersystem {
   private final Pivot pivot;
   private final Flywheel flywheel;
 
-  private final Supplier<Translation2d> positionSupplier;
-
-  public Superstructure(
-      PivotIO pivotIO, FlywheelIO flywheelIO, Supplier<Translation2d> positionSupplier) {
+  public Superstructure(PivotIO pivotIO, FlywheelIO flywheelIO) {
     this.pivot = new Pivot(pivotIO);
     this.flywheel = new Flywheel(flywheelIO);
-
-    this.positionSupplier = positionSupplier;
-
-    new Trigger(
-            () -> {
-              double fieldWidthMeters = 16.54;
-              if (Robot.isOnRed()) {
-                return this.positionSupplier.get().getX() > (fieldWidthMeters / 2);
-              } else {
-                return this.positionSupplier.get().getX() < (fieldWidthMeters / 2);
-              }
-            })
-        .whileTrue(speakerShot());
   }
 
   public Command rest() {
     return expose(pivot.minAngle());
   }
 
-  public Command autoAim(Supplier<ChassisSpeeds> speedsSupplier) {
+  public Command subwooferAim() {
+    return expose(parallel(speakerShot(), pivot.subwooferAim()));
+  }
+
+  public Command autoAim(
+      Supplier<Translation2d> positionSupplier, Supplier<ChassisSpeeds> speedsSupplier) {
     return expose(pivot.aimAtSpeaker(positionSupplier, speedsSupplier));
   }
 

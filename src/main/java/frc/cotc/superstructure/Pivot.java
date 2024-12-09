@@ -104,12 +104,14 @@ public class Pivot extends SubsystemBase {
   private final ExponentialProfile.State targetState = new ExponentialProfile.State();
 
   private void angleControl(double angleRad, double velRadPerSec) {
+    Logger.recordOutput("Superstructure/Pivot/Target angle", angleRad);
     currentState.position = (inputs.leftAngleRad + inputs.rightAngleRad) / 2;
     currentState.velocity = (inputs.leftVelRadPerSec + inputs.leftVelRadPerSec) / 2;
     targetState.position = angleRad;
     targetState.velocity = velRadPerSec;
 
     var state = angleProfile.calculate(Robot.defaultPeriodSecs, currentState, targetState);
+    Logger.recordOutput("Superstructure/Pivot/Profiled position", state.position);
     velocityControl(state.velocity + anglePID.calculate(currentState.position, state.position));
   }
 
@@ -130,6 +132,7 @@ public class Pivot extends SubsystemBase {
    */
   @SuppressWarnings("removal")
   private void velocityControl(double velRadPerSec) {
+    Logger.recordOutput("Superstructure/Pivot/Target vel", velRadPerSec);
     double diffControl = diffPID.calculate(inputs.leftAngleRad - inputs.rightAngleRad, 0);
     io.run(
         feedforward.calculate(

@@ -11,13 +11,14 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import frc.cotc.util.AKitIO;
 import frc.cotc.util.MotorCurrentDraws;
 import java.util.ArrayList;
 import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
-public interface SwerveIO {
+public interface SwerveIO extends AKitIO<SwerveModuleConstantsAutoLogged, SwerveIO.SwerveIOInputs> {
   class SwerveIOInputs implements LoggableInputs {
     SwerveModuleState[] moduleStates = new SwerveModuleState[4];
     Rotation2d gyroYaw = Rotation2d.kZero;
@@ -174,20 +175,10 @@ public interface SwerveIO {
     double ANGULAR_SPEED_FUDGING;
   }
 
-  /**
-   * Gets the drive constants.
-   *
-   * @return A SwerveIOConstantsAutoLogged object that contains constants.
-   */
   default SwerveModuleConstantsAutoLogged getConstants() {
     return new SwerveModuleConstantsAutoLogged();
   }
 
-  /**
-   * Updates the {@link SwerveIOInputs} to feed in new data from the drivebase.
-   *
-   * @param inputs The SwerveIOInputs object. Will be mutated.
-   */
   default void updateInputs(SwerveIOInputs inputs) {}
 
   /**

@@ -7,12 +7,13 @@
 
 package frc.cotc.superstructure;
 
+import frc.cotc.util.AKitIO;
 import frc.cotc.util.MotorCurrentDraws;
 import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
 
-public interface PivotIO {
+public interface PivotIO extends AKitIO<PivotIOConstantsAutoLogged, PivotIO.PivotIOInputs> {
   class PivotIOInputs implements LoggableInputs {
     double leftAngleRad;
     double leftVelRadPerSec;

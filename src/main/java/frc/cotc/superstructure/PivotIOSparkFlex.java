@@ -12,16 +12,11 @@ import static frc.cotc.util.SparkUtils.configureSparks;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel;
-import com.revrobotics.spark.SparkSim;
 import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkFlexConfig;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
-import edu.wpi.first.wpilibj.RobotController;
-import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
-import frc.cotc.Robot;
 
 public class PivotIOSparkFlex implements PivotIO {
   private final PivotIOConstantsAutoLogged CONSTANTS = new PivotIOConstantsAutoLogged();
@@ -33,11 +28,6 @@ public class PivotIOSparkFlex implements PivotIO {
 
   private final DutyCycleEncoder angleEncoder;
 
-  private SingleJointedArmSim leftArmSim;
-  private SparkSim leftMotorSim;
-  private SingleJointedArmSim rightArmSim;
-  private SparkSim rightMotorSim;
-
   private final double startAngle;
 
   public PivotIOSparkFlex() {
@@ -46,6 +36,13 @@ public class PivotIOSparkFlex implements PivotIO {
     var motor = DCMotor.getNeoVortex(1);
     double gearRatio = 400;
     CONSTANTS.maxSpeedRadPerSec = motor.freeSpeedRadPerSec / gearRatio;
+
+    CONSTANTS.kG = .16;
+    CONSTANTS.kV = 12 / CONSTANTS.maxSpeedRadPerSec;
+    CONSTANTS.kA = .01;
+    CONSTANTS.angleKp = 5;
+    CONSTANTS.diffKp = 1;
+    CONSTANTS.velKp = 5;
 
     // TODO: Configure CAN IDs
     leftMotor = new SparkFlex(15, SparkLowLevel.MotorType.kBrushless);
@@ -66,38 +63,6 @@ public class PivotIOSparkFlex implements PivotIO {
 
     angleEncoder = new DutyCycleEncoder(0);
 
-    if (Robot.isSimulation()) {
-      double massKg = Units.lbsToKilograms(22);
-      double comDistanceMeters = Units.inchesToMeters(15);
-      double moiKgMetersSquared = massKg * comDistanceMeters * comDistanceMeters;
-      double startAngle =
-          MathUtil.interpolate(CONSTANTS.minAngleRad, CONSTANTS.maxAngleRad, Math.random());
-      leftArmSim =
-          new SingleJointedArmSim(
-              motor,
-              gearRatio,
-              moiKgMetersSquared,
-              comDistanceMeters,
-              CONSTANTS.minAngleRad,
-              CONSTANTS.maxAngleRad,
-              true,
-              startAngle);
-      rightArmSim =
-          leftArmSim =
-              new SingleJointedArmSim(
-                  motor,
-                  gearRatio,
-                  moiKgMetersSquared,
-                  comDistanceMeters,
-                  CONSTANTS.minAngleRad,
-                  CONSTANTS.maxAngleRad,
-                  true,
-                  startAngle);
-
-      leftMotorSim = new SparkSim(leftMotor, motor);
-      rightMotorSim = new SparkSim(rightMotor, motor);
-    }
-
     startAngle = getAbsoluteAngleRad();
   }
 
@@ -106,23 +71,8 @@ public class PivotIOSparkFlex implements PivotIO {
     return CONSTANTS;
   }
 
-  private double leftSimVolts;
-  private double rightSimVolts;
-
   @Override
   public void updateInputs(PivotIOInputs inputs) {
-    if (Robot.isSimulation()) {
-      var batteryVoltage = RobotController.getBatteryVoltage();
-      leftArmSim.setInputVoltage(MathUtil.clamp(leftSimVolts, -batteryVoltage, batteryVoltage));
-      leftArmSim.update(Robot.defaultPeriodSecs);
-      leftMotorSim.iterate(
-          leftArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
-      rightArmSim.setInputVoltage(MathUtil.clamp(rightSimVolts, -batteryVoltage, batteryVoltage));
-      rightArmSim.update(Robot.defaultPeriodSecs);
-      rightMotorSim.iterate(
-          rightArmSim.getVelocityRadPerSec(), batteryVoltage, Robot.defaultPeriodSecs);
-    }
-
     inputs.leftAngleRad = startAngle + leftEncoder.getPosition();
     inputs.leftVelRadPerSec = leftEncoder.getVelocity();
     inputs.rightAngleRad = startAngle - rightEncoder.getPosition();
@@ -140,17 +90,9 @@ public class PivotIOSparkFlex implements PivotIO {
   public void run(double leftVolts, double rightVolts) {
     leftMotor.setVoltage(leftVolts);
     rightMotor.setVoltage(-rightVolts);
-
-    if (Robot.isSimulation()) {
-      leftSimVolts = leftVolts;
-      rightSimVolts = rightVolts;
-    }
   }
 
   private double getAbsoluteAngleRad() {
-    if (Robot.isReal()) {
-      return Units.rotationsToRadians(angleEncoder.get() - (193.5 / 360));
-    }
-    return (leftArmSim.getAngleRads() + rightArmSim.getAngleRads()) / 2;
+    return Units.rotationsToRadians(angleEncoder.get() - (193.5 / 360));
   }
 }
