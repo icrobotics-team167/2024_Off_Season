@@ -260,7 +260,8 @@ public class Swerve extends SubsystemBase {
     // Get idealized states from the current robot velocity.
     var idealStates = setpointGenerator.getKinematics().toSwerveModuleStates(robotRelativeSpeeds);
 
-    double squaredSum = 0;
+    double xSquaredSum = 0;
+    double ySquaredSum = 0;
     for (int i = 0; i < 4; i++) {
       var measuredVector =
           new Translation2d(
@@ -270,17 +271,19 @@ public class Swerve extends SubsystemBase {
           new Translation2d(idealStates[i].speedMetersPerSecond, idealStates[i].angle);
 
       // Compare the state vectors and get the delta between them.
-      var delta = measuredVector.getDistance(idealVector);
+      var xDelta = idealVector.getX() - measuredVector.getX();
+      var yDelta = idealVector.getY() - measuredVector.getY();
 
       // Square the delta and add it to a sum
-      squaredSum += delta * delta;
+      xSquaredSum += xDelta * xDelta;
+      ySquaredSum += yDelta * yDelta;
     }
 
     // Sqrt of avg of squared deltas = standard deviation
-    double linearStdDevs = Math.sqrt(squaredSum / 4);
-
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {(linearStdDevs + .005), (linearStdDevs + .005), .001};
+    return new double[] {
+      (Math.sqrt(xSquaredSum / 4) + .005), (Math.sqrt(ySquaredSum / 4) + .005), .001
+    };
   }
 
   private double[] getVisionStdDevs(FiducialPoseEstimatorIO.PoseEstimate poseEstimate) {
