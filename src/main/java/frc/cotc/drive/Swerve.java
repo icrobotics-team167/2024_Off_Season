@@ -61,6 +61,16 @@ public class Swerve extends SubsystemBase {
 
   private final RepulsorFieldPlanner repulsorFieldPlanner = new RepulsorFieldPlanner();
 
+  private record StdDevTunings(
+      double distanceScalar, double tagCountExponent, double velocityScalar) {}
+
+  private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
+    static final CameraTunings defaults =
+        new CameraTunings(new StdDevTunings(.5, 3, 4), new StdDevTunings(.0125, 2, 2));
+  }
+
+  private final CameraTunings[] cameraTunings = new CameraTunings[0];
+
   public Swerve(SwerveIO driveIO, FiducialPoseEstimatorIO[] visionIOs) {
     this.swerveIO = driveIO;
     var CONSTANTS = driveIO.getConstants();
@@ -157,7 +167,7 @@ public class Swerve extends SubsystemBase {
 
   private ChassisSpeeds robotRelativeSpeeds = new ChassisSpeeds();
   private ChassisSpeeds fieldRelativeSpeeds = new ChassisSpeeds();
-  private Pose2d poseEstimate = new Pose2d();
+  private Pose2d latestPoseEstimate = new Pose2d();
 
   private final Alert invalidOdometryWarning =
       new Alert("Swerve: Invalid odometry data!", Alert.AlertType.kWarning);
@@ -165,6 +175,12 @@ public class Swerve extends SubsystemBase {
       new Alert(
           "Swerve: Odometry data was out of order! Expected latest data last.",
           Alert.AlertType.kWarning);
+
+  private ArrayList<Pose3d> tagPoses;
+  private ArrayList<Pose3d> poseEstimates;
+  private ArrayList<Rotation2d> poseEstimateYaws;
+
+  boolean visionLoggingEnabled = true;
 
   @Override
   public void periodic() {
@@ -209,9 +225,12 @@ public class Swerve extends SubsystemBase {
     if (Robot.isSimulation() && !Logger.hasReplaySource()) {
       FiducialPoseEstimatorIOPhoton.VisionSim.getInstance().update();
     }
-    var tagPoses = new ArrayList<Pose3d>();
-    var poseEstimates = new ArrayList<Pose3d>();
-    var poseEstimateYaws = new ArrayList<Rotation2d>();
+
+    if (visionLoggingEnabled && tagPoses == null) {
+      tagPoses = new ArrayList<>();
+      poseEstimates = new ArrayList<>();
+      poseEstimateYaws = new ArrayList<>();
+    }
     for (int i = 0; i < visionIOs.length; i++) {
       visionIOs[i].updateInputs(visionInputs[i]);
       Logger.processInputs("Vision/" + i, visionInputs[i]);
@@ -219,6 +238,13 @@ public class Swerve extends SubsystemBase {
       if (!visionInputs[i].hasNewData) {
         // If there's no new data, save some CPU
         continue;
+      }
+
+      CameraTunings tunings;
+      if (i >= cameraTunings.length) {
+        tunings = CameraTunings.defaults;
+      } else {
+        tunings = cameraTunings[i];
       }
 
       for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
@@ -229,30 +255,38 @@ public class Swerve extends SubsystemBase {
           continue;
         }
 
-        var stdDevs = getVisionStdDevs(poseEstimate);
+        var stdDevs = getVisionStdDevs(poseEstimate, tunings);
         Logger.recordOutput("Vision/Std Devs/" + i + "/" + j, stdDevs);
 
         poseEstimator.addVisionMeasurement(
             poseEstimate.estimatedPose().toPose2d(), poseEstimate.timestamp(), stdDevs);
 
-        poseEstimates.add(poseEstimate.estimatedPose());
-        poseEstimateYaws.add(new Rotation2d(poseEstimate.estimatedPose().getRotation().getZ()));
-        tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
+        if (visionLoggingEnabled) {
+          poseEstimates.add(poseEstimate.estimatedPose());
+          poseEstimateYaws.add(new Rotation2d(poseEstimate.estimatedPose().getRotation().getZ()));
+          tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
+        }
       }
     }
-    Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
-    Logger.recordOutput(
-        "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
-    Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
+    if (visionLoggingEnabled) {
+      Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
+      Logger.recordOutput(
+          "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
+      Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
+      poseEstimates.clear();
+      poseEstimateYaws.clear();
+      tagPoses.clear();
+    }
 
-    poseEstimate = poseEstimator.getEstimatedPosition();
-    Logger.recordOutput("Swerve/Odometry/Final Position", poseEstimate);
+    latestPoseEstimate = poseEstimator.getEstimatedPosition();
+    Logger.recordOutput("Swerve/Odometry/Final Position", latestPoseEstimate);
 
     Logger.recordOutput(
         "Swerve/Repulsor trajectory",
         repulsorFieldPlanner
             .getTrajectory(
-                poseEstimate.getTranslation(), maxLinearSpeedMetersPerSec * Robot.defaultPeriodSecs)
+                latestPoseEstimate.getTranslation(),
+              maxLinearSpeedMetersPerSec * Robot.defaultPeriodSecs)
             .toArray(new Translation2d[0]));
   }
 
@@ -271,7 +305,8 @@ public class Swerve extends SubsystemBase {
     // Get idealized states from the current robot velocity.
     var idealStates = setpointGenerator.getKinematics().toSwerveModuleStates(robotRelativeSpeeds);
 
-    double squaredSum = 0;
+    double xSquaredSum = 0;
+    double ySquaredSum = 0;
     for (int i = 0; i < 4; i++) {
       var measuredVector =
           new Translation2d(
@@ -281,43 +316,35 @@ public class Swerve extends SubsystemBase {
           new Translation2d(idealStates[i].speedMetersPerSecond, idealStates[i].angle);
 
       // Compare the state vectors and get the delta between them.
-      var delta = measuredVector.getDistance(idealVector);
+      var xDelta = idealVector.getX() - measuredVector.getX();
+      var yDelta = idealVector.getY() - measuredVector.getY();
 
       // Square the delta and add it to a sum
-      squaredSum += delta * delta;
+      xSquaredSum += xDelta * xDelta;
+      ySquaredSum += yDelta * yDelta;
     }
 
     // Sqrt of avg of squared deltas = standard deviation
-    double linearStdDevs = Math.sqrt(squaredSum / 4);
-
-    // Get the % speeds of each axis
-    // Minimum of 25% to avoid divide by 0 errors and to prevent the scaled std dev from being
-    // too large
-    var xSpeed =
-        Math.max(Math.abs(fieldRelativeSpeeds.vxMetersPerSecond) / maxLinearSpeedMetersPerSec, .25);
-    var ySpeed =
-        Math.max(Math.abs(fieldRelativeSpeeds.vyMetersPerSecond) / maxLinearSpeedMetersPerSec, .25);
-
-    // Normalize the smaller one to 100% and scale the other to match
-    var minMagnitude = Math.min(xSpeed, ySpeed);
-    xSpeed /= minMagnitude;
-    ySpeed /= minMagnitude;
-
-    // Scale each axis by the normalized (?) % speed of each axis
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {(linearStdDevs + .005) * xSpeed, (linearStdDevs + .005) * ySpeed, .001};
+    return new double[] {
+      (Math.sqrt(xSquaredSum / 4) + .005), (Math.sqrt(ySquaredSum / 4) + .005), .001
+    };
   }
 
-  private double[] getVisionStdDevs(FiducialPoseEstimatorIO.PoseEstimate poseEstimate) {
+  private double[] getVisionStdDevs(
+      FiducialPoseEstimatorIO.PoseEstimate poseEstimate, CameraTunings tunings) {
     double translationalScoreSum = 0;
     double rotationalScoreSum = 0;
     for (var distanceMeters : poseEstimate.tagDistances()) {
-      translationalScoreSum += .125 * distanceMeters * distanceMeters;
-      rotationalScoreSum += .0125 * distanceMeters * distanceMeters;
+      translationalScoreSum +=
+          tunings.translational.distanceScalar * distanceMeters * distanceMeters;
+      rotationalScoreSum += tunings.angular.distanceScalar * distanceMeters * distanceMeters;
     }
 
-    var translationalDivisor = Math.pow(poseEstimate.tagDistances().length, 5);
-    var rotationalDivisor = Math.pow(poseEstimate.tagDistances().length, 2);
+    var translationalDivisor =
+        Math.pow(poseEstimate.tagDistances().length, tunings.translational.tagCountExponent);
+    var rotationalDivisor =
+        Math.pow(poseEstimate.tagDistances().length, tunings.angular.tagCountExponent);
 
     var translationalVelMagnitude =
         Math.hypot(fieldRelativeSpeeds.vxMetersPerSecond, fieldRelativeSpeeds.vyMetersPerSecond)
@@ -325,8 +352,10 @@ public class Swerve extends SubsystemBase {
     var angularVelMagnitude =
         Math.abs(fieldRelativeSpeeds.omegaRadiansPerSecond) / maxAngularSpeedRadPerSec;
 
-    var translationalScalar = MathUtil.interpolate(1, 5, translationalVelMagnitude);
-    var rotationalScalar = MathUtil.interpolate(1, 5, angularVelMagnitude);
+    var translationalScalar =
+        MathUtil.interpolate(1, tunings.translational.velocityScalar, translationalVelMagnitude);
+    var rotationalScalar =
+        MathUtil.interpolate(1, tunings.angular.velocityScalar, angularVelMagnitude);
 
     return new double[] {
       translationalScoreSum * translationalScalar / translationalDivisor,
@@ -368,9 +397,9 @@ public class Swerve extends SubsystemBase {
   public Command resetGyro() {
     return runOnce(
         () -> {
-          swerveIO.resetGyro(poseEstimate.getRotation());
+          swerveIO.resetGyro(latestPoseEstimate.getRotation());
           poseEstimator.resetPosition(
-              poseEstimate.getRotation(), getLatestModulePositions(), poseEstimate);
+              latestPoseEstimate.getRotation(), getLatestModulePositions(), latestPoseEstimate);
         });
   }
 
@@ -422,12 +451,13 @@ public class Swerve extends SubsystemBase {
     var targetPose = new Pose2d(sample.x, sample.y, new Rotation2d(sample.heading));
     var feedback =
         new ChassisSpeeds(
-            xController.calculate(poseEstimate.getX(), targetPose.getX()),
-            yController.calculate(poseEstimate.getY(), targetPose.getY()),
+            xController.calculate(latestPoseEstimate.getX(), targetPose.getX()),
+            yController.calculate(latestPoseEstimate.getY(), targetPose.getY()),
             yawController.calculate(
-                poseEstimate.getRotation().getRadians(), targetPose.getRotation().getRadians()));
+                latestPoseEstimate.getRotation().getRadians(),
+                targetPose.getRotation().getRadians()));
 
-    Logger.recordOutput("Choreo/Error", targetPose.minus(poseEstimate));
+    Logger.recordOutput("Choreo/Error", targetPose.minus(latestPoseEstimate));
 
     var forceVectors = new Translation2d[4];
     for (int i = 0; i < 4; i++) {
@@ -485,7 +515,7 @@ public class Swerve extends SubsystemBase {
   }
 
   public Pose2d getPose() {
-    return poseEstimate;
+    return latestPoseEstimate;
   }
 
   public void resetForAuto(Pose2d pose) {
