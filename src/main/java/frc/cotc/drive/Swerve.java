@@ -279,33 +279,19 @@ public class Swerve extends SubsystemBase {
     // Sqrt of avg of squared deltas = standard deviation
     double linearStdDevs = Math.sqrt(squaredSum / 4);
 
-    // Get the % speeds of each axis
-    // Minimum of 25% to avoid divide by 0 errors and to prevent the scaled std dev from being
-    // too large
-    var xSpeed =
-        Math.max(Math.abs(fieldRelativeSpeeds.vxMetersPerSecond) / maxLinearSpeedMetersPerSec, .25);
-    var ySpeed =
-        Math.max(Math.abs(fieldRelativeSpeeds.vyMetersPerSecond) / maxLinearSpeedMetersPerSec, .25);
-
-    // Normalize the smaller one to 100% and scale the other to match
-    var minMagnitude = Math.min(xSpeed, ySpeed);
-    xSpeed /= minMagnitude;
-    ySpeed /= minMagnitude;
-
-    // Scale each axis by the normalized (?) % speed of each axis
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {(linearStdDevs + .005) * xSpeed, (linearStdDevs + .005) * ySpeed, .001};
+    return new double[] {(linearStdDevs + .005), (linearStdDevs + .005), .001};
   }
 
   private double[] getVisionStdDevs(FiducialPoseEstimatorIO.PoseEstimate poseEstimate) {
     double translationalScoreSum = 0;
     double rotationalScoreSum = 0;
     for (var distanceMeters : poseEstimate.tagDistances()) {
-      translationalScoreSum += .125 * distanceMeters * distanceMeters;
+      translationalScoreSum += .5 * distanceMeters * distanceMeters;
       rotationalScoreSum += .0125 * distanceMeters * distanceMeters;
     }
 
-    var translationalDivisor = Math.pow(poseEstimate.tagDistances().length, 5);
+    var translationalDivisor = Math.pow(poseEstimate.tagDistances().length, 3);
     var rotationalDivisor = Math.pow(poseEstimate.tagDistances().length, 2);
 
     var translationalVelMagnitude =
