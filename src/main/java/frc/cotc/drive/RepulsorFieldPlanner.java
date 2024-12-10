@@ -66,13 +66,20 @@ public class RepulsorFieldPlanner {
   }
 
   static class SnowmanObstacle extends Obstacle {
-    Translation2d loc;
-    final double primaryMaxRange = 1.5;
-    final double secondaryMaxRange = 1;
+    final Translation2d loc;
+    final double primaryMaxRange;
+    final double secondaryMaxRange;
 
-    public SnowmanObstacle(Translation2d loc, double strength, boolean positive) {
+    public SnowmanObstacle(
+        Translation2d loc,
+        double strength,
+        double primaryMaxRange,
+        double secondaryMaxRange,
+        boolean positive) {
       super(strength, positive);
       this.loc = loc;
+      this.primaryMaxRange = primaryMaxRange;
+      this.secondaryMaxRange = secondaryMaxRange;
     }
 
     public Translation2d getForceAtPosition(Translation2d position, Translation2d target) {
@@ -100,36 +107,40 @@ public class RepulsorFieldPlanner {
   }
 
   static class HorizontalObstacle extends Obstacle {
-    double y;
+    final double y;
+    final double maxRange;
 
-    public HorizontalObstacle(double y, double strength, boolean positive) {
+    public HorizontalObstacle(double y, double strength, double maxRange, boolean positive) {
       super(strength, positive);
       this.y = y;
+      this.maxRange = maxRange;
     }
 
     public Translation2d getForceAtPosition(Translation2d position, Translation2d target) {
       var dist = Math.abs(position.getY() - y);
-      if (dist > .5) {
+      if (dist > maxRange) {
         return Translation2d.kZero;
       }
-      return new Translation2d(0, distToForceMag(y - position.getY(), .5));
+      return new Translation2d(0, distToForceMag(y - position.getY(), maxRange));
     }
   }
 
   static class VerticalObstacle extends Obstacle {
-    double x;
+    final double x;
+    final double maxRange;
 
-    public VerticalObstacle(double x, double strength, boolean positive) {
+    public VerticalObstacle(double x, double strength, double maxRange, boolean positive) {
       super(strength, positive);
       this.x = x;
+      this.maxRange = maxRange;
     }
 
     public Translation2d getForceAtPosition(Translation2d position, Translation2d target) {
       var dist = Math.abs(position.getX() - x);
-      if (dist > .5) {
+      if (dist > maxRange) {
         return Translation2d.kZero;
       }
-      return new Translation2d(distToForceMag(x - position.getX(), .5), 0);
+      return new Translation2d(distToForceMag(x - position.getX(), maxRange), 0);
     }
   }
 
@@ -137,20 +148,20 @@ public class RepulsorFieldPlanner {
 
   static final List<Obstacle> FIELD_OBSTACLES =
       List.of(
-          new SnowmanObstacle(new Translation2d(5.56, 2.74), 0.4, true),
-          new SnowmanObstacle(new Translation2d(3.45, 4.07), 0.4, true),
-          new SnowmanObstacle(new Translation2d(5.56, 5.35), 0.4, true),
-          new SnowmanObstacle(new Translation2d(11.0, 2.74), 0.4, true),
-          new SnowmanObstacle(new Translation2d(13.27, 4.07), 0.4, true),
-          new SnowmanObstacle(new Translation2d(11.0, 5.35), 0.4, true));
+          new SnowmanObstacle(new Translation2d(5.56, 2.74), 0.5, 1.5, 1, true),
+          new SnowmanObstacle(new Translation2d(3.45, 4.07), 0.5, 1.5, 1, true),
+          new SnowmanObstacle(new Translation2d(5.56, 5.35), 0.5, 1.5, 1, true),
+          new SnowmanObstacle(new Translation2d(11.0, 2.74), 0.5, 1.5, 1, true),
+          new SnowmanObstacle(new Translation2d(13.27, 4.07), 0.5, 1.5, 1, true),
+          new SnowmanObstacle(new Translation2d(11.0, 5.35), 0.5, 1.5, 1, true));
   static final double FIELD_LENGTH = 16.42;
   static final double FIELD_WIDTH = 8.16;
   static final List<Obstacle> WALLS =
       List.of(
-          new HorizontalObstacle(0.0, 0.5, true),
-          new HorizontalObstacle(FIELD_WIDTH, 0.5, false),
-          new VerticalObstacle(0.0, 0.5, true),
-          new VerticalObstacle(FIELD_LENGTH, 0.5, false));
+          new HorizontalObstacle(0.0, 0.5, .5, true),
+          new HorizontalObstacle(FIELD_WIDTH, 0.5, .5, false),
+          new VerticalObstacle(0.0, 0.5, .5, true),
+          new VerticalObstacle(FIELD_LENGTH, 0.5, .5, false));
 
   private final List<Obstacle> fixedObstacles = new ArrayList<>();
   private Translation2d goal = new Translation2d(1, 1);
