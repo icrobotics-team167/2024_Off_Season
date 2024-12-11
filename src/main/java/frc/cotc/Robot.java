@@ -100,6 +100,7 @@ public class Robot extends LoggedRobot {
             () -> MathUtil.applyDeadband(-primaryLeft.getX(), .01),
             () -> MathUtil.applyDeadband(-primaryRight.getX(), .01)));
     RobotModeTriggers.disabled().or(primaryLeft.button(3)).whileTrue(swerve.stopInX());
+    primaryLeft.button(4).whileTrue(swerve.vectorFieldPathing());
     RobotModeTriggers.teleop().onTrue(swerve.resetGyro());
 
     autos = new Autos(swerve);

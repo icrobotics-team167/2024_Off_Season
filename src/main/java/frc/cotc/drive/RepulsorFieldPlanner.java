@@ -12,6 +12,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import frc.cotc.Robot;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -69,17 +70,20 @@ public class RepulsorFieldPlanner {
     final Translation2d loc;
     final double primaryMaxRange;
     final double secondaryMaxRange;
+    final double secondaryStrengthRatio;
 
     public SnowmanObstacle(
         Translation2d loc,
-        double strength,
+        double primaryStrength,
         double primaryMaxRange,
+        double secondaryStrength,
         double secondaryMaxRange,
         boolean positive) {
-      super(strength, positive);
+      super(primaryStrength, positive);
       this.loc = loc;
       this.primaryMaxRange = primaryMaxRange;
       this.secondaryMaxRange = secondaryMaxRange;
+      secondaryStrengthRatio = primaryStrength / secondaryStrength;
     }
 
     public Translation2d getForceAtPosition(Translation2d position, Translation2d target) {
@@ -92,7 +96,9 @@ public class RepulsorFieldPlanner {
       if (dist > primaryMaxRange && sidewaysDist > secondaryMaxRange) {
         return Translation2d.kZero;
       }
-      var sidewaysMag = distToForceMag(sidewaysCircle.getDistance(position), primaryMaxRange) / 2;
+      var sidewaysMag =
+          distToForceMag(sidewaysCircle.getDistance(position), primaryMaxRange)
+              / secondaryStrengthRatio;
       var outwardsMag = distToForceMag(loc.getDistance(position), secondaryMaxRange);
       var initial = new Translation2d(outwardsMag, position.minus(loc).getAngle());
 
@@ -148,12 +154,12 @@ public class RepulsorFieldPlanner {
 
   static final List<Obstacle> FIELD_OBSTACLES =
       List.of(
-          new SnowmanObstacle(new Translation2d(5.56, 2.74), 0.5, 1.5, 1, true),
-          new SnowmanObstacle(new Translation2d(3.45, 4.07), 0.5, 1.5, 1, true),
-          new SnowmanObstacle(new Translation2d(5.56, 5.35), 0.5, 1.5, 1, true),
-          new SnowmanObstacle(new Translation2d(11.0, 2.74), 0.5, 1.5, 1, true),
-          new SnowmanObstacle(new Translation2d(13.27, 4.07), 0.5, 1.5, 1, true),
-          new SnowmanObstacle(new Translation2d(11.0, 5.35), 0.5, 1.5, 1, true));
+          new SnowmanObstacle(new Translation2d(5.56, 2.74), 0.7, 1.5, .5, 1.5, true),
+          new SnowmanObstacle(new Translation2d(3.45, 4.07), 0.7, 1.5, .5, 1.5, true),
+          new SnowmanObstacle(new Translation2d(5.56, 5.35), 0.7, 1.5, .5, 1.5, true),
+          new SnowmanObstacle(new Translation2d(11.0, 2.74), 0.7, 1.5, .5, 1.5, true),
+          new SnowmanObstacle(new Translation2d(13.27, 4.07), 0.7, 1.5, .5, 1.5, true),
+          new SnowmanObstacle(new Translation2d(11.0, 5.35), 0.7, 1.5, .5, 1.5, true));
   static final double FIELD_LENGTH = 16.42;
   static final double FIELD_WIDTH = 8.16;
   static final List<Obstacle> WALLS =
@@ -250,8 +256,8 @@ public class RepulsorFieldPlanner {
     this.goal = goal;
   }
 
-  public SwerveSample getCmd(Pose2d pose, double maxSpeed) {
-    double stepSize_m = maxSpeed * 0.02; // TODO
+  public SwerveSample sampleRepulsorField(Pose2d pose, double maxSpeed) {
+    double stepSize_m = maxSpeed * Robot.defaultPeriodSecs;
     var curTrans = pose.getTranslation();
     var err = curTrans.minus(goal);
     if (err.getNorm() < stepSize_m * 1.5) {
@@ -263,7 +269,7 @@ public class RepulsorFieldPlanner {
       // Calculate how quickly to move in this direction
       var closeToGoalMax = maxSpeed * Math.min(err.getNorm() / 2, 1);
 
-      stepSize_m = Math.min(maxSpeed, closeToGoalMax) * 0.02;
+      stepSize_m = Math.min(maxSpeed, closeToGoalMax) * Robot.defaultPeriodSecs;
       var step = new Translation2d(stepSize_m, netForce.getAngle());
       var intermediateGoal = curTrans.plus(step);
       return sample(intermediateGoal, pose.getRotation(), step.getX() / 0.02, step.getY() / 0.02);
