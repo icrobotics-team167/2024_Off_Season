@@ -281,13 +281,13 @@ public class Swerve extends SubsystemBase {
     latestPoseEstimate = poseEstimator.getEstimatedPosition();
     Logger.recordOutput("Swerve/Odometry/Final Position", latestPoseEstimate);
 
-    //    Logger.recordOutput(
-    //        "Swerve/Repulsor trajectory",
-    //        repulsorFieldPlanner
-    //            .getTrajectory(
-    //                latestPoseEstimate.getTranslation(),
-    //                maxLinearSpeedMetersPerSec * Robot.defaultPeriodSecs)
-    //            .toArray(new Translation2d[0]));
+    Logger.recordOutput(
+        "Swerve/Repulsor trajectory",
+        repulsorFieldPlanner
+            .getTrajectory(
+                latestPoseEstimate.getTranslation(),
+                maxLinearSpeedMetersPerSec * .5 * Robot.defaultPeriodSecs)
+            .toArray(new Translation2d[0]));
   }
 
   /**
@@ -391,7 +391,7 @@ public class Swerve extends SubsystemBase {
         () ->
             followTrajectory(
                 repulsorFieldPlanner.sampleRepulsorField(
-                    latestPoseEstimate, maxLinearSpeedMetersPerSec)));
+                    latestPoseEstimate, maxLinearSpeedMetersPerSec * .5)));
   }
 
   public Command stopInX() {

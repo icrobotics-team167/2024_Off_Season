@@ -69,6 +69,7 @@ public class RepulsorFieldPlanner {
   static class SnowmanObstacle extends Obstacle {
     final Translation2d loc;
     final double primaryMaxRange;
+    final double secondaryDistance;
     final double secondaryMaxRange;
     final double secondaryStrengthRatio;
 
@@ -76,12 +77,13 @@ public class RepulsorFieldPlanner {
         Translation2d loc,
         double primaryStrength,
         double primaryMaxRange,
+        double secondaryDistance,
         double secondaryStrength,
-        double secondaryMaxRange,
-        boolean positive) {
-      super(primaryStrength, positive);
+        double secondaryMaxRange) {
+      super(primaryStrength, true);
       this.loc = loc;
       this.primaryMaxRange = primaryMaxRange;
+      this.secondaryDistance = secondaryDistance;
       this.secondaryMaxRange = secondaryMaxRange;
       secondaryStrengthRatio = primaryStrength / secondaryStrength;
     }
@@ -89,8 +91,7 @@ public class RepulsorFieldPlanner {
     public Translation2d getForceAtPosition(Translation2d position, Translation2d target) {
       var targetToLoc = loc.minus(target);
       var targetToLocAngle = targetToLoc.getAngle();
-      // 1 meter away from loc, opposite target.
-      var sidewaysCircle = new Translation2d(1, targetToLoc.getAngle()).plus(loc);
+      var sidewaysCircle = new Translation2d(secondaryDistance, targetToLoc.getAngle()).plus(loc);
       var dist = loc.getDistance(position);
       var sidewaysDist = sidewaysCircle.getDistance(position);
       if (dist > primaryMaxRange && sidewaysDist > secondaryMaxRange) {
@@ -109,6 +110,69 @@ public class RepulsorFieldPlanner {
       double sideways = sidewaysMag * Math.signum(Math.sin(sidewaysTheta.getRadians()));
       var sidewaysAngle = targetToLocAngle.rotateBy(Rotation2d.kCCW_90deg);
       return new Translation2d(sideways, sidewaysAngle).plus(initial);
+    }
+  }
+
+  static class TeardropObstacle extends Obstacle {
+    final Translation2d loc;
+    final double primaryMaxRange;
+    final double tailStrength;
+    final double tailDistance;
+
+    public TeardropObstacle(
+        Translation2d loc,
+        double primaryStrength,
+        double primaryMaxRange,
+        double tailStrength,
+        double tailLength) {
+      super(primaryStrength, true);
+      this.loc = loc;
+      this.primaryMaxRange = primaryMaxRange;
+      this.tailStrength = tailStrength;
+      this.tailDistance = tailLength + primaryMaxRange;
+    }
+
+    public Translation2d getForceAtPosition(Translation2d position, Translation2d target) {
+      var targetToLoc = loc.minus(target);
+      var targetToLocAngle = targetToLoc.getAngle();
+      var sidewaysPoint = new Translation2d(tailDistance, targetToLoc.getAngle()).plus(loc);
+
+      var positionToLine = position.minus(loc).rotateBy(targetToLocAngle.unaryMinus());
+      var distanceAlongLine = positionToLine.getX();
+      var distanceToLine = Math.abs(positionToLine.getY());
+
+      var positionToLocation = position.minus(loc);
+      Translation2d outwardsForce;
+      if (positionToLocation.getNorm() <= primaryMaxRange) {
+        outwardsForce =
+            new Translation2d(
+                distToForceMag(positionToLocation.getNorm(), primaryMaxRange),
+                positionToLocation.getAngle());
+      } else {
+        outwardsForce = Translation2d.kZero;
+      }
+
+      Translation2d sidewaysForce;
+      var distanceScalar = distanceAlongLine / tailDistance;
+      if (distanceScalar >= 0 && distanceScalar <= 1) {
+        var secondaryMaxRange = MathUtil.interpolate(primaryMaxRange, 0, Math.sqrt(distanceScalar));
+        if (distanceToLine <= secondaryMaxRange) {
+          var sidewaysMag = tailStrength * (1 - distanceScalar * distanceScalar);
+          // flip the sidewaysMag based on which side of the goal-sideways circle the robot is on
+          var sidewaysTheta =
+              target.minus(position).getAngle().minus(position.minus(sidewaysPoint).getAngle());
+          sidewaysForce =
+              new Translation2d(
+                  sidewaysMag * Math.signum(Math.sin(sidewaysTheta.getRadians())),
+                  targetToLocAngle.rotateBy(Rotation2d.kCCW_90deg));
+        } else {
+          sidewaysForce = Translation2d.kZero;
+        }
+      } else {
+        sidewaysForce = Translation2d.kZero;
+      }
+
+      return outwardsForce.plus(sidewaysForce);
     }
   }
 
@@ -154,12 +218,12 @@ public class RepulsorFieldPlanner {
 
   static final List<Obstacle> FIELD_OBSTACLES =
       List.of(
-          new SnowmanObstacle(new Translation2d(5.56, 2.74), 0.7, 1.5, .5, 1.5, true),
-          new SnowmanObstacle(new Translation2d(3.45, 4.07), 0.7, 1.5, .5, 1.5, true),
-          new SnowmanObstacle(new Translation2d(5.56, 5.35), 0.7, 1.5, .5, 1.5, true),
-          new SnowmanObstacle(new Translation2d(11.0, 2.74), 0.7, 1.5, .5, 1.5, true),
-          new SnowmanObstacle(new Translation2d(13.27, 4.07), 0.7, 1.5, .5, 1.5, true),
-          new SnowmanObstacle(new Translation2d(11.0, 5.35), 0.7, 1.5, .5, 1.5, true));
+          new TeardropObstacle(new Translation2d(5.56, 2.74), .5, 1.5, .75, 1),
+          new TeardropObstacle(new Translation2d(3.45, 4.07), .5, 1.5, .75, 1),
+          new TeardropObstacle(new Translation2d(5.56, 5.35), .5, 1.5, .75, 1),
+          new TeardropObstacle(new Translation2d(11.0, 2.74), .5, 1.5, .75, 1),
+          new TeardropObstacle(new Translation2d(13.27, 4.07), .5, 1.5, .75, 1),
+          new TeardropObstacle(new Translation2d(11.0, 5.35), .5, 1.5, .75, 1));
   static final double FIELD_LENGTH = 16.42;
   static final double FIELD_WIDTH = 8.16;
   static final List<Obstacle> WALLS =
@@ -168,21 +232,17 @@ public class RepulsorFieldPlanner {
           new HorizontalObstacle(FIELD_WIDTH, 0.5, .5, false),
           new VerticalObstacle(0.0, 0.5, .5, true),
           new VerticalObstacle(FIELD_LENGTH, 0.5, .5, false));
+  //      List.of();
 
   private final List<Obstacle> fixedObstacles = new ArrayList<>();
   private Translation2d goal = new Translation2d(1, 1);
 
-  private static final int ARROWS_X = 20;
-  private static final int ARROWS_Y = 10;
-  private static final int ARROWS_SIZE = (ARROWS_X + 1) * (ARROWS_Y + 1);
-  private final ArrayList<Pose2d> arrows = new ArrayList<>(ARROWS_SIZE);
+  private static final int ARROWS_X = 40;
+  private static final int ARROWS_Y = 20;
 
   public RepulsorFieldPlanner() {
     fixedObstacles.addAll(FIELD_OBSTACLES);
     fixedObstacles.addAll(WALLS);
-    for (int i = 0; i < ARROWS_SIZE; i++) {
-      arrows.add(new Pose2d());
-    }
   }
 
   private final Pose2d arrowBackstage = new Pose2d(-10, -10, Rotation2d.kZero);
@@ -195,22 +255,21 @@ public class RepulsorFieldPlanner {
     if (goal.equals(lastGoal)) {
       return arrowList;
     }
+    var list = new ArrayList<Pose2d>();
     for (int x = 0; x <= ARROWS_X; x++) {
       for (int y = 0; y <= ARROWS_Y; y++) {
         var translation =
             new Translation2d(x * FIELD_LENGTH / ARROWS_X, y * FIELD_WIDTH / ARROWS_Y);
-        var force = getObstacleForce(translation, goal).plus(getGoalForce(translation, goal));
-        if (force.getNorm() < 1e-6) {
-          arrows.set(x * (ARROWS_Y + 1) + y, arrowBackstage);
-        } else {
+        var force = getForce(translation, goal);
+        if (force.getNorm() > 1e-6) {
           var rotation = force.getAngle();
 
-          arrows.set(x * (ARROWS_Y + 1) + y, new Pose2d(translation, rotation));
+          list.add(new Pose2d(translation, rotation));
         }
       }
     }
     lastGoal = goal;
-    arrowList = arrows.toArray(new Pose2d[0]);
+    arrowList = list.toArray(new Pose2d[0]);
     return arrowList;
   }
 
@@ -263,9 +322,7 @@ public class RepulsorFieldPlanner {
     if (err.getNorm() < stepSize_m * 1.5) {
       return sample(goal, pose.getRotation(), 0, 0);
     } else {
-      var obstacleForce = getObstacleForce(curTrans, goal);
-
-      var netForce = getGoalForce(curTrans, goal).plus(obstacleForce);
+      var netForce = getForce(curTrans, goal);
       // Calculate how quickly to move in this direction
       var closeToGoalMax = maxSpeed * Math.min(err.getNorm() / 2, 1);
 
