@@ -286,7 +286,7 @@ public class Swerve extends SubsystemBase {
         repulsorFieldPlanner
             .getTrajectory(
                 latestPoseEstimate.getTranslation(),
-                maxLinearSpeedMetersPerSec * .5 * Robot.defaultPeriodSecs)
+                maxLinearSpeedMetersPerSec * Robot.defaultPeriodSecs)
             .toArray(new Translation2d[0]));
   }
 
@@ -391,7 +391,7 @@ public class Swerve extends SubsystemBase {
         () ->
             followTrajectory(
                 repulsorFieldPlanner.sampleRepulsorField(
-                    latestPoseEstimate, maxLinearSpeedMetersPerSec * .5)));
+                    latestPoseEstimate, maxLinearSpeedMetersPerSec)));
   }
 
   public Command stopInX() {
