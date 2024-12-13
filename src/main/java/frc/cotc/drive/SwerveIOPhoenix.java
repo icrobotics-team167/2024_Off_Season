@@ -66,7 +66,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC =
         Units.rotationsPerMinuteToRadiansPerSecond(6000) / STEER_GEAR_RATIO;
 
-    CONSTANTS.MASS_KG = Units.lbsToKilograms(125);
+    CONSTANTS.MASS_KG = Units.lbsToKilograms(90);
     CONSTANTS.MOI_KG_METERS_SQUARED =
         CONSTANTS.MASS_KG
             * Math.hypot(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2)

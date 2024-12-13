@@ -116,6 +116,7 @@ public class RepulsorFieldPlanner {
   static class TeardropObstacle extends Obstacle {
     final Translation2d loc;
     final double primaryMaxRange;
+    final double primaryRadius;
     final double tailStrength;
     final double tailDistance;
 
@@ -123,11 +124,13 @@ public class RepulsorFieldPlanner {
         Translation2d loc,
         double primaryStrength,
         double primaryMaxRange,
+        double primaryRadius,
         double tailStrength,
         double tailLength) {
       super(primaryStrength, true);
       this.loc = loc;
       this.primaryMaxRange = primaryMaxRange;
+      this.primaryRadius = primaryRadius;
       this.tailStrength = tailStrength;
       this.tailDistance = tailLength + primaryMaxRange;
     }
@@ -137,25 +140,29 @@ public class RepulsorFieldPlanner {
       var targetToLocAngle = targetToLoc.getAngle();
       var sidewaysPoint = new Translation2d(tailDistance, targetToLoc.getAngle()).plus(loc);
 
-      var positionToLine = position.minus(loc).rotateBy(targetToLocAngle.unaryMinus());
-      var distanceAlongLine = positionToLine.getX();
-      var distanceToLine = Math.abs(positionToLine.getY());
-
       var positionToLocation = position.minus(loc);
+      var positionToLocationDistance = positionToLocation.getNorm();
       Translation2d outwardsForce;
-      if (positionToLocation.getNorm() <= primaryMaxRange) {
+      if (positionToLocationDistance <= primaryMaxRange) {
         outwardsForce =
             new Translation2d(
-                distToForceMag(positionToLocation.getNorm(), primaryMaxRange),
+                distToForceMag(
+                    Math.max(positionToLocationDistance - primaryRadius, 0),
+                    primaryMaxRange - primaryRadius),
                 positionToLocation.getAngle());
       } else {
         outwardsForce = Translation2d.kZero;
       }
 
+      var positionToLine = position.minus(loc).rotateBy(targetToLocAngle.unaryMinus());
+      var distanceAlongLine = positionToLine.getX();
+
       Translation2d sidewaysForce;
       var distanceScalar = distanceAlongLine / tailDistance;
       if (distanceScalar >= 0 && distanceScalar <= 1) {
-        var secondaryMaxRange = MathUtil.interpolate(primaryMaxRange, 0, Math.sqrt(distanceScalar));
+        var secondaryMaxRange =
+            MathUtil.interpolate(primaryMaxRange, 0, distanceScalar * distanceScalar);
+        var distanceToLine = Math.abs(positionToLine.getY());
         if (distanceToLine <= secondaryMaxRange) {
           var sidewaysMag =
               tailStrength
@@ -217,16 +224,14 @@ public class RepulsorFieldPlanner {
     }
   }
 
-  public static final double GOAL_STRENGTH = 1;
-
   static final List<Obstacle> FIELD_OBSTACLES =
       List.of(
-          new TeardropObstacle(new Translation2d(5.56, 2.74), 1, 1.5, 2.5, 2),
-          new TeardropObstacle(new Translation2d(3.45, 4.07), 1, 1.5, 2.5, 2),
-          new TeardropObstacle(new Translation2d(5.56, 5.35), 1, 1.5, 2.5, 2),
-          new TeardropObstacle(new Translation2d(11.0, 2.74), 1, 1.5, 2.5, 2),
-          new TeardropObstacle(new Translation2d(13.27, 4.07), 1, 1.5, 2.5, 2),
-          new TeardropObstacle(new Translation2d(11.0, 5.35), 1, 1.5, 2.5, 2));
+          new TeardropObstacle(new Translation2d(5.56, 2.74), .8, 1.5, .25, .8, 2),
+          new TeardropObstacle(new Translation2d(3.45, 4.07), .8, 1.5, .25, .8, 2),
+          new TeardropObstacle(new Translation2d(5.56, 5.35), .8, 1.5, .25, .8, 2),
+          new TeardropObstacle(new Translation2d(11.0, 2.74), .8, 1.5, .25, .8, 2),
+          new TeardropObstacle(new Translation2d(13.27, 4.07), .8, 1.5, .25, .8, 2),
+          new TeardropObstacle(new Translation2d(11.0, 5.35), .8, 1.5, .25, .8, 2));
   static final double FIELD_LENGTH = 16.42;
   static final double FIELD_WIDTH = 8.16;
   static final List<Obstacle> WALLS =
@@ -240,8 +245,8 @@ public class RepulsorFieldPlanner {
   private final List<Obstacle> fixedObstacles = new ArrayList<>();
   private Translation2d goal = new Translation2d(1, 1);
 
-  private static final int ARROWS_X = 60;
-  private static final int ARROWS_Y = 30;
+  private static final int ARROWS_X = 40;
+  private static final int ARROWS_Y = 20;
 
   public RepulsorFieldPlanner() {
     fixedObstacles.addAll(FIELD_OBSTACLES);
@@ -263,7 +268,7 @@ public class RepulsorFieldPlanner {
       for (int y = 0; y <= ARROWS_Y; y++) {
         var translation =
             new Translation2d(x * FIELD_LENGTH / ARROWS_X, y * FIELD_WIDTH / ARROWS_Y);
-        var force = getObstacleForce(translation, goal);
+        var force = getForce(translation, goal);
         if (force.getNorm() > 1e-6) {
           var rotation = force.getAngle();
 
@@ -282,7 +287,7 @@ public class RepulsorFieldPlanner {
       return new Translation2d();
     }
     var direction = displacement.getAngle();
-    var mag = GOAL_STRENGTH * (1 + 1.0 / (0.0001 + displacement.getNorm()));
+    var mag = (1 + 1.0 / (1e-6 + displacement.getNorm()));
     return new Translation2d(mag, direction);
   }
 
