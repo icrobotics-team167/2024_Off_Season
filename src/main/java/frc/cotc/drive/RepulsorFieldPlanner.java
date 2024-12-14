@@ -12,6 +12,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import frc.cotc.Constants;
 import frc.cotc.Robot;
 import java.util.ArrayList;
 import java.util.List;
@@ -232,14 +233,12 @@ public class RepulsorFieldPlanner {
           new TeardropObstacle(new Translation2d(11.0, 2.74), .8, 1.5, .25, .8, 2),
           new TeardropObstacle(new Translation2d(13.27, 4.07), .8, 1.5, .25, .8, 2),
           new TeardropObstacle(new Translation2d(11.0, 5.35), .8, 1.5, .25, .8, 2));
-  static final double FIELD_LENGTH = 16.42;
-  static final double FIELD_WIDTH = 8.16;
   static final List<Obstacle> WALLS =
       List.of(
           new HorizontalObstacle(0.0, 0.5, .5, true),
-          new HorizontalObstacle(FIELD_WIDTH, 0.5, .5, false),
+          new HorizontalObstacle(Constants.FIELD_WIDTH, 0.5, .5, false),
           new VerticalObstacle(0.0, 0.5, .5, true),
-          new VerticalObstacle(FIELD_LENGTH, 0.5, .5, false));
+          new VerticalObstacle(Constants.FIELD_LENGTH, 0.5, .5, false));
   //      List.of();
 
   private final List<Obstacle> fixedObstacles = new ArrayList<>();
@@ -267,7 +266,8 @@ public class RepulsorFieldPlanner {
     for (int x = 0; x <= ARROWS_X; x++) {
       for (int y = 0; y <= ARROWS_Y; y++) {
         var translation =
-            new Translation2d(x * FIELD_LENGTH / ARROWS_X, y * FIELD_WIDTH / ARROWS_Y);
+            new Translation2d(
+                x * Constants.FIELD_LENGTH / ARROWS_X, y * Constants.FIELD_WIDTH / ARROWS_Y);
         var force = getForce(translation, goal);
         if (force.getNorm() > 1e-6) {
           var rotation = force.getAngle();
