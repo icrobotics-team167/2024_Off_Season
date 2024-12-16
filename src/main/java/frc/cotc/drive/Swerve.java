@@ -284,8 +284,6 @@ public class Swerve extends SubsystemBase {
    * raise the estimated standard deviation of the drivebase odometry to trust the wheel encoders
    * less.
    *
-   * <p>Algorithm from <a href="https://youtu.be/N6ogT5DjGOk">1690 Orbit's 2nd software session</a>
-   *
    * @return An array of length 3, containing the estimated standard deviations in each axis (x, y,
    *     yaw)
    */
@@ -312,11 +310,13 @@ public class Swerve extends SubsystemBase {
       ySquaredSum += yDelta * yDelta;
     }
 
+    var stdDevs =
+        new Translation2d(Math.sqrt(xSquaredSum) / 4, Math.sqrt(ySquaredSum) / 4)
+            .rotateBy(swerveInputs.gyroYaw.unaryMinus());
+
     // Sqrt of avg of squared deltas = standard deviation
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {
-      (Math.sqrt(xSquaredSum / 4) + .005), (Math.sqrt(ySquaredSum / 4) + .005), .001
-    };
+    return new double[] {stdDevs.getX() + .005, stdDevs.getY() + .005, .001};
   }
 
   private double[] getVisionStdDevs(
