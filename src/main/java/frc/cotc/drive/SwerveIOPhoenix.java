@@ -53,8 +53,8 @@ public class SwerveIOPhoenix implements SwerveIO {
   static {
     CONSTANTS = new SwerveModuleConstantsAutoLogged();
 
-    CONSTANTS.TRACK_WIDTH_METERS = Units.inchesToMeters(22.75);
-    CONSTANTS.TRACK_LENGTH_METERS = Units.inchesToMeters(22.75);
+    CONSTANTS.TRACK_WIDTH_METERS = Units.inchesToMeters(30.5);
+    CONSTANTS.TRACK_LENGTH_METERS = Units.inchesToMeters(27.5);
     CONSTANTS.WHEEL_DIAMETER_METERS = Units.inchesToMeters(4);
     WHEEL_CIRCUMFERENCE_METERS = CONSTANTS.WHEEL_DIAMETER_METERS * PI;
     CONSTANTS.WHEEL_COF = 1.5;
@@ -66,7 +66,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC =
         Units.rotationsPerMinuteToRadiansPerSecond(6000) / STEER_GEAR_RATIO;
 
-    CONSTANTS.MASS_KG = Units.lbsToKilograms(125);
+    CONSTANTS.MASS_KG = Units.lbsToKilograms(40);
     CONSTANTS.MOI_KG_METERS_SQUARED =
         CONSTANTS.MASS_KG
             * Math.hypot(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2)
@@ -111,7 +111,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       System.arraycopy(signals, i * 8 + 3, lowFreqSignals, i * 5, 5);
     }
-    gyro = new Pigeon2(13, Robot.CANIVORE_NAME);
+    gyro = new Pigeon2(4 * 3 + 3, Robot.CANIVORE_NAME);
     devices[12] = gyro;
     signals[32] = gyro.getYaw(false);
     signals[33] = gyro.getAngularVelocityZWorld(false);
@@ -286,7 +286,7 @@ public class SwerveIOPhoenix implements SwerveIO {
           case 3 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
         }
 
-        driveKpMultiplier = 0;
+        driveKpMultiplier = 1;
       } else {
         driveKpMultiplier = 80;
 
