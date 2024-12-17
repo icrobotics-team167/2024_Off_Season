@@ -120,7 +120,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     BaseStatusSignal.setUpdateFrequencyForAll(50, lowFreqSignals);
 
-    ParentDevice.optimizeBusUtilizationForAll(4, devices);
+    ParentDevice.optimizeBusUtilizationForAll(5, devices);
 
     if (Robot.isSimulation()) {
       simThread = new SimThread(modules, gyro);
@@ -184,17 +184,14 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
-  public void drive(SwerveSetpoint setpoint, double[] forceFeedforward) {
+  public void drive(SwerveSetpoint setpoint) {
     for (int i = 0; i < 4; i++) {
-      var currentState = getCurrentState(i);
-      if (DriverStation.isDisabled()) {
-        currentState.speedMetersPerSecond = 0;
-      }
       modules[i].run(
           setpoint.moduleStates()[i],
-          currentState,
-          setpoint.steerFeedforwards()[i],
-          forceFeedforward[i]);
+          BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[i * 8], signals[i * 8 + 3])
+              * WHEEL_CIRCUMFERENCE_METERS,
+          Units.radiansToRotations(setpoint.steerFeedforwardsRadPerSec()[i]),
+          setpoint.driveFeedforwardsAmps()[i]);
     }
   }
 
@@ -311,25 +308,23 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     void run(
         SwerveModuleState desiredState,
-        SwerveModuleState currentState,
-        double steerFeedforward,
-        double forceFeedforward) {
+        double currentVel,
+        double steerFeedforwardRotPerSec,
+        double forceFeedforwardAmps) {
       if (MathUtil.isNear(0, desiredState.speedMetersPerSecond, 1e-3)
-          && MathUtil.isNear(0, forceFeedforward, 1e-3)
-          && MathUtil.isNear(0, currentState.speedMetersPerSecond, 1e-3)) {
+          && MathUtil.isNear(0, forceFeedforwardAmps, 1e-3)
+          && MathUtil.isNear(0, currentVel, 1e-3)) {
         driveMotor.setControl(brakeControlRequest);
       } else {
         driveMotor.setControl(
             driveControlRequest
                 .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE_METERS)
-                .withFeedForward(
-                    ((forceFeedforward * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)))
-                        / CONSTANTS.DRIVE_MOTOR.KtNMPerAmp));
+                .withFeedForward(forceFeedforwardAmps));
       }
       steerMotor.setControl(
           steerControlRequest
               .withPosition(desiredState.angle.getRotations())
-              .withVelocity(Units.radiansToRotations(steerFeedforward)));
+              .withVelocity(steerFeedforwardRotPerSec));
     }
 
     private final VoltageOut steerCharacterization = new VoltageOut(0).withEnableFOC(false);

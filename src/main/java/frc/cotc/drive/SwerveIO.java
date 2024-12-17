@@ -194,9 +194,8 @@ public interface SwerveIO {
    * Drives the drivebase.
    *
    * @param setpoint The drive setpoint.
-   * @param forceFeedforward The feedforward for the drive motor. Newtons.
    */
-  default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint, double[] forceFeedforward) {}
+  default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint) {}
 
   default void resetGyro(Rotation2d newYaw) {}
 

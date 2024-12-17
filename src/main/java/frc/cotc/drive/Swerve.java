@@ -64,8 +64,12 @@ public class Swerve extends SubsystemBase {
 
   private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
     static final CameraTunings defaults =
-        new CameraTunings(new StdDevTunings(.5, 3, 4), new StdDevTunings(.0125, 2, 2));
+        new CameraTunings(new StdDevTunings(.4, 3, 2), new StdDevTunings(.0125, 2, 1.5));
   }
+
+  private final double wheelRadiusMeters;
+  private final double kTNewtonMetersPerAmp;
+  private final double currentVisualizationScalar;
 
   private final CameraTunings[] cameraTunings = new CameraTunings[0];
 
@@ -131,9 +135,16 @@ public class Swerve extends SubsystemBase {
                       Math.atan2(
                           -CONSTANTS.TRACK_WIDTH_METERS / 2, -CONSTANTS.TRACK_LENGTH_METERS / 2)))
             },
+            EMPTY_FEEDFORWARDS,
             EMPTY_FEEDFORWARDS);
     lastSetpoint =
-        new SwerveSetpoint(new ChassisSpeeds(), swerveInputs.moduleStates, EMPTY_FEEDFORWARDS);
+        new SwerveSetpoint(
+            new ChassisSpeeds(), swerveInputs.moduleStates, EMPTY_FEEDFORWARDS, EMPTY_FEEDFORWARDS);
+
+    wheelRadiusMeters = CONSTANTS.WHEEL_DIAMETER_METERS / 2;
+    kTNewtonMetersPerAmp = CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
+    currentVisualizationScalar =
+        maxLinearSpeedMetersPerSec / CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
 
     poseEstimator =
         new SwervePoseEstimator(
@@ -153,7 +164,7 @@ public class Swerve extends SubsystemBase {
     yawController.enableContinuousInput(-PI, PI);
   }
 
-  private final SwerveModuleState[] lastModuleForces =
+  private final SwerveModuleState[] lastDriveFeedforwards =
       new SwerveModuleState[] {
         new SwerveModuleState(),
         new SwerveModuleState(),
@@ -163,7 +174,6 @@ public class Swerve extends SubsystemBase {
 
   private ChassisSpeeds robotRelativeSpeeds = new ChassisSpeeds();
   private ChassisSpeeds fieldRelativeSpeeds = new ChassisSpeeds();
-  private Pose2d latestPoseEstimate = new Pose2d();
 
   private final Alert invalidOdometryWarning =
       new Alert("Swerve: Invalid odometry data!", Alert.AlertType.kWarning);
@@ -180,9 +190,20 @@ public class Swerve extends SubsystemBase {
 
   @Override
   public void periodic() {
-    Logger.recordOutput("Swerve/Commanded speeds", lastSetpoint.chassisSpeeds());
-    Logger.recordOutput("Swerve/Drive setpoint", lastSetpoint.moduleStates());
-    Logger.recordOutput("Swerve/Force feedforwards", lastModuleForces);
+    Logger.recordOutput(
+        "Swerve/Setpoint Generator/Setpoint/Desired Speeds", lastSetpoint.chassisSpeeds());
+    Logger.recordOutput(
+        "Swerve/Setpoint Generator/Setpoint/Module Setpoints", lastSetpoint.moduleStates());
+    Logger.recordOutput(
+        "Swerve/Setpoint Generator/Setpoint/Steer Feedforwards",
+        lastSetpoint.steerFeedforwardsRadPerSec());
+    for (int i = 0; i < 4; i++) {
+      lastDriveFeedforwards[i].angle = lastSetpoint.moduleStates()[i].angle;
+      lastDriveFeedforwards[i].speedMetersPerSecond =
+          lastSetpoint.driveFeedforwardsAmps()[i] * currentVisualizationScalar;
+    }
+    Logger.recordOutput(
+        "Swerve/Setpoint Generator/Setpoint/Drive feedforwards", lastDriveFeedforwards);
 
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
@@ -274,8 +295,7 @@ public class Swerve extends SubsystemBase {
       tagPoses.clear();
     }
 
-    latestPoseEstimate = poseEstimator.getEstimatedPosition();
-    Logger.recordOutput("Swerve/Odometry/Final Position", latestPoseEstimate);
+    Logger.recordOutput("Swerve/Odometry/Final Position", poseEstimator.getEstimatedPosition());
   }
 
   /**
@@ -312,11 +332,11 @@ public class Swerve extends SubsystemBase {
 
     var stdDevs =
         new Translation2d(Math.sqrt(xSquaredSum) / 4, Math.sqrt(ySquaredSum) / 4)
-            .rotateBy(swerveInputs.gyroYaw.unaryMinus());
+            .rotateBy(swerveInputs.gyroYaw);
 
     // Sqrt of avg of squared deltas = standard deviation
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {stdDevs.getX() + .005, stdDevs.getY() + .005, .001};
+    return new double[] {Math.abs(stdDevs.getX()) + .005, Math.abs(stdDevs.getY()) + .005, .001};
   }
 
   private double[] getVisionStdDevs(
@@ -353,10 +373,6 @@ public class Swerve extends SubsystemBase {
   }
 
   private final ChassisSpeeds teleopDriveSpeeds = new ChassisSpeeds();
-  private final Translation2d[] EMPTY_FORCES =
-      new Translation2d[] {
-        Translation2d.kZero, Translation2d.kZero, Translation2d.kZero, Translation2d.kZero
-      };
 
   public Command teleopDrive(
       DoubleSupplier xSupplier, DoubleSupplier ySupplier, DoubleSupplier omegaSupplier) {
@@ -370,13 +386,13 @@ public class Swerve extends SubsystemBase {
               omegaSupplier.getAsDouble() * maxAngularSpeedRadPerSec;
 
           teleopDriveSpeeds.toRobotRelativeSpeeds(swerveInputs.gyroYaw);
-          drive(teleopDriveSpeeds, lastSetpoint, EMPTY_FORCES);
+          teleopDrive();
         });
   }
 
   public Command stopInX() {
     return run(() -> {
-          swerveIO.drive(stopInXSetpoint, EMPTY_FEEDFORWARDS);
+          swerveIO.drive(stopInXSetpoint);
           lastSetpoint = stopInXSetpoint;
         })
         .ignoringDisable(true);
@@ -385,28 +401,24 @@ public class Swerve extends SubsystemBase {
   public Command resetGyro() {
     return runOnce(
         () -> {
-          swerveIO.resetGyro(latestPoseEstimate.getRotation());
+          swerveIO.resetGyro(poseEstimator.getEstimatedPosition().getRotation());
           poseEstimator.resetPosition(
-              latestPoseEstimate.getRotation(), getLatestModulePositions(), latestPoseEstimate);
+              poseEstimator.getEstimatedPosition().getRotation(),
+              getLatestModulePositions(),
+              poseEstimator.getEstimatedPosition());
         });
   }
 
-  private void autoDrive(ChassisSpeeds speeds, Translation2d[] forceFeedforwards) {
-    // teleopDrive uses the current drive state for more responsiveness, autoDrive uses the
-    // previous generated setpoint for more consistency
-    drive(speeds, lastSetpoint, forceFeedforwards);
-  }
-
-  private void drive(
-      ChassisSpeeds speeds, SwerveSetpoint lastSetpoint, Translation2d[] forceVectors) {
-    var translationalMagnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+  private void teleopDrive() {
+    var translationalMagnitude =
+        Math.hypot(teleopDriveSpeeds.vxMetersPerSecond, teleopDriveSpeeds.vyMetersPerSecond);
     if (translationalMagnitude > maxLinearSpeedMetersPerSec) {
-      speeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
-      speeds.vyMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
+      teleopDriveSpeeds.vxMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
+      teleopDriveSpeeds.vyMetersPerSecond *= maxLinearSpeedMetersPerSec / translationalMagnitude;
 
       translationalMagnitude = maxLinearSpeedMetersPerSec;
     }
-    speeds.omegaRadiansPerSecond *=
+    teleopDriveSpeeds.omegaRadiansPerSecond *=
         MathUtil.interpolate(
             1,
             angularSpeedFudgeFactor,
@@ -414,23 +426,30 @@ public class Swerve extends SubsystemBase {
 
     var setpoint =
         setpointGenerator.generateSetpoint(
+            lastSetpoint, teleopDriveSpeeds, RobotController.getBatteryVoltage());
+    swerveIO.drive(setpoint);
+    lastSetpoint = setpoint;
+  }
+
+  private void autoDrive(ChassisSpeeds speeds, Translation2d[] forceVectors) {
+    var setpoint =
+        setpointGenerator.generateSetpoint(
             lastSetpoint, speeds, RobotController.getBatteryVoltage());
 
-    double[] forceFeedforwards = new double[4];
     for (int i = 0; i < 4; i++) {
-      if (MathUtil.isNear(0, forceVectors[i].getNorm(), 1e-6)) {
-        forceFeedforwards[i] = 0;
-        continue;
+      if (forceVectors[i].getNorm() < 1e-6) {
+        setpoint.driveFeedforwardsAmps()[i] = 0;
+      } else {
+        setpoint.driveFeedforwardsAmps()[i] =
+            forceVectors[i].getNorm()
+                * forceVectors[i].getAngle().minus(setpoint.moduleStates()[i].angle).getCos()
+                * wheelRadiusMeters
+                / kTNewtonMetersPerAmp;
       }
-      var scalar = forceVectors[i].getAngle().minus(setpoint.moduleStates()[i].angle).getCos();
-      forceFeedforwards[i] = forceVectors[i].getNorm() * scalar;
-      lastModuleForces[i] =
-          new SwerveModuleState(
-              forceVectors[i].getNorm() * Math.abs(scalar) / 20, forceVectors[i].getAngle());
     }
 
-    swerveIO.drive(setpoint, forceFeedforwards);
-    this.lastSetpoint = setpoint;
+    swerveIO.drive(setpoint);
+    lastSetpoint = setpoint;
   }
 
   public void followTrajectory(SwerveSample sample) {
@@ -439,13 +458,13 @@ public class Swerve extends SubsystemBase {
     var targetPose = new Pose2d(sample.x, sample.y, new Rotation2d(sample.heading));
     var feedback =
         new ChassisSpeeds(
-            xController.calculate(latestPoseEstimate.getX(), targetPose.getX()),
-            yController.calculate(latestPoseEstimate.getY(), targetPose.getY()),
+            xController.calculate(poseEstimator.getEstimatedPosition().getX(), targetPose.getX()),
+            yController.calculate(poseEstimator.getEstimatedPosition().getY(), targetPose.getY()),
             yawController.calculate(
-                latestPoseEstimate.getRotation().getRadians(),
+                poseEstimator.getEstimatedPosition().getRotation().getRadians(),
                 targetPose.getRotation().getRadians()));
 
-    Logger.recordOutput("Choreo/Error", targetPose.minus(latestPoseEstimate));
+    Logger.recordOutput("Choreo/Error", targetPose.minus(poseEstimator.getEstimatedPosition()));
 
     var forceVectors = new Translation2d[4];
     for (int i = 0; i < 4; i++) {
@@ -503,7 +522,7 @@ public class Swerve extends SubsystemBase {
   }
 
   public Pose2d getPose() {
-    return latestPoseEstimate;
+    return poseEstimator.getEstimatedPosition();
   }
 
   public void resetForAuto(Pose2d pose) {
