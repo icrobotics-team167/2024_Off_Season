@@ -223,9 +223,17 @@ public class SwerveSetpointGenerator {
    */
   public SwerveSetpoint generateSetpoint(
       final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double voltage, double dt) {
+    double maxSpeed = maxDriveVelocity * Math.min(1, voltage / 12);
+
     SwerveModuleState[] desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
     // Make sure desiredState respects velocity limits.
-    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxDriveVelocity);
+    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
+    desiredState = kinematics.toChassisSpeeds(desiredModuleState);
+    // Discretize
+    desiredState.discretize(dt);
+    desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
+    // Desaturate
+    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
     desiredState = kinematics.toChassisSpeeds(desiredModuleState);
 
     // Special case: desiredState is a complete stop. In this case, module angle is arbitrary, so
@@ -491,8 +499,17 @@ public class SwerveSetpointGenerator {
             prevSetpoint.chassisSpeeds.vxMetersPerSecond + min_s * dx,
             prevSetpoint.chassisSpeeds.vyMetersPerSecond + min_s * dy,
             prevSetpoint.chassisSpeeds.omegaRadiansPerSecond + min_s * dtheta);
-    retSpeeds.discretize(dt);
     var retStates = kinematics.toSwerveModuleStates(retSpeeds);
+    // Desaturate
+    SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxSpeed);
+    retSpeeds = kinematics.toChassisSpeeds(retStates);
+    // Discretize
+    retSpeeds.discretize(dt);
+    retStates = kinematics.toSwerveModuleStates(retSpeeds);
+    // Desaturate
+    SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxSpeed);
+    retSpeeds = kinematics.toChassisSpeeds(retStates);
+
     var steerFeedforwards = new double[4];
     for (int i = 0; i < 4; ++i) {
       final var maybeOverride = overrideSteering.get(i);
@@ -518,6 +535,6 @@ public class SwerveSetpointGenerator {
     }
     SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxDriveVelocity);
 
-    return new SwerveSetpoint(kinematics.toChassisSpeeds(retStates), retStates, steerFeedforwards);
+    return new SwerveSetpoint(retSpeeds, retStates, steerFeedforwards);
   }
 }
