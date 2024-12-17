@@ -45,7 +45,6 @@ public class Swerve extends SubsystemBase {
 
   private final SwerveSetpointGenerator setpointGenerator;
   private final SwerveSetpoint stopInXSetpoint;
-  private final double[] EMPTY_FEEDFORWARDS = new double[4];
   private SwerveSetpoint lastSetpoint;
 
   private final double maxLinearSpeedMetersPerSec;
@@ -135,11 +134,11 @@ public class Swerve extends SubsystemBase {
                       Math.atan2(
                           -CONSTANTS.TRACK_WIDTH_METERS / 2, -CONSTANTS.TRACK_LENGTH_METERS / 2)))
             },
-            EMPTY_FEEDFORWARDS,
-            EMPTY_FEEDFORWARDS);
+            new double[4],
+            new double[4]);
     lastSetpoint =
         new SwerveSetpoint(
-            new ChassisSpeeds(), swerveInputs.moduleStates, EMPTY_FEEDFORWARDS, EMPTY_FEEDFORWARDS);
+            new ChassisSpeeds(), swerveInputs.moduleStates, new double[4], new double[4]);
 
     wheelRadiusMeters = CONSTANTS.WHEEL_DIAMETER_METERS / 2;
     kTNewtonMetersPerAmp = CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
