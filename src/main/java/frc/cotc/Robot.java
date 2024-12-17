@@ -164,8 +164,6 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void robotPeriodic() {
-    // Updates Choreo's auto selector.
-    autos.update();
     // Runs the Scheduler. This is responsible for polling buttons, adding newly-scheduled commands,
     // running already-scheduled commands, removing finished or interrupted commands, and running
     // subsystem periodic() methods. This must be called from the robot's periodic block in order
@@ -174,6 +172,12 @@ public class Robot extends LoggedRobot {
     Logger.recordOutput(
         "LoggedRobot/MemoryUsageMb",
         (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1e6);
+  }
+
+  @Override
+  public void disabledPeriodic() {
+    // Updates Choreo's auto selector.
+    autos.update();
   }
 
   public static volatile double simVoltage = 12;

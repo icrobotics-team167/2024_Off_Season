@@ -115,7 +115,7 @@ public class Autos {
           Alert.AlertType.kWarning);
 
   public void update() {
-    if (DriverStation.isDisabled() && DriverStation.getAlliance().isPresent()) {
+    if (DriverStation.getAlliance().isPresent()) {
       String selectStr = selector.get();
       if (selectStr.equals(lastAutoRoutineName)) return;
       if (!autoRoutines.containsKey(selectStr)) {
