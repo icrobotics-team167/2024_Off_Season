@@ -240,7 +240,7 @@ public class SwerveSetpointGenerator {
     SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
     desiredState = kinematics.toChassisSpeeds(desiredModuleState);
     // Discretize
-    desiredState.discretize(dt);
+    desiredState = ChassisSpeeds.discretize(desiredState, dt);
     desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
     // Desaturate
     SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
@@ -530,7 +530,7 @@ public class SwerveSetpointGenerator {
     SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxSpeed);
     retSpeeds = kinematics.toChassisSpeeds(retStates);
     // Discretize
-    retSpeeds.discretize(dt);
+    retSpeeds = ChassisSpeeds.discretize(retSpeeds, dt);
     retStates = kinematics.toSwerveModuleStates(retSpeeds);
     // Desaturate
     SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxSpeed);
