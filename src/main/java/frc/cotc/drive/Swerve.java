@@ -25,7 +25,6 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.Alert;
-import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
@@ -412,17 +411,13 @@ public class Swerve extends SubsystemBase {
             angularSpeedFudgeFactor,
             MathUtil.inverseInterpolate(0, maxLinearSpeedMetersPerSec, translationalMagnitude));
 
-    var setpoint =
-        setpointGenerator.generateSetpoint(
-            lastSetpoint, robotRelativeSpeeds, RobotController.getBatteryVoltage());
+    var setpoint = setpointGenerator.generateSetpoint(lastSetpoint, robotRelativeSpeeds);
     swerveIO.drive(setpoint);
     lastSetpoint = setpoint;
   }
 
   private void autoDrive(ChassisSpeeds speeds, Translation2d[] forceVectors) {
-    var setpoint =
-        setpointGenerator.generateSetpoint(
-            lastSetpoint, speeds, RobotController.getBatteryVoltage());
+    var setpoint = setpointGenerator.generateSetpoint(lastSetpoint, speeds);
 
     for (int i = 0; i < 4; i++) {
       if (forceVectors[i].getNorm() < 1e-6) {

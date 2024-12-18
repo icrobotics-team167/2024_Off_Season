@@ -14,6 +14,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.RobotController;
 import frc.cotc.Robot;
 import java.util.ArrayList;
 import java.util.List;
@@ -202,6 +203,11 @@ public class SwerveSetpointGenerator {
     double offset = f_0 + Math.signum(diff) * max_vel_step;
     Function2d func = (x, y) -> Math.hypot(x, y) - offset;
     return findRoot(func, x_0, y_0, f_0 - offset, x_1, y_1, f_1 - offset, 10);
+  }
+
+  public SwerveSetpoint generateSetpoint(
+      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState) {
+    return generateSetpoint(prevSetpoint, desiredState, RobotController.getBatteryVoltage());
   }
 
   public SwerveSetpoint generateSetpoint(
