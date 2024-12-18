@@ -617,6 +617,20 @@ public class SwerveIOPhoenix implements SwerveIO {
             driveWheelSim.getPos() * CONSTANTS.WHEEL_DIAMETER_METERS / 2,
             new Rotation2d(steerSim.getAngularPositionRad()));
       }
+
+      private double getSidewaysResistance(
+          Rotation2d applyingModuleAngle, Rotation2d receivingModuleAngle, double frictionForce) {
+        return frictionForce
+            * Math.abs(
+                // Subtract receiving module's angle from 0 degrees to normalize the module's angle
+                // to 0
+                Rotation2d.kZero
+                    .minus(
+                        // Subtract applying module's angle to normalize the applied force to 0
+                        // degrees
+                        receivingModuleAngle.minus(applyingModuleAngle))
+                    .getSin());
+      }
     }
   }
 }
