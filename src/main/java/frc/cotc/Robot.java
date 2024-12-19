@@ -89,8 +89,8 @@ public class Robot extends LoggedRobot {
 
     Swerve swerve = getSwerve(mode);
 
-    CommandJoystick primaryLeft = new CommandJoystick(0);
-    CommandJoystick primaryRight = new CommandJoystick(1);
+    var primaryLeft = new CommandJoystick(0);
+    var primaryRight = new CommandJoystick(1);
 
     // Robot wants +X fwd, +Y left
     // Sticks are +X right +Y back
@@ -153,7 +153,7 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void autonomousInit() {
-    autoCommand = autos.getAuto();
+    autoCommand = autos.getSelectedCommand();
     autoCommand.schedule();
   }
 

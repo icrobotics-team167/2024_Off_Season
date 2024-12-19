@@ -1,18 +1,18 @@
 {
  "name":"choreo",
- "version":"v2025.0.0",
+ "version":1,
  "type":"Swerve",
  "variables":{
   "expressions":{},
   "poses":{
-   "C1":{
+   "C2":{
     "x":{
-     "exp":"3.5 m",
+     "exp":"C1.x()",
      "val":3.5
     },
     "y":{
-     "exp":"7.025 m",
-     "val":7.025
+     "exp":"speaker.y()",
+     "val":5.559
     },
     "heading":{
      "exp":"180 deg",
@@ -33,6 +33,20 @@
      "val":3.141592653589793
     }
    },
+   "C1":{
+    "x":{
+     "exp":"3.5 m",
+     "val":3.5
+    },
+    "y":{
+     "exp":"7.025 m",
+     "val":7.025
+    },
+    "heading":{
+     "exp":"180 deg",
+     "val":3.141592653589793
+    }
+   },
    "C3":{
     "x":{
      "exp":"2.75 m",
@@ -41,20 +55,6 @@
     "y":{
      "exp":"4.095 m",
      "val":4.095
-    },
-    "heading":{
-     "exp":"180 deg",
-     "val":3.141592653589793
-    }
-   },
-   "C2":{
-    "x":{
-     "exp":"C1.x()",
-     "val":3.5
-    },
-    "y":{
-     "exp":"speaker.y()",
-     "val":5.559
     },
     "heading":{
      "exp":"180 deg",
@@ -85,12 +85,12 @@
    }
   },
   "mass":{
-   "exp":"150 lbs",
-   "val":68.0388555
+   "exp":"80 lbs",
+   "val":36.2873896
   },
   "inertia":{
-   "exp":"6 kg m ^ 2",
-   "val":6.0
+   "exp":"3 kg m ^ 2",
+   "val":3.0
   },
   "gearing":{
    "exp":"5.90277778",
@@ -105,8 +105,12 @@
    "val":400.0
   },
   "tmax":{
-   "exp":"1.25 N m",
-   "val":1.25
+   "exp":"1 N m",
+   "val":1.0
+  },
+  "cof":{
+   "exp":"1",
+   "val":1.0
   },
   "bumper":{
    "front":{

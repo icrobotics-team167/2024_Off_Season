@@ -25,6 +25,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
@@ -214,80 +215,84 @@ public class Swerve extends SubsystemBase {
     fieldRelativeSpeeds =
         ChassisSpeeds.fromRobotRelativeSpeeds(robotRelativeSpeeds, swerveInputs.gyroYaw);
 
-    var driveStdDevs = getDriveStdDevs();
-    Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
-    poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
+    if (!poseReset) {
+      var driveStdDevs = getDriveStdDevs();
+      Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
+      poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
-    double lastTimestamp = -1;
-    for (var frame : swerveInputs.odometryFrames) {
-      if (frame.timestamp() < 0) {
-        invalidOdometryWarning.set(true);
-        break;
-      }
-      invalidOdometryWarning.set(false);
-      if (frame.timestamp() < lastTimestamp) {
-        outOfOrderOdometryWarning.set(true);
-        break;
-      }
-      outOfOrderOdometryWarning.set(false);
-      poseEstimator.updateWithTime(frame.timestamp(), frame.gyroYaw(), frame.positions());
-      lastTimestamp = frame.timestamp();
-    }
-
-    if (Robot.isSimulation() && !Logger.hasReplaySource()) {
-      FiducialPoseEstimatorIOPhoton.VisionSim.getInstance().update();
-    }
-
-    if (visionLoggingEnabled && tagPoses == null) {
-      tagPoses = new ArrayList<>();
-      poseEstimates = new ArrayList<>();
-      poseEstimateYaws = new ArrayList<>();
-    }
-    for (int i = 0; i < visionIOs.length; i++) {
-      visionIOs[i].updateInputs(visionInputs[i]);
-      Logger.processInputs("Vision/" + i, visionInputs[i]);
-
-      if (!visionInputs[i].hasNewData) {
-        // If there's no new data, save some CPU
-        continue;
+      double lastTimestamp = -1;
+      for (var frame : swerveInputs.odometryFrames) {
+        if (frame.timestamp() < 0) {
+          invalidOdometryWarning.set(true);
+          break;
+        }
+        invalidOdometryWarning.set(false);
+        if (frame.timestamp() < lastTimestamp) {
+          outOfOrderOdometryWarning.set(true);
+          break;
+        }
+        outOfOrderOdometryWarning.set(false);
+        poseEstimator.updateWithTime(frame.timestamp(), frame.gyroYaw(), frame.positions());
+        lastTimestamp = frame.timestamp();
       }
 
-      CameraTunings tunings;
-      if (i >= cameraTunings.length) {
-        tunings = CameraTunings.defaults;
-      } else {
-        tunings = cameraTunings[i];
+      if (Robot.isSimulation() && !Logger.hasReplaySource()) {
+        FiducialPoseEstimatorIOPhoton.VisionSim.getInstance().update();
       }
 
-      for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
-        var poseEstimate = visionInputs[i].poseEstimates[j];
+      if (visionLoggingEnabled && tagPoses == null) {
+        tagPoses = new ArrayList<>();
+        poseEstimates = new ArrayList<>();
+        poseEstimateYaws = new ArrayList<>();
+      }
+      for (int i = 0; i < visionIOs.length; i++) {
+        visionIOs[i].updateInputs(visionInputs[i]);
+        Logger.processInputs("Vision/" + i, visionInputs[i]);
 
-        // Discard if the pose is too far above/below the ground
-        if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .05)) {
+        if (!visionInputs[i].hasNewData) {
+          // If there's no new data, save some CPU
           continue;
         }
 
-        var stdDevs = getVisionStdDevs(poseEstimate, tunings);
-        Logger.recordOutput("Vision/Std Devs/" + i + "/" + j, stdDevs);
+        CameraTunings tunings;
+        if (i >= cameraTunings.length) {
+          tunings = CameraTunings.defaults;
+        } else {
+          tunings = cameraTunings[i];
+        }
 
-        poseEstimator.addVisionMeasurement(
-            poseEstimate.estimatedPose().toPose2d(), poseEstimate.timestamp(), stdDevs);
+        for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
+          var poseEstimate = visionInputs[i].poseEstimates[j];
 
-        if (visionLoggingEnabled) {
-          poseEstimates.add(poseEstimate.estimatedPose());
-          poseEstimateYaws.add(new Rotation2d(poseEstimate.estimatedPose().getRotation().getZ()));
-          tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
+          // Discard if the pose is too far above/below the ground
+          if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .05)) {
+            continue;
+          }
+
+          var stdDevs = getVisionStdDevs(poseEstimate, tunings);
+          Logger.recordOutput("Vision/Std Devs/" + i + "/" + j, stdDevs);
+
+          poseEstimator.addVisionMeasurement(
+              poseEstimate.estimatedPose().toPose2d(), poseEstimate.timestamp(), stdDevs);
+
+          if (visionLoggingEnabled) {
+            poseEstimates.add(poseEstimate.estimatedPose());
+            poseEstimateYaws.add(new Rotation2d(poseEstimate.estimatedPose().getRotation().getZ()));
+            tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
+          }
         }
       }
-    }
-    if (visionLoggingEnabled) {
-      Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
-      Logger.recordOutput(
-          "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
-      Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
-      poseEstimates.clear();
-      poseEstimateYaws.clear();
-      tagPoses.clear();
+      if (visionLoggingEnabled) {
+        Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
+        Logger.recordOutput(
+            "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
+        Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
+        poseEstimates.clear();
+        poseEstimateYaws.clear();
+        tagPoses.clear();
+      }
+    } else {
+      poseReset = false;
     }
 
     Logger.recordOutput("Swerve/Odometry/Final Position", poseEstimator.getEstimatedPosition());
@@ -560,7 +565,10 @@ public class Swerve extends SubsystemBase {
     return poseEstimator.getEstimatedPosition();
   }
 
+  private boolean poseReset = false;
+
   public void resetForAuto(Pose2d pose) {
+    DriverStation.reportWarning("Reset For Auto run", true);
     if (Robot.isSimulation()
         && !Logger.hasReplaySource()
         && swerveIO instanceof SwerveIOPhoenix phoenix) {
@@ -571,5 +579,8 @@ public class Swerve extends SubsystemBase {
     yController.reset();
     yawController.reset();
     poseEstimator.resetPosition(pose.getRotation(), getLatestModulePositions(), pose);
+    swerveIO.updateInputs(swerveInputs);
+    Logger.processInputs("Swerve", swerveInputs);
+    poseReset = true;
   }
 }
