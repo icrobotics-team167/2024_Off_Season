@@ -14,6 +14,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.RobotController;
 import frc.cotc.Robot;
 import java.util.ArrayList;
 import java.util.List;
@@ -205,6 +206,11 @@ public class SwerveSetpointGenerator {
   }
 
   public SwerveSetpoint generateSetpoint(
+      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState) {
+    return generateSetpoint(prevSetpoint, desiredState, RobotController.getBatteryVoltage());
+  }
+
+  public SwerveSetpoint generateSetpoint(
       final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double voltage) {
     return generateSetpoint(prevSetpoint, desiredState, voltage, Robot.defaultPeriodSecs);
   }
@@ -240,7 +246,7 @@ public class SwerveSetpointGenerator {
     SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
     desiredState = kinematics.toChassisSpeeds(desiredModuleState);
     // Discretize
-    desiredState.discretize(dt);
+    desiredState = ChassisSpeeds.discretize(desiredState, dt);
     desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
     // Desaturate
     SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
@@ -530,7 +536,7 @@ public class SwerveSetpointGenerator {
     SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxSpeed);
     retSpeeds = kinematics.toChassisSpeeds(retStates);
     // Discretize
-    retSpeeds.discretize(dt);
+    retSpeeds = ChassisSpeeds.discretize(retSpeeds, dt);
     retStates = kinematics.toSwerveModuleStates(retSpeeds);
     // Desaturate
     SwerveDriveKinematics.desaturateWheelSpeeds(retStates, maxSpeed);

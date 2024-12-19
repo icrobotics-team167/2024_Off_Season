@@ -67,10 +67,13 @@ public class SwerveIOPhoenix implements SwerveIO {
         Units.rotationsPerMinuteToRadiansPerSecond(6000) / STEER_GEAR_RATIO;
 
     CONSTANTS.MASS_KG = Units.lbsToKilograms(40);
+
+    double linearKa = 1;
+    double angularKa = 1;
     CONSTANTS.MOI_KG_METERS_SQUARED =
         CONSTANTS.MASS_KG
             * Math.hypot(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2)
-            * 1;
+            * (angularKa / linearKa);
 
     CONSTANTS.ANGULAR_SPEED_FUDGING = .45;
 
@@ -213,6 +216,13 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
+  public void driveCharacterization(double amps, Rotation2d[] angles) {
+    for (int i = 0; i < 4; i++) {
+      modules[i].driveCharacterize(amps, angles[i]);
+    }
+  }
+
+  @Override
   public void resetGyro(Rotation2d newYaw) {
     gyro.setYaw(newYaw.getDegrees());
   }
@@ -233,20 +243,8 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerMotor = new TalonFX(id * 3 + 1, Robot.CANIVORE_NAME);
       encoder = new CANcoder(id * 3 + 2, Robot.CANIVORE_NAME);
 
-      var wheelForceNewtonsPerAmp =
-          CONSTANTS.DRIVE_MOTOR.KtNMPerAmp / (CONSTANTS.WHEEL_DIAMETER_METERS / 2);
-      var maxCurrentAccelMetersPerSecSquared =
-          4
-              * wheelForceNewtonsPerAmp
-              * CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS
-              / CONSTANTS.MASS_KG;
-      var maxTractionAccelMetersPerSecSquared = CONSTANTS.WHEEL_COF * 9.81;
-
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = DRIVE_GEAR_RATIO;
-      driveConfig.MotionMagic.MotionMagicAcceleration =
-          Math.min(maxCurrentAccelMetersPerSecSquared, maxTractionAccelMetersPerSecSquared)
-              / WHEEL_CIRCUMFERENCE_METERS;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
@@ -285,14 +283,12 @@ public class SwerveIOPhoenix implements SwerveIO {
 
         driveKpMultiplier = 1;
       } else {
-        driveKpMultiplier = 80;
+        driveKpMultiplier = 2;
 
         steerConfig.Slot0.kP = 600;
         steerConfig.Slot0.kD = 2.5;
       }
-      driveConfig.Slot0.kA =
-          WHEEL_CIRCUMFERENCE_METERS / (4 * wheelForceNewtonsPerAmp / CONSTANTS.MASS_KG);
-      driveConfig.Slot0.kP = driveKpMultiplier * driveConfig.Slot0.kA;
+      driveConfig.Slot0.kP = driveKpMultiplier * CONSTANTS.MASS_KG;
 
       steerConfig.Slot0.kV = 12 / Units.radiansToRotations(CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC);
 
@@ -301,8 +297,8 @@ public class SwerveIOPhoenix implements SwerveIO {
       encoder.getConfigurator().apply(encoderConfig);
     }
 
-    private final MotionMagicVelocityTorqueCurrentFOC driveControlRequest =
-        new MotionMagicVelocityTorqueCurrentFOC(0).withOverrideCoastDurNeutral(true);
+    private final VelocityTorqueCurrentFOC driveControlRequest =
+        new VelocityTorqueCurrentFOC(0).withOverrideCoastDurNeutral(true);
     private final PositionVoltage steerControlRequest = new PositionVoltage(0).withEnableFOC(false);
     private final StaticBrake brakeControlRequest = new StaticBrake();
 
@@ -332,6 +328,17 @@ public class SwerveIOPhoenix implements SwerveIO {
     void steerCharacterize(double volts) {
       driveMotor.setControl(brakeControlRequest);
       steerMotor.setControl(steerCharacterization.withOutput(volts));
+    }
+
+    private final TorqueCurrentFOC driveCharacterization = new TorqueCurrentFOC(0);
+
+    void driveCharacterize(double amps, Rotation2d angle) {
+      if (MathUtil.isNear(0, amps, 1e-2)) {
+        driveMotor.setControl(brakeControlRequest);
+      } else {
+        driveMotor.setControl(driveCharacterization.withOutput(amps));
+      }
+      steerMotor.setControl(steerControlRequest.withPosition(angle.getRotations()));
     }
 
     SwerveModulePosition getPosition() {

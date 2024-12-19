@@ -160,11 +160,6 @@ public interface SwerveIO {
    */
   default void updateInputs(SwerveIOInputs inputs) {}
 
-  /**
-   * Drives the drivebase.
-   *
-   * @param setpoint The drive setpoint.
-   */
   default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint) {}
 
   default void resetGyro(Rotation2d newYaw) {}
@@ -172,4 +167,6 @@ public interface SwerveIO {
   default void initSysId() {}
 
   default void steerCharacterization(double volts) {}
+
+  default void driveCharacterization(double amps, Rotation2d[] angles) {}
 }
