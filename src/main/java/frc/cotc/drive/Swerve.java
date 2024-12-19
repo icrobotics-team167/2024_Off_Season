@@ -201,7 +201,7 @@ public class Swerve extends SubsystemBase {
     for (int i = 0; i < 4; i++) {
       lastDriveFeedforwards[i].angle = lastSetpoint.moduleStates()[i].angle;
       lastDriveFeedforwards[i].speedMetersPerSecond =
-          lastSetpoint.driveFeedforwardsAmps()[i] * currentVisualizationScalar;
+          lastSetpoint.driveFeedforwardsAmps()[i] / currentVisualizationScalar;
     }
     Logger.recordOutput(
         "Swerve/Setpoint Generator/Setpoint/Drive feedforwards", lastDriveFeedforwards);

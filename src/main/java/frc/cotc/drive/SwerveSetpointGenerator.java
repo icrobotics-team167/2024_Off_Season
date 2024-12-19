@@ -566,7 +566,11 @@ public class SwerveSetpointGenerator {
           wheelForceMagnitude > 1e-6
               ? wheelForceMagnitude * wheelForce.getAngle().minus(retStates[i].angle).getCos()
               : 0;
-      var torqueCurrent = driveMotor.getCurrent(appliedForce * wheelRadiusMeters);
+      var torqueCurrent =
+          MathUtil.clamp(
+              driveMotor.getCurrent(appliedForce * wheelRadiusMeters),
+              -driveCurrentLimitAmps,
+              driveCurrentLimitAmps);
 
       final var maybeOverride = overrideSteering.get(i);
       if (maybeOverride.isPresent()) {
