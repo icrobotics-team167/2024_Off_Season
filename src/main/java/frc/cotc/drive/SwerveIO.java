@@ -10,47 +10,138 @@ package frc.cotc.drive;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.util.struct.Struct;
+import edu.wpi.first.util.struct.StructSerializable;
+import frc.cotc.util.MotorCurrentDraws;
+import java.nio.ByteBuffer;
 import org.littletonrobotics.junction.AutoLog;
+import org.littletonrobotics.junction.LogTable;
+import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 public interface SwerveIO {
-  @AutoLog
-  class SwerveIOInputs {
-    SwerveModuleState[] moduleStates =
-        new SwerveModuleState[] {
-          new SwerveModuleState(),
-          new SwerveModuleState(),
-          new SwerveModuleState(),
-          new SwerveModuleState()
-        };
-    Rotation2d gyroYaw = new Rotation2d();
+  class SwerveIOInputs implements LoggableInputs {
+    SwerveModuleState[] moduleStates = new SwerveModuleState[4];
+    Rotation2d gyroYaw = Rotation2d.kZero;
 
-    // I wanted this to be a 2D array, so that one of the dimensions can be data ID and the other
-    // dimension can be the module ID, but AK doesn't support 2D arrays
-    // So the data is packed into a 1D array
-    SwerveModulePosition[] odometryPositions =
-        new SwerveModulePosition[] {
-          new SwerveModulePosition(),
-          new SwerveModulePosition(),
-          new SwerveModulePosition(),
-          new SwerveModulePosition()
+    OdometryFrame[] odometryFrames =
+        new OdometryFrame[] {
+          new OdometryFrame(
+              new SwerveModulePosition[] {
+                new SwerveModulePosition(),
+                new SwerveModulePosition(),
+                new SwerveModulePosition(),
+                new SwerveModulePosition()
+              },
+              Rotation2d.kZero,
+              -1.0)
         };
-    Rotation2d[] odometryYaws = new Rotation2d[0];
-    double[] odometryTimestamps = new double[0];
+
+    MotorCurrentDraws[] driveMotorCurrents = new MotorCurrentDraws[4];
+    MotorCurrentDraws[] steerMotorCurrents = new MotorCurrentDraws[4];
+
+    @Override
+    public void toLog(LogTable table) {
+      table.put("ModuleStates", moduleStates);
+      table.put("GyroYaw", gyroYaw);
+      table.put("OdometryFrames", OdometryFrame.struct, odometryFrames);
+      table.put("DriveMotorCurrents", MotorCurrentDraws.struct, driveMotorCurrents);
+      table.put("SteerMotorCurrents", MotorCurrentDraws.struct, steerMotorCurrents);
+    }
+
+    @Override
+    public void fromLog(LogTable table) {
+      moduleStates = table.get("ModuleStates", new SwerveModuleState[4]);
+      gyroYaw = table.get("GyroYaw", Rotation2d.kZero);
+      odometryFrames = table.get("OdometryFrames", OdometryFrame.struct);
+      driveMotorCurrents =
+          table.get("DriveMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws[4]);
+      steerMotorCurrents =
+          table.get("SteerMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws[4]);
+    }
+  }
+
+  record OdometryFrame(SwerveModulePosition[] positions, Rotation2d gyroYaw, double timestamp)
+      implements StructSerializable {
+    public OdometryFrame {
+      if (positions == null || positions.length != 4) {
+        throw new IllegalArgumentException("Position count not 4");
+      }
+      if (gyroYaw == null) {
+        throw new NullPointerException("Gyro yaw is null");
+      }
+    }
+
+    public static final Struct<OdometryFrame> struct =
+        new Struct<>() {
+          @Override
+          public Class<OdometryFrame> getTypeClass() {
+            return OdometryFrame.class;
+          }
+
+          @Override
+          public String getTypeName() {
+            return "OdometryFrame";
+          }
+
+          @Override
+          public int getSize() {
+            return SwerveModulePosition.struct.getSize() * 4
+                + Rotation2d.struct.getSize()
+                + kSizeDouble;
+          }
+
+          @Override
+          public String getSchema() {
+            return "SwerveModulePosition positions[4];Rotation2d gyroYaw;double timestamp";
+          }
+
+          @Override
+          public Struct<?>[] getNested() {
+            return new Struct<?>[] {SwerveModulePosition.struct, Rotation2d.struct};
+          }
+
+          @Override
+          public OdometryFrame unpack(ByteBuffer bb) {
+            var positions = Struct.unpackArray(bb, 4, SwerveModulePosition.struct);
+            var yaw = Rotation2d.struct.unpack(bb);
+            var timestamp = bb.getDouble();
+            return new OdometryFrame(positions, yaw, timestamp);
+          }
+
+          @Override
+          public void pack(ByteBuffer bb, OdometryFrame value) {
+            Struct.packArray(bb, value.positions, SwerveModulePosition.struct);
+            Rotation2d.struct.pack(bb, value.gyroYaw);
+            bb.putDouble(value.timestamp);
+          }
+        };
   }
 
   @SuppressWarnings("CanBeFinal")
   @AutoLog
   class SwerveModuleConstants {
     // Meters
-    double TRACK_WIDTH;
-    double TRACK_LENGTH;
-    double WHEEL_DIAMETER;
+    double TRACK_WIDTH_METERS;
+    double TRACK_LENGTH_METERS;
+    double WHEEL_DIAMETER_METERS;
+    double WHEEL_COF;
 
-    // Reductions
-    double DRIVE_GEAR_RATIO;
+    // Should have a gear reduction applied with .withReduction()
+    DCMotor DRIVE_MOTOR = DCMotor.getKrakenX60(1);
+    double DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
 
-    // Rad/sec
-    double DRIVE_MOTOR_MAX_SPEED;
+    double MASS_KG;
+    double MOI_KG_METERS_SQUARED;
+
+    // Should already have a reduction applied
+    double MAX_STEER_SPEED_RAD_PER_SEC;
+
+    // Due to kinematic limits, it may not be possible for the bot to stay moving straight when
+    // spinning and moving at the same time. This fudge factor slows down the max angular speed
+    // when the bot is translating, but doesn't affect the limit when the bot isn't translating.
+    // Scalar
+    double ANGULAR_SPEED_FUDGING;
   }
 
   /**
@@ -69,22 +160,13 @@ public interface SwerveIO {
    */
   default void updateInputs(SwerveIOInputs inputs) {}
 
-  /**
-   * Drives the drivebase.
-   *
-   * @param setpoint The drive setpoint.
-   */
-  default void drive(SwerveModuleState[] setpoint) {
-    drive(setpoint, new double[4]);
-  }
+  default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint) {}
 
-  /**
-   * Drives the drivebase.
-   *
-   * @param setpoint The drive setpoint.
-   * @param forceFeedforward The feedforward for the drive motor. Newtons.
-   */
-  default void drive(SwerveModuleState[] setpoint, double[] forceFeedforward) {}
+  default void resetGyro(Rotation2d newYaw) {}
 
-  default void driveCharacterization(double volts) {}
+  default void initSysId() {}
+
+  default void steerCharacterization(double volts) {}
+
+  default void driveCharacterization(double amps, Rotation2d[] angles) {}
 }

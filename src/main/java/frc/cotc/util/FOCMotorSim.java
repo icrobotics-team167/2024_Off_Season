@@ -18,36 +18,51 @@ import edu.wpi.first.math.system.plant.DCMotor;
  */
 public class FOCMotorSim {
   private final DCMotor motor;
-  private final double gearRatio;
   private final double moi;
 
-  public FOCMotorSim(DCMotor motor, double gearRatio, double moi) {
+  /**
+   * @param motor The DCMotor object. {@link DCMotor#withReduction} needs to be applied if it's not
+   *     a direct drive system.
+   * @param moiKgMetersSquared The moment of inertia for the simulated flywheel.
+   */
+  public FOCMotorSim(DCMotor motor, double moiKgMetersSquared) {
     this.motor = motor;
-    this.gearRatio = gearRatio;
-    this.moi = moi;
+    this.moi = moiKgMetersSquared;
   }
 
   private double pos = 0;
   private double vel = 0;
   private double accel = 0;
 
+  /**
+   * Ticks the simulation one timestep forwards.
+   *
+   * @param current The torque current of the motor. Should be positive for forward accel and
+   *     negative for backwards accel.
+   * @param dt The delta time in which to tick forwards.
+   */
   public void tick(double current, double dt) {
-    // If we are accelerating, (AKA torque is in the same direction as current velocity) then clamp
-    // current. Otherwise, we don't. This is to simulate braking effects.
+    double maxCurrentDraw;
+    // If accelerating (aka current and vel have the same sign), then limit current based on
+    // current vel
     if (Math.signum(current) == Math.signum(vel)) {
       // Clamp current draw to the max possible draw based on current vel
-      double maxCurrentDraw =
+      maxCurrentDraw =
           MathUtil.interpolate(
               motor.stallCurrentAmps,
               0,
-              MathUtil.inverseInterpolate(0, motor.freeSpeedRadPerSec, vel * gearRatio));
-      current = MathUtil.clamp(current, -maxCurrentDraw, maxCurrentDraw);
+              MathUtil.inverseInterpolate(0, motor.freeSpeedRadPerSec, Math.abs(vel)));
+
+    } else {
+      // Otherwise, clamp based on max stall current
+      maxCurrentDraw = motor.stallCurrentAmps;
     }
+    current = MathUtil.clamp(current, -maxCurrentDraw, maxCurrentDraw);
 
     // Torque / moi = acceleration
-    accel = ((current * motor.KtNMPerAmp) * gearRatio) / moi;
-    // pos = p_0 * v_0 + (1/2 * a * dt^2)
-    pos += vel * dt + (accel * Math.pow(dt, 2) / 2);
+    accel = (current * motor.KtNMPerAmp) / moi;
+    // pos = p_0 + v_0 * dt + (1/2 * a * dt^2)
+    pos += vel * dt + (accel * dt * dt / 2);
     vel += accel * dt;
   }
 
