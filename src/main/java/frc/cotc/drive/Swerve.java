@@ -142,7 +142,10 @@ public class Swerve extends SubsystemBase {
     wheelRadiusMeters = CONSTANTS.WHEEL_DIAMETER_METERS / 2;
     kTNewtonMetersPerAmp = CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
     currentVisualizationScalar =
-        maxLinearSpeedMetersPerSec / CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
+        CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS / maxLinearSpeedMetersPerSec;
+    Logger.recordOutput(
+        "Swerve/Setpoint Generator/Setpoint/Current Visualization Scalar",
+        currentVisualizationScalar);
 
     poseEstimator =
         new SwervePoseEstimator(
@@ -486,6 +489,52 @@ public class Swerve extends SubsystemBase {
 
     return sequence(
         runOnce(swerveIO::initSysId),
+        sysId.quasistatic(SysIdRoutine.Direction.kForward),
+        waitSeconds(1),
+        sysId.quasistatic(SysIdRoutine.Direction.kReverse),
+        waitSeconds(1),
+        sysId.dynamic(SysIdRoutine.Direction.kForward),
+        waitSeconds(1),
+        sysId.dynamic(SysIdRoutine.Direction.kReverse));
+  }
+
+  /**
+   * Runs SysID for characterizing the drivebase.
+   *
+   * <p>Moment of inertia can be estimated using the following equation:
+   *
+   * <p>{@code I = mass * drivebaseRadius * kA_angular / kA_linear}
+   *
+   * <p>The above formula is from <a
+   * href="https://choreo.autos/usage/estimating-moi/">https://choreo.autos/usage/estimating-moi/</a>
+   *
+   * @param linear Whether the routine should be characterizing linear or angular dynamics.
+   */
+  public Command driveCharacterize(boolean linear) {
+    var states =
+        setpointGenerator
+            .getKinematics()
+            .toSwerveModuleStates(linear ? new ChassisSpeeds(1, 0, 0) : new ChassisSpeeds(0, 0, 1));
+    Rotation2d[] angles = new Rotation2d[4];
+    for (int i = 0; i < 4; i++) {
+      angles[i] = states[i].angle;
+    }
+
+    var sysId =
+        new SysIdRoutine(
+            new SysIdRoutine.Config(
+                Volts.of(10).per(Second),
+                Volts.of(25),
+                Seconds.of(4),
+                state -> SignalLogger.writeString("SysIDState", state.toString())),
+            new SysIdRoutine.Mechanism(
+                voltage -> swerveIO.driveCharacterization(voltage.baseUnitMagnitude(), angles),
+                null,
+                this));
+
+    return sequence(
+        runOnce(swerveIO::initSysId),
+        run(() -> swerveIO.driveCharacterization(0, angles)).withTimeout(1),
         sysId.quasistatic(SysIdRoutine.Direction.kForward),
         waitSeconds(1),
         sysId.quasistatic(SysIdRoutine.Direction.kReverse),
