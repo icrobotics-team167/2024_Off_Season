@@ -343,16 +343,19 @@ public class Swerve extends SubsystemBase {
       FiducialPoseEstimatorIO.PoseEstimate poseEstimate, CameraTunings tunings) {
     double translationalScoreSum = 0;
     double rotationalScoreSum = 0;
-    for (var distanceMeters : poseEstimate.tagDistances()) {
+
+    for (var tagPose : poseEstimate.tagsUsed()) {
+      var distanceMeters =
+          tagPose.getTranslation().getDistance(poseEstimate.estimatedPose().getTranslation());
       translationalScoreSum +=
           tunings.translational.distanceScalar * distanceMeters * distanceMeters;
       rotationalScoreSum += tunings.angular.distanceScalar * distanceMeters * distanceMeters;
     }
 
     var translationalDivisor =
-        Math.pow(poseEstimate.tagDistances().length, tunings.translational.tagCountExponent);
+        Math.pow(poseEstimate.tagsUsed().length, tunings.translational.tagCountExponent);
     var rotationalDivisor =
-        Math.pow(poseEstimate.tagDistances().length, tunings.angular.tagCountExponent);
+        Math.pow(poseEstimate.tagsUsed().length, tunings.angular.tagCountExponent);
 
     var translationalVelMagnitude =
         Math.hypot(fieldRelativeSpeeds.vxMetersPerSecond, fieldRelativeSpeeds.vyMetersPerSecond)
