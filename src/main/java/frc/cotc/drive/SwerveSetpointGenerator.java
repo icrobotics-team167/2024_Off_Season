@@ -500,6 +500,7 @@ public class SwerveSetpointGenerator {
         new ChassisSpeeds(chassisAccelVec.getX(), chassisAccelVec.getY(), chassisAngularAccel);
     var accelStates = kinematics.toSwerveModuleStates(chassisAccel);
 
+    var maxVelSteps = new double[4];
     for (int i = 0; i < 4; i++) {
       if (min_s == 0.0) {
         // No need to carry on.
@@ -507,6 +508,7 @@ public class SwerveSetpointGenerator {
       }
 
       double maxVelStep = Math.abs(accelStates[i].speedMetersPerSecond * dt);
+      maxVelSteps[i] = maxVelStep;
 
       double vx_min_s =
           min_s == 1.0 ? desired_vx[i] : (desired_vx[i] - prev_vx[i]) * min_s + prev_vx[i];
@@ -525,6 +527,7 @@ public class SwerveSetpointGenerator {
               maxVelStep);
       min_s = Math.min(min_s, s);
     }
+    Logger.recordOutput("Swerve/Setpoint Generator/Internal State/Max Vel Step", maxVelSteps);
 
     var retSpeeds =
         new ChassisSpeeds(
