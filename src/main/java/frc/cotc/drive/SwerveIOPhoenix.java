@@ -11,6 +11,7 @@ import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
@@ -386,7 +387,14 @@ public class SwerveIOPhoenix implements SwerveIO {
     public void run() {
       //noinspection InfiniteLoopStatement
       while (true) {
-        BaseStatusSignal.waitForAll(2.0 / FREQUENCY, signals);
+        if (BaseStatusSignal.waitForAll(2.0 / FREQUENCY, signals) != StatusCode.OK) {
+          continue;
+        }
+
+        double latencySum = 0;
+        for (var signal : signals) {
+          latencySum += signal.getTimestamp().getLatency();
+        }
         var frame =
             new OdometryFrame(
                 new SwerveModulePosition[] {
@@ -397,7 +405,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                 },
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
-                RobotController.getFPGATime() / 1e6);
+                (RobotController.getFPGATime() / 1e6) - (latencySum / signals.length));
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
         }
