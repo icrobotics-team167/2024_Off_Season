@@ -63,7 +63,7 @@ public class Swerve extends SubsystemBase {
 
   private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
     static final CameraTunings defaults =
-        new CameraTunings(new StdDevTunings(.5, 1.5, 2), new StdDevTunings(.2, 1.5, 1.5));
+        new CameraTunings(new StdDevTunings(.3, 1.6, 3), new StdDevTunings(.2, 1.5, 1));
   }
 
   private final double wheelRadiusMeters;
@@ -337,7 +337,7 @@ public class Swerve extends SubsystemBase {
 
     // Sqrt of avg of squared deltas = standard deviation
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {Math.abs(stdDevs.getX()) + .005, Math.abs(stdDevs.getY()) + .005, .001};
+    return new double[] {Math.abs(stdDevs.getX()) + .01, Math.abs(stdDevs.getY()) + .01, .0005};
   }
 
   private double[] getVisionStdDevs(
