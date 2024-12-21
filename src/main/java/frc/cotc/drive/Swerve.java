@@ -103,7 +103,8 @@ public class Swerve extends SubsystemBase {
                   -CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2)
             },
             CONSTANTS.DRIVE_MOTOR,
-            CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS,
+            CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS,
+            CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS,
             CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC,
             CONSTANTS.MASS_KG,
             CONSTANTS.MOI_KG_METERS_SQUARED,
@@ -143,7 +144,7 @@ public class Swerve extends SubsystemBase {
     wheelRadiusMeters = CONSTANTS.WHEEL_DIAMETER_METERS / 2;
     kTNewtonMetersPerAmp = CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
     currentVisualizationScalar =
-        CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS / maxLinearSpeedMetersPerSec;
+        CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS / maxLinearSpeedMetersPerSec;
     Logger.recordOutput(
         "Swerve/Setpoint Generator/Setpoint/Current Visualization Scalar",
         currentVisualizationScalar);

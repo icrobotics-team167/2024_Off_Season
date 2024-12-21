@@ -36,7 +36,8 @@ public class SwerveSetpointGenerator {
   private final SwerveDriveKinematics kinematics;
   private final Translation2d[] moduleLocations;
   private final DCMotor driveMotor;
-  private final double driveCurrentLimitAmps,
+  private final double statorCurrentLimitAmps,
+      supplyCurrentLimitAmps,
       maxDriveVelocity,
       maxSteerSpeedRadPerSec,
       massKg,
@@ -49,7 +50,8 @@ public class SwerveSetpointGenerator {
   public SwerveSetpointGenerator(
       final Translation2d[] moduleLocations,
       final DCMotor driveMotor,
-      final double driveCurrentLimitAmps,
+      final double statorCurrentLimitAmps,
+      final double supplyCurrentLimitAmps,
       final double maxSteerSpeedRadPerSec,
       final double massKg,
       final double moiKgMetersSquared,
@@ -57,7 +59,8 @@ public class SwerveSetpointGenerator {
       final double wheelCoF) {
 
     this.driveMotor = driveMotor;
-    this.driveCurrentLimitAmps = driveCurrentLimitAmps;
+    this.statorCurrentLimitAmps = statorCurrentLimitAmps;
+    this.supplyCurrentLimitAmps = supplyCurrentLimitAmps;
     this.maxSteerSpeedRadPerSec = maxSteerSpeedRadPerSec;
     kinematics = new SwerveDriveKinematics(moduleLocations);
     this.moduleLocations = moduleLocations;
@@ -219,7 +222,8 @@ public class SwerveSetpointGenerator {
     STEER_VEL,
     CENTRIPETAL,
     MOTOR_DYNAMICS,
-    CURRENT_LIMITS,
+    STATOR_CURRENT,
+    SUPPLY_CURRENT,
     TRACTION
   }
 
@@ -238,6 +242,9 @@ public class SwerveSetpointGenerator {
    */
   public SwerveSetpoint generateSetpoint(
       final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double voltage, double dt) {
+    if (voltage > 12) {
+      voltage = 12;
+    }
     double maxSpeed = maxDriveVelocity * Math.min(1, voltage / 12);
 
     // Some crimes against RAM right here. This wouldn't be a big deal if the RoboRIO wasn't crap.
@@ -407,6 +414,8 @@ public class SwerveSetpointGenerator {
     // Enforce drive wheel torque limits
     Translation2d chassisForceVec = new Translation2d();
     double chassisTorque = 0.0;
+    double[] dutyCycles = new double[4];
+    double[] currentLimits = new double[4];
     int[] forceSigns = new int[4];
     double[] desiredSpeeds = new double[4];
     double[] expectedCurrentDraws = new double[4];
@@ -439,29 +448,22 @@ public class SwerveSetpointGenerator {
       lastVelMagnitudes[i] =
           Math.abs(prevSetpoint.moduleStates()[i].speedMetersPerSecond / wheelRadiusMeters);
       double currentDraw;
-      if (forceSign == 1) {
-        double lastVelRadPerSec = lastVelMagnitudes[i];
-        // Use the current battery voltage since we won't be able to supply 12v if the
-        // battery is sagging down to 11v, which will affect the max torque output
-        if (voltage > 12) {
-          voltage = 12;
-        }
-        currentDraw =
-            Math.max(
-                Math.min(
-                    driveMotor.getCurrent(Math.abs(lastVelRadPerSec), voltage),
-                    driveCurrentLimitAmps),
-                0);
-      } else {
-        currentDraw = driveCurrentLimitAmps;
-      }
-      double moduleTorque = driveMotor.getTorque(currentDraw);
+      // Estimate duty cycle from stator current and duty cycle
+      double lastVelRadPerSec = lastVelMagnitudes[i];
+      double dutyCycle = Math.min(Math.abs(lastVelRadPerSec) / (maxSpeed / wheelRadiusMeters), 1);
+      dutyCycles[i] = dutyCycle;
 
-      if (currentDraw == driveCurrentLimitAmps) {
-        activeConstraints[i] = ActiveConstraint.CURRENT_LIMITS;
-      } else if (!epsilonEquals(0, currentDraw)) {
-        activeConstraints[i] = ActiveConstraint.MOTOR_DYNAMICS;
-      }
+      double supplyLimitedStatorCurrent = supplyCurrentLimitAmps / dutyCycle;
+      double currentLimitAmps = Math.min(statorCurrentLimitAmps, supplyLimitedStatorCurrent);
+      currentLimits[i] = currentLimitAmps;
+      // Use the current battery voltage since we won't be able to supply 12v if the
+      // battery is sagging down to 11v, which will affect the max torque output
+      currentDraw =
+          Math.max(
+              Math.min(
+                  driveMotor.getCurrent(Math.abs(lastVelRadPerSec), voltage), currentLimitAmps),
+              0);
+      double moduleTorque = driveMotor.getTorque(currentDraw);
 
       // Limit torque to prevent wheel slip
       moduleTorque = Math.min(moduleTorque, maxTorqueFriction);
@@ -469,6 +471,12 @@ public class SwerveSetpointGenerator {
       if (moduleTorque == maxTorqueFriction) {
         activeConstraints[i] = ActiveConstraint.TRACTION;
         currentDraw = driveMotor.getCurrent(maxTorqueFriction);
+      } else if (currentDraw == statorCurrentLimitAmps) {
+        activeConstraints[i] = ActiveConstraint.STATOR_CURRENT;
+      } else if (currentDraw == supplyLimitedStatorCurrent) {
+        activeConstraints[i] = ActiveConstraint.SUPPLY_CURRENT;
+      } else if (!epsilonEquals(0, currentDraw)) {
+        activeConstraints[i] = ActiveConstraint.MOTOR_DYNAMICS;
       }
       expectedCurrentDraws[i] = currentDraw;
 
@@ -487,7 +495,10 @@ public class SwerveSetpointGenerator {
     }
 
     Logger.recordOutput(
-        "Swerve/Setpoint Generator/Internal State/Expected current draws/", expectedCurrentDraws);
+        "Swerve/Setpoint Generator/Internal State/Expected Duty Cycles/", dutyCycles);
+    Logger.recordOutput("Swerve/Setpoint Generator/Internal State/Current Limits/", currentLimits);
+    Logger.recordOutput(
+        "Swerve/Setpoint Generator/Internal State/Expected stator current/", expectedCurrentDraws);
     Logger.recordOutput("Swerve/Setpoint Generator/Internal State/Force Signs", forceSigns);
     Logger.recordOutput("Swerve/Setpoint Generator/Internal State/Desired Speeds", desiredSpeeds);
     Logger.recordOutput("Swerve/Setpoint Generator/Internal State/Last Vel Mag", lastVelMagnitudes);
@@ -572,8 +583,8 @@ public class SwerveSetpointGenerator {
       var torqueCurrent =
           MathUtil.clamp(
               driveMotor.getCurrent(appliedForce * wheelRadiusMeters),
-              -driveCurrentLimitAmps,
-              driveCurrentLimitAmps);
+              -currentLimits[i],
+              currentLimits[i]);
 
       final var maybeOverride = overrideSteering.get(i);
       if (maybeOverride.isPresent()) {

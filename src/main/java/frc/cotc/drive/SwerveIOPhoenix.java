@@ -77,7 +77,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     CONSTANTS.ANGULAR_SPEED_FUDGING = .45;
 
-    CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS =
+    CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS =
         Math.min(
             CONSTANTS.DRIVE_MOTOR.getCurrent(
                     CONSTANTS.WHEEL_COF
@@ -85,7 +85,8 @@ public class SwerveIOPhoenix implements SwerveIO {
                         * CONSTANTS.WHEEL_DIAMETER_METERS
                         / 2)
                 + 10,
-            100);
+            120);
+    CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS = 60;
   }
 
   private final Module[] modules = new Module[4];
@@ -247,8 +248,10 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.Feedback.SensorToMechanismRatio = DRIVE_GEAR_RATIO;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
-      driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
-      driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+      driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS;
+      driveConfig.CurrentLimits.SupplyCurrentLimit = CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS;
+      driveConfig.CurrentLimits.SupplyCurrentLowerLimit = 40;
+      driveConfig.CurrentLimits.SupplyCurrentLowerTime = 1;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
       var steerConfig = new TalonFXConfiguration();
@@ -283,7 +286,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
         driveKpMultiplier = 1;
       } else {
-        driveKpMultiplier = 2;
+        driveKpMultiplier = 5;
 
         steerConfig.Slot0.kP = 600;
         steerConfig.Slot0.kD = 2.5;
