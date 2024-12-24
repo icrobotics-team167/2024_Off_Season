@@ -32,13 +32,11 @@ public interface FiducialPoseEstimatorIO {
     }
   }
 
-  record PoseEstimate(
-      Pose3d estimatedPose, double timestamp, Pose3d[] tagsUsed, double[] tagDistances) {
+  record PoseEstimate(Pose3d estimatedPose, double timestamp, Pose3d[] tagsUsed) {
     public void toLog(LogTable table, int i) {
       table.put("poseEstimates/" + i + "/estimatedPose", estimatedPose);
       table.put("poseEstimates/" + i + "/timestamp", timestamp);
       table.put("poseEstimates/" + i + "/tagsUsed", tagsUsed);
-      table.put("poseEstimates/" + i + "/tagDistances", tagDistances);
     }
 
     public static PoseEstimate[] fromLog(LogTable table) {
@@ -53,9 +51,8 @@ public interface FiducialPoseEstimatorIO {
 
         var estimatedPose = table.get("poseEstimates/" + i + "/estimatedPose", Pose3d.kZero);
         var tagsUsed = table.get("poseEstimates/" + i + "/tagsUsed", new Pose3d[0]);
-        var tagDistances = table.get("poseEstimates/" + i + "/tagDistances", new double[0]);
 
-        entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed, tagDistances));
+        entries.add(new PoseEstimate(estimatedPose, timestamp, tagsUsed));
 
         i++;
       }

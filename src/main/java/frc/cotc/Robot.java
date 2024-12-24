@@ -49,8 +49,8 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
-    String mode = Robot.isReal() ? "REAL" : "SIM";
-    //    String mode = "REPLAY";
+    //    String mode = Robot.isReal() ? "REAL" : "SIM";
+    String mode = "REPLAY";
 
     switch (mode) {
       case "REAL" -> {
@@ -89,8 +89,8 @@ public class Robot extends LoggedRobot {
 
     Swerve swerve = getSwerve(mode);
 
-    CommandJoystick primaryLeft = new CommandJoystick(0);
-    CommandJoystick primaryRight = new CommandJoystick(1);
+    var primaryLeft = new CommandJoystick(0);
+    var primaryRight = new CommandJoystick(1);
 
     // Robot wants +X fwd, +Y left
     // Sticks are +X right +Y back
@@ -154,7 +154,7 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void autonomousInit() {
-    autoCommand = autos.getAuto();
+    autoCommand = autos.getSelectedCommand();
     autoCommand.schedule();
   }
 
@@ -165,8 +165,6 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void robotPeriodic() {
-    // Updates Choreo's auto selector.
-    autos.update();
     // Runs the Scheduler. This is responsible for polling buttons, adding newly-scheduled commands,
     // running already-scheduled commands, removing finished or interrupted commands, and running
     // subsystem periodic() methods. This must be called from the robot's periodic block in order
@@ -175,6 +173,12 @@ public class Robot extends LoggedRobot {
     Logger.recordOutput(
         "LoggedRobot/MemoryUsageMb",
         (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1e6);
+  }
+
+  @Override
+  public void disabledPeriodic() {
+    // Updates Choreo's auto selector.
+    autos.update();
   }
 
   public static volatile double simVoltage = 12;

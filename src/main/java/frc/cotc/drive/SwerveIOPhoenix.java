@@ -11,6 +11,7 @@ import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
@@ -53,11 +54,11 @@ public class SwerveIOPhoenix implements SwerveIO {
   static {
     CONSTANTS = new SwerveModuleConstantsAutoLogged();
 
-    CONSTANTS.TRACK_WIDTH_METERS = Units.inchesToMeters(22.75);
-    CONSTANTS.TRACK_LENGTH_METERS = Units.inchesToMeters(22.75);
+    CONSTANTS.TRACK_WIDTH_METERS = Units.inchesToMeters(30.5);
+    CONSTANTS.TRACK_LENGTH_METERS = Units.inchesToMeters(27.5);
     CONSTANTS.WHEEL_DIAMETER_METERS = Units.inchesToMeters(4);
     WHEEL_CIRCUMFERENCE_METERS = CONSTANTS.WHEEL_DIAMETER_METERS * PI;
-    CONSTANTS.WHEEL_COF = 1.5;
+    CONSTANTS.WHEEL_COF = 1;
 
     DRIVE_GEAR_RATIO = (50.0 / 16.0) * (17.0 / 27.0) * (45.0 / 15.0);
     CONSTANTS.DRIVE_MOTOR = DCMotor.getKrakenX60Foc(1).withReduction(DRIVE_GEAR_RATIO);
@@ -66,15 +67,18 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC =
         Units.rotationsPerMinuteToRadiansPerSecond(6000) / STEER_GEAR_RATIO;
 
-    CONSTANTS.MASS_KG = Units.lbsToKilograms(90);
+    CONSTANTS.MASS_KG = Units.lbsToKilograms(58);
+
+    double linearKa = 1;
+    double angularKa = 1;
     CONSTANTS.MOI_KG_METERS_SQUARED =
         CONSTANTS.MASS_KG
             * Math.hypot(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2)
-            * 1;
+            * (angularKa / linearKa);
 
     CONSTANTS.ANGULAR_SPEED_FUDGING = .45;
 
-    CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS =
+    CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS =
         Math.min(
             CONSTANTS.DRIVE_MOTOR.getCurrent(
                     CONSTANTS.WHEEL_COF
@@ -82,7 +86,8 @@ public class SwerveIOPhoenix implements SwerveIO {
                         * CONSTANTS.WHEEL_DIAMETER_METERS
                         / 2)
                 + 10,
-            100);
+            120);
+    CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS = 60;
   }
 
   private final Module[] modules = new Module[4];
@@ -111,7 +116,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
       System.arraycopy(signals, i * 8 + 3, lowFreqSignals, i * 5, 5);
     }
-    gyro = new Pigeon2(13, Robot.CANIVORE_NAME);
+    gyro = new Pigeon2(4 * 3 + 3, Robot.CANIVORE_NAME);
     devices[12] = gyro;
     signals[32] = gyro.getYaw(false);
     signals[33] = gyro.getAngularVelocityZWorld(false);
@@ -120,7 +125,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     BaseStatusSignal.setUpdateFrequencyForAll(50, lowFreqSignals);
 
-    ParentDevice.optimizeBusUtilizationForAll(4, devices);
+    ParentDevice.optimizeBusUtilizationForAll(5, devices);
 
     if (Robot.isSimulation()) {
       simThread = new SimThread(modules, gyro);
@@ -184,17 +189,14 @@ public class SwerveIOPhoenix implements SwerveIO {
   }
 
   @Override
-  public void drive(SwerveSetpoint setpoint, double[] forceFeedforward) {
+  public void drive(SwerveSetpoint setpoint) {
     for (int i = 0; i < 4; i++) {
-      var currentState = getCurrentState(i);
-      if (DriverStation.isDisabled()) {
-        currentState.speedMetersPerSecond = 0;
-      }
       modules[i].run(
           setpoint.moduleStates()[i],
-          currentState,
-          setpoint.steerFeedforwards()[i],
-          forceFeedforward[i]);
+          BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[i * 8], signals[i * 8 + 3])
+              * WHEEL_CIRCUMFERENCE_METERS,
+          Units.radiansToRotations(setpoint.steerFeedforwardsRadPerSec()[i]),
+          setpoint.driveFeedforwardsAmps()[i]);
     }
   }
 
@@ -212,6 +214,13 @@ public class SwerveIOPhoenix implements SwerveIO {
   public void steerCharacterization(double volts) {
     for (var module : modules) {
       module.steerCharacterize(volts);
+    }
+  }
+
+  @Override
+  public void driveCharacterization(double amps, Rotation2d[] angles) {
+    for (int i = 0; i < 4; i++) {
+      modules[i].driveCharacterize(amps, angles[i]);
     }
   }
 
@@ -236,24 +245,14 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerMotor = new TalonFX(id * 3 + 1, Robot.CANIVORE_NAME);
       encoder = new CANcoder(id * 3 + 2, Robot.CANIVORE_NAME);
 
-      var wheelForceNewtonsPerAmp =
-          CONSTANTS.DRIVE_MOTOR.KtNMPerAmp / (CONSTANTS.WHEEL_DIAMETER_METERS / 2);
-      var maxCurrentAccelMetersPerSecSquared =
-          4
-              * wheelForceNewtonsPerAmp
-              * CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS
-              / CONSTANTS.MASS_KG;
-      var maxTractionAccelMetersPerSecSquared = CONSTANTS.WHEEL_COF * 9.81;
-
       var driveConfig = new TalonFXConfiguration();
       driveConfig.Feedback.SensorToMechanismRatio = DRIVE_GEAR_RATIO;
-      driveConfig.MotionMagic.MotionMagicAcceleration =
-          Math.min(maxCurrentAccelMetersPerSecSquared, maxTractionAccelMetersPerSecSquared)
-              / WHEEL_CIRCUMFERENCE_METERS;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
-      driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
-      driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+      driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS;
+      driveConfig.CurrentLimits.SupplyCurrentLimit = CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS;
+      driveConfig.CurrentLimits.SupplyCurrentLowerLimit = 40;
+      driveConfig.CurrentLimits.SupplyCurrentLowerTime = 1;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
       var steerConfig = new TalonFXConfiguration();
@@ -286,16 +285,14 @@ public class SwerveIOPhoenix implements SwerveIO {
           case 3 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
         }
 
-        driveKpMultiplier = 0;
+        driveKpMultiplier = 1;
       } else {
-        driveKpMultiplier = 80;
+        driveKpMultiplier = 5;
 
         steerConfig.Slot0.kP = 600;
         steerConfig.Slot0.kD = 2.5;
       }
-      driveConfig.Slot0.kA =
-          WHEEL_CIRCUMFERENCE_METERS / (4 * wheelForceNewtonsPerAmp / CONSTANTS.MASS_KG);
-      driveConfig.Slot0.kP = driveKpMultiplier * driveConfig.Slot0.kA;
+      driveConfig.Slot0.kP = driveKpMultiplier * CONSTANTS.MASS_KG;
 
       steerConfig.Slot0.kV = 12 / Units.radiansToRotations(CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC);
 
@@ -304,32 +301,30 @@ public class SwerveIOPhoenix implements SwerveIO {
       encoder.getConfigurator().apply(encoderConfig);
     }
 
-    private final MotionMagicVelocityTorqueCurrentFOC driveControlRequest =
-        new MotionMagicVelocityTorqueCurrentFOC(0).withOverrideCoastDurNeutral(true);
+    private final VelocityTorqueCurrentFOC driveControlRequest =
+        new VelocityTorqueCurrentFOC(0).withOverrideCoastDurNeutral(true);
     private final PositionVoltage steerControlRequest = new PositionVoltage(0).withEnableFOC(false);
     private final StaticBrake brakeControlRequest = new StaticBrake();
 
     void run(
         SwerveModuleState desiredState,
-        SwerveModuleState currentState,
-        double steerFeedforward,
-        double forceFeedforward) {
+        double currentVel,
+        double steerFeedforwardRotPerSec,
+        double forceFeedforwardAmps) {
       if (MathUtil.isNear(0, desiredState.speedMetersPerSecond, 1e-3)
-          && MathUtil.isNear(0, forceFeedforward, 1e-3)
-          && MathUtil.isNear(0, currentState.speedMetersPerSecond, 1e-3)) {
+          && MathUtil.isNear(0, forceFeedforwardAmps, 1e-3)
+          && MathUtil.isNear(0, currentVel, 1e-3)) {
         driveMotor.setControl(brakeControlRequest);
       } else {
         driveMotor.setControl(
             driveControlRequest
                 .withVelocity(desiredState.speedMetersPerSecond / WHEEL_CIRCUMFERENCE_METERS)
-                .withFeedForward(
-                    ((forceFeedforward * (CONSTANTS.WHEEL_DIAMETER_METERS / 2)))
-                        / CONSTANTS.DRIVE_MOTOR.KtNMPerAmp));
+                .withFeedForward(forceFeedforwardAmps));
       }
       steerMotor.setControl(
           steerControlRequest
               .withPosition(desiredState.angle.getRotations())
-              .withVelocity(Units.radiansToRotations(steerFeedforward)));
+              .withVelocity(steerFeedforwardRotPerSec));
     }
 
     private final VoltageOut steerCharacterization = new VoltageOut(0).withEnableFOC(false);
@@ -337,6 +332,17 @@ public class SwerveIOPhoenix implements SwerveIO {
     void steerCharacterize(double volts) {
       driveMotor.setControl(brakeControlRequest);
       steerMotor.setControl(steerCharacterization.withOutput(volts));
+    }
+
+    private final TorqueCurrentFOC driveCharacterization = new TorqueCurrentFOC(0);
+
+    void driveCharacterize(double amps, Rotation2d angle) {
+      if (MathUtil.isNear(0, amps, 1e-2)) {
+        driveMotor.setControl(brakeControlRequest);
+      } else {
+        driveMotor.setControl(driveCharacterization.withOutput(amps));
+      }
+      steerMotor.setControl(steerControlRequest.withPosition(angle.getRotations()));
     }
 
     SwerveModulePosition getPosition() {
@@ -381,7 +387,14 @@ public class SwerveIOPhoenix implements SwerveIO {
     public void run() {
       //noinspection InfiniteLoopStatement
       while (true) {
-        BaseStatusSignal.waitForAll(2.0 / FREQUENCY, signals);
+        if (BaseStatusSignal.waitForAll(2.0 / FREQUENCY, signals) != StatusCode.OK) {
+          continue;
+        }
+
+        double latencySum = 0;
+        for (var signal : signals) {
+          latencySum += signal.getTimestamp().getLatency();
+        }
         var frame =
             new OdometryFrame(
                 new SwerveModulePosition[] {
@@ -392,7 +405,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                 },
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
-                RobotController.getFPGATime() / 1e6);
+                (RobotController.getFPGATime() / 1e6) - (latencySum / signals.length));
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
         }

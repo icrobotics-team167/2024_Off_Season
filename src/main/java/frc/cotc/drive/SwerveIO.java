@@ -11,8 +11,10 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.util.struct.Struct;
+import edu.wpi.first.util.struct.StructSerializable;
 import frc.cotc.util.MotorCurrentDraws;
-import java.util.ArrayList;
+import java.nio.ByteBuffer;
 import org.littletonrobotics.junction.AutoLog;
 import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.inputs.LoggableInputs;
@@ -42,8 +44,7 @@ public interface SwerveIO {
     public void toLog(LogTable table) {
       table.put("ModuleStates", moduleStates);
       table.put("GyroYaw", gyroYaw);
-      //      table.put("OdometryFrames", OdometryFrame.struct, odometryFrames);
-      OdometryFrame.toLog(odometryFrames, table);
+      table.put("OdometryFrames", OdometryFrame.struct, odometryFrames);
       table.put("DriveMotorCurrents", MotorCurrentDraws.struct, driveMotorCurrents);
       table.put("SteerMotorCurrents", MotorCurrentDraws.struct, steerMotorCurrents);
     }
@@ -52,8 +53,7 @@ public interface SwerveIO {
     public void fromLog(LogTable table) {
       moduleStates = table.get("ModuleStates", new SwerveModuleState[4]);
       gyroYaw = table.get("GyroYaw", Rotation2d.kZero);
-      //      odometryFrames = table.get("OdometryFrames", OdometryFrame.struct);
-      odometryFrames = OdometryFrame.fromLog(table);
+      odometryFrames = table.get("OdometryFrames", OdometryFrame.struct);
       driveMotorCurrents =
           table.get("DriveMotorCurrents", MotorCurrentDraws.struct, new MotorCurrentDraws[4]);
       steerMotorCurrents =
@@ -62,8 +62,7 @@ public interface SwerveIO {
   }
 
   record OdometryFrame(SwerveModulePosition[] positions, Rotation2d gyroYaw, double timestamp)
-  //      implements StructSerializable {
-  {
+      implements StructSerializable {
     public OdometryFrame {
       if (positions == null || positions.length != 4) {
         throw new IllegalArgumentException("Position count not 4");
@@ -73,79 +72,50 @@ public interface SwerveIO {
       }
     }
 
-    public static void toLog(OdometryFrame[] array, LogTable table) {
-      for (int i = 0; i < array.length; i++) {
-        table.put("OdometryFrames/" + i + "/positions", array[i].positions);
-        table.put("OdometryFrames/" + i + "/gyroYaw", array[i].gyroYaw);
-        table.put("OdometryFrames/" + i + "/timestamp", array[i].timestamp);
-      }
-    }
+    public static final Struct<OdometryFrame> struct =
+        new Struct<>() {
+          @Override
+          public Class<OdometryFrame> getTypeClass() {
+            return OdometryFrame.class;
+          }
 
-    public static OdometryFrame[] fromLog(LogTable table) {
-      var list = new ArrayList<OdometryFrame>();
-      int i = 0;
-      while (true) {
-        var timestamp = table.get("OdometryFrames/" + i + "/timestamp", -1.0);
-        if (timestamp < 0) {
-          break;
-        }
+          @Override
+          public String getTypeName() {
+            return "OdometryFrame";
+          }
 
-        var positions =
-            table.get("OdometryFrames/" + i + "/positions", new SwerveModulePosition[4]);
-        var gyroYaw = table.get("OdometryFrames/" + i + "/gyroYaw", Rotation2d.kZero);
+          @Override
+          public int getSize() {
+            return SwerveModulePosition.struct.getSize() * 4
+                + Rotation2d.struct.getSize()
+                + kSizeDouble;
+          }
 
-        list.add(new OdometryFrame(positions, gyroYaw, timestamp));
+          @Override
+          public String getSchema() {
+            return "SwerveModulePosition positions[4];Rotation2d gyroYaw;double timestamp";
+          }
 
-        i++;
-      }
+          @Override
+          public Struct<?>[] getNested() {
+            return new Struct<?>[] {SwerveModulePosition.struct, Rotation2d.struct};
+          }
 
-      return list.toArray(new OdometryFrame[i]);
-    }
+          @Override
+          public OdometryFrame unpack(ByteBuffer bb) {
+            var positions = Struct.unpackArray(bb, 4, SwerveModulePosition.struct);
+            var yaw = Rotation2d.struct.unpack(bb);
+            var timestamp = bb.getDouble();
+            return new OdometryFrame(positions, yaw, timestamp);
+          }
 
-    //    public static final Struct<OdometryFrame> struct =
-    //        new Struct<>() {
-    //          @Override
-    //          public Class<OdometryFrame> getTypeClass() {
-    //            return OdometryFrame.class;
-    //          }
-    //
-    //          @Override
-    //          public String getTypeName() {
-    //            return "OdometryFrame";
-    //          }
-    //
-    //          @Override
-    //          public int getSize() {
-    //            return SwerveModulePosition.struct.getSize() * 4
-    //                + Rotation2d.struct.getSize()
-    //                + kSizeDouble;
-    //          }
-    //
-    //          @Override
-    //          public String getSchema() {
-    //            return "SwerveModulePosition positions[4];Rotation2d gyroYaw;double timestamp";
-    //          }
-    //
-    //          @Override
-    //          public Struct<?>[] getNested() {
-    //            return new Struct<?>[] {SwerveModulePosition.struct, Rotation2d.struct};
-    //          }
-    //
-    //          @Override
-    //          public OdometryFrame unpack(ByteBuffer bb) {
-    //            var positions = Struct.unpackArray(bb, 4, SwerveModulePosition.struct);
-    //            var yaw = Rotation2d.struct.unpack(bb);
-    //            var timestamp = bb.getDouble();
-    //            return new OdometryFrame(positions, yaw, timestamp);
-    //          }
-    //
-    //          @Override
-    //          public void pack(ByteBuffer bb, OdometryFrame value) {
-    //            Struct.packArray(bb, value.positions, SwerveModulePosition.struct);
-    //            Rotation2d.struct.pack(bb, value.gyroYaw);
-    //            bb.putDouble(value.timestamp);
-    //          }
-    //        };
+          @Override
+          public void pack(ByteBuffer bb, OdometryFrame value) {
+            Struct.packArray(bb, value.positions, SwerveModulePosition.struct);
+            Rotation2d.struct.pack(bb, value.gyroYaw);
+            bb.putDouble(value.timestamp);
+          }
+        };
   }
 
   @SuppressWarnings("CanBeFinal")
@@ -159,7 +129,8 @@ public interface SwerveIO {
 
     // Should have a gear reduction applied with .withReduction()
     DCMotor DRIVE_MOTOR = DCMotor.getKrakenX60(1);
-    double DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
+    double DRIVE_STATOR_CURRENT_LIMIT_AMPS;
+    double DRIVE_SUPPLY_CURRENT_LIMIT_AMPS;
 
     double MASS_KG;
     double MOI_KG_METERS_SQUARED;
@@ -190,17 +161,13 @@ public interface SwerveIO {
    */
   default void updateInputs(SwerveIOInputs inputs) {}
 
-  /**
-   * Drives the drivebase.
-   *
-   * @param setpoint The drive setpoint.
-   * @param forceFeedforward The feedforward for the drive motor. Newtons.
-   */
-  default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint, double[] forceFeedforward) {}
+  default void drive(SwerveSetpointGenerator.SwerveSetpoint setpoint) {}
 
   default void resetGyro(Rotation2d newYaw) {}
 
   default void initSysId() {}
 
   default void steerCharacterization(double volts) {}
+
+  default void driveCharacterization(double amps, Rotation2d[] angles) {}
 }
