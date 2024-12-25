@@ -187,7 +187,6 @@ public class Swerve extends SubsystemBase {
 
   private ArrayList<Pose3d> tagPoses;
   private ArrayList<Pose3d> poseEstimates;
-  private ArrayList<Rotation2d> poseEstimateYaws;
 
   boolean visionLoggingEnabled = true;
 
@@ -244,7 +243,6 @@ public class Swerve extends SubsystemBase {
       if (visionLoggingEnabled && tagPoses == null) {
         tagPoses = new ArrayList<>();
         poseEstimates = new ArrayList<>();
-        poseEstimateYaws = new ArrayList<>();
       }
       for (int i = 0; i < visionIOs.length; i++) {
         visionIOs[i].updateInputs(visionInputs[i]);
@@ -278,18 +276,14 @@ public class Swerve extends SubsystemBase {
 
           if (visionLoggingEnabled) {
             poseEstimates.add(poseEstimate.estimatedPose());
-            poseEstimateYaws.add(new Rotation2d(poseEstimate.estimatedPose().getRotation().getZ()));
             tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
           }
         }
       }
       if (visionLoggingEnabled) {
         Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
-        Logger.recordOutput(
-            "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
         Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
         poseEstimates.clear();
-        poseEstimateYaws.clear();
         tagPoses.clear();
       }
     } else {
