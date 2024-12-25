@@ -59,11 +59,11 @@ public class Swerve extends SubsystemBase {
   private final PIDController xController, yController, yawController;
 
   private record StdDevTunings(
-      double distanceScalar, double tagCountExponent, double velocityScalar) {}
+      double distanceScalar, double heightScalar, double tagCountExponent, double velocityScalar) {}
 
   private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
     static final CameraTunings defaults =
-        new CameraTunings(new StdDevTunings(.3, 1.6, 3), new StdDevTunings(.2, 1.5, 1));
+        new CameraTunings(new StdDevTunings(.5, 1, 1.25, 3), new StdDevTunings(.2, 1, 1.5, 1));
   }
 
   private final double wheelRadiusMeters;
@@ -265,16 +265,16 @@ public class Swerve extends SubsystemBase {
         for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
           var poseEstimate = visionInputs[i].poseEstimates[j];
 
-          // Discard if the pose is too far above/below the ground
-          if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .05)) {
-            continue;
-          }
-
-          var stdDevs = getVisionStdDevs(poseEstimate, tunings);
-          Logger.recordOutput("Vision/Std Devs/" + i + "/" + j, stdDevs);
+          var translationalStdDevs = getVisionStdDevs(poseEstimate, tunings.translational);
+          var angularStdDevs = getVisionStdDevs(poseEstimate, tunings.angular);
+          Logger.recordOutput(
+              "Vision/Std Devs/" + i + "/" + j + "/Translational", translationalStdDevs);
+          Logger.recordOutput("Vision/Std Devs/" + i + "/" + j + "/Angular", angularStdDevs);
 
           poseEstimator.addVisionMeasurement(
-              poseEstimate.estimatedPose().toPose2d(), poseEstimate.timestamp(), stdDevs);
+              poseEstimate.estimatedPose().toPose2d(),
+              poseEstimate.timestamp(),
+              new double[] {translationalStdDevs, translationalStdDevs, angularStdDevs});
 
           if (visionLoggingEnabled) {
             poseEstimates.add(poseEstimate.estimatedPose());
@@ -340,40 +340,31 @@ public class Swerve extends SubsystemBase {
     return new double[] {Math.abs(stdDevs.getX()) + .01, Math.abs(stdDevs.getY()) + .01, .0005};
   }
 
-  private double[] getVisionStdDevs(
-      FiducialPoseEstimatorIO.PoseEstimate poseEstimate, CameraTunings tunings) {
-    double translationalScoreSum = 0;
-    double rotationalScoreSum = 0;
-
+  private double getVisionStdDevs(
+      FiducialPoseEstimatorIO.PoseEstimate poseEstimate, StdDevTunings tunings) {
+    double distanceScoreSum = 0;
     for (var tagPose : poseEstimate.tagsUsed()) {
       var distanceMeters =
           tagPose.getTranslation().getDistance(poseEstimate.estimatedPose().getTranslation());
-      translationalScoreSum +=
-          tunings.translational.distanceScalar * distanceMeters * distanceMeters;
-      rotationalScoreSum += tunings.angular.distanceScalar * distanceMeters * distanceMeters;
+      distanceScoreSum += tunings.distanceScalar * distanceMeters * distanceMeters;
     }
 
-    var translationalDivisor =
-        Math.pow(poseEstimate.tagsUsed().length, tunings.translational.tagCountExponent);
-    var rotationalDivisor =
-        Math.pow(poseEstimate.tagsUsed().length, tunings.angular.tagCountExponent);
+    var tagCountDivisor = Math.pow(poseEstimate.tagsUsed().length, tunings.tagCountExponent);
 
-    var translationalVelMagnitude =
-        Math.hypot(fieldRelativeSpeeds.vxMetersPerSecond, fieldRelativeSpeeds.vyMetersPerSecond)
-            / maxLinearSpeedMetersPerSec;
-    var angularVelMagnitude =
-        Math.abs(fieldRelativeSpeeds.omegaRadiansPerSecond) / maxAngularSpeedRadPerSec;
+    var velScalar =
+        MathUtil.interpolate(
+            1,
+            tunings.velocityScalar,
+            Math.hypot(fieldRelativeSpeeds.vxMetersPerSecond, fieldRelativeSpeeds.vyMetersPerSecond)
+                / maxLinearSpeedMetersPerSec);
 
-    var translationalScalar =
-        MathUtil.interpolate(1, tunings.translational.velocityScalar, translationalVelMagnitude);
-    var rotationalScalar =
-        MathUtil.interpolate(1, tunings.angular.velocityScalar, angularVelMagnitude);
+    var translationalHeightScalar =
+        1
+            + tunings.heightScalar
+                * poseEstimate.estimatedPose().getZ()
+                * poseEstimate.estimatedPose().getZ();
 
-    return new double[] {
-      translationalScoreSum * translationalScalar / translationalDivisor,
-      translationalScoreSum * translationalScalar / translationalDivisor,
-      rotationalScoreSum * rotationalScalar / rotationalDivisor
-    };
+    return distanceScoreSum * velScalar * translationalHeightScalar / tagCountDivisor;
   }
 
   public Command teleopDrive(

@@ -37,6 +37,13 @@ public class Robot extends LoggedRobot {
 
   private final Autos autos;
 
+  @SuppressWarnings("unused")
+  private enum Mode {
+    REAL,
+    SIM,
+    REPLAY
+  }
+
   @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
   public Robot() {
     // If this is erroring, hit build
@@ -49,23 +56,23 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
-    //    String mode = Robot.isReal() ? "REAL" : "SIM";
-    String mode = "REPLAY";
+    Mode mode = Robot.isReal() ? Mode.REAL : Mode.SIM;
+    // Mode mode = Robot.isReal() ? Mode.REAL : Mode.REPLAY;
 
     switch (mode) {
-      case "REAL" -> {
+      case REAL -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
         LoggedPowerDistribution.getInstance(); // Enables power distribution logging
         SignalLogger.start(); // Start logging Phoenix CAN signals
       }
-      case "SIM" -> {
+      case SIM -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to the project's logs folder
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
 
         SignalLogger.start(); // Start logging Phoenix CAN signals
       }
-      case "REPLAY" -> {
+      case REPLAY -> {
         setUseTiming(false); // Run as fast as possible
         String logPath;
         try {
@@ -105,7 +112,7 @@ public class Robot extends LoggedRobot {
     autos = new Autos(swerve);
   }
 
-  private Swerve getSwerve(String mode) {
+  private Swerve getSwerve(Mode mode) {
     SwerveIO swerveIO;
     FiducialPoseEstimatorIO[] visionIOs;
 
@@ -125,7 +132,7 @@ public class Robot extends LoggedRobot {
         };
 
     switch (mode) {
-      case "REAL", "SIM" -> {
+      case REAL, SIM -> {
         swerveIO = new SwerveIOPhoenix();
         visionIOs =
             new FiducialPoseEstimatorIO[] {
