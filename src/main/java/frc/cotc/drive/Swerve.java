@@ -63,7 +63,7 @@ public class Swerve extends SubsystemBase {
 
   private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
     static final CameraTunings defaults =
-        new CameraTunings(new StdDevTunings(.5, 1, 1.25, 3), new StdDevTunings(.2, 1, 1.5, 1));
+        new CameraTunings(new StdDevTunings(1, 1, 2, 3), new StdDevTunings(.2, 1, 1.5, 1));
   }
 
   private final double wheelRadiusMeters;
@@ -104,7 +104,6 @@ public class Swerve extends SubsystemBase {
             },
             CONSTANTS.DRIVE_MOTOR,
             CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS,
-            CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS,
             CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC,
             CONSTANTS.MASS_KG,
             CONSTANTS.MOI_KG_METERS_SQUARED,
@@ -185,8 +184,8 @@ public class Swerve extends SubsystemBase {
           "Swerve: Odometry data was out of order! Expected latest data last.",
           Alert.AlertType.kWarning);
 
-  private ArrayList<Pose3d> tagPoses;
-  private ArrayList<Pose3d> poseEstimates;
+  private final ArrayList<Pose3d> tagPoses = new ArrayList<>();
+  private final ArrayList<Pose3d> poseEstimates = new ArrayList<>();
 
   boolean visionLoggingEnabled = true;
 
@@ -240,10 +239,6 @@ public class Swerve extends SubsystemBase {
         FiducialPoseEstimatorIOPhoton.VisionSim.getInstance().update();
       }
 
-      if (visionLoggingEnabled && tagPoses == null) {
-        tagPoses = new ArrayList<>();
-        poseEstimates = new ArrayList<>();
-      }
       for (int i = 0; i < visionIOs.length; i++) {
         visionIOs[i].updateInputs(visionInputs[i]);
         Logger.processInputs("Vision/" + i, visionInputs[i]);
@@ -280,12 +275,10 @@ public class Swerve extends SubsystemBase {
           }
         }
       }
-      if (visionLoggingEnabled) {
-        Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
-        Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
-        poseEstimates.clear();
-        tagPoses.clear();
-      }
+      Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
+      Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
+      poseEstimates.clear();
+      tagPoses.clear();
     } else {
       poseReset = false;
     }

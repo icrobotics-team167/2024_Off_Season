@@ -57,7 +57,7 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
     Mode mode = Robot.isReal() ? Mode.REAL : Mode.SIM;
-    // Mode mode = Robot.isReal() ? Mode.REAL : Mode.REPLAY;
+    //    Mode mode = Robot.isReal() ? Mode.REAL : Mode.REPLAY;
 
     switch (mode) {
       case REAL -> {

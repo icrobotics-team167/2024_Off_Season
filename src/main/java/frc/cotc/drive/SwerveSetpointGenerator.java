@@ -37,7 +37,6 @@ public class SwerveSetpointGenerator {
   private final Translation2d[] moduleLocations;
   private final DCMotor driveMotor;
   private final double statorCurrentLimitAmps,
-      supplyCurrentLimitAmps,
       maxDriveVelocity,
       maxSteerSpeedRadPerSec,
       massKg,
@@ -51,7 +50,6 @@ public class SwerveSetpointGenerator {
       final Translation2d[] moduleLocations,
       final DCMotor driveMotor,
       final double statorCurrentLimitAmps,
-      final double supplyCurrentLimitAmps,
       final double maxSteerSpeedRadPerSec,
       final double massKg,
       final double moiKgMetersSquared,
@@ -60,7 +58,6 @@ public class SwerveSetpointGenerator {
 
     this.driveMotor = driveMotor;
     this.statorCurrentLimitAmps = statorCurrentLimitAmps;
-    this.supplyCurrentLimitAmps = supplyCurrentLimitAmps;
     this.maxSteerSpeedRadPerSec = maxSteerSpeedRadPerSec;
     kinematics = new SwerveDriveKinematics(moduleLocations);
     this.moduleLocations = moduleLocations;
@@ -223,7 +220,6 @@ public class SwerveSetpointGenerator {
     CENTRIPETAL,
     MOTOR_DYNAMICS,
     STATOR_CURRENT,
-    SUPPLY_CURRENT,
     TRACTION
   }
 
@@ -415,7 +411,6 @@ public class SwerveSetpointGenerator {
     Translation2d chassisForceVec = new Translation2d();
     double chassisTorque = 0.0;
     double[] dutyCycles = new double[4];
-    double[] currentLimits = new double[4];
     int[] forceSigns = new int[4];
     double[] desiredSpeeds = new double[4];
     double[] expectedCurrentDraws = new double[4];
@@ -447,23 +442,31 @@ public class SwerveSetpointGenerator {
 
       lastVelMagnitudes[i] =
           Math.abs(prevSetpoint.moduleStates()[i].speedMetersPerSecond / wheelRadiusMeters);
-      double currentDraw;
       // Estimate duty cycle from stator current and duty cycle
       double lastVelRadPerSec = lastVelMagnitudes[i];
       double dutyCycle = Math.min(Math.abs(lastVelRadPerSec) / (maxSpeed / wheelRadiusMeters), 1);
       dutyCycles[i] = dutyCycle;
 
-      double supplyLimitedStatorCurrent = supplyCurrentLimitAmps / dutyCycle;
-      double currentLimitAmps = Math.min(statorCurrentLimitAmps, supplyLimitedStatorCurrent);
-      currentLimits[i] = currentLimitAmps;
-      // Use the current battery voltage since we won't be able to supply 12v if the
-      // battery is sagging down to 11v, which will affect the max torque output
-      currentDraw =
-          Math.max(
-              Math.min(
-                  driveMotor.getCurrent(Math.abs(lastVelRadPerSec), voltage), currentLimitAmps),
-              0);
-      double moduleTorque = driveMotor.getTorque(currentDraw);
+      double currentDraw;
+      if (forceSign == 1) { // Use the current battery voltage since we won't be able to supply
+        // 12v if the
+        // battery is sagging down to 11v, which will affect the max torque output
+        currentDraw =
+            Math.max(
+                Math.min(
+                    driveMotor.getCurrent(Math.abs(lastVelRadPerSec), voltage),
+                    statorCurrentLimitAmps),
+                0);
+      } else {
+        currentDraw = statorCurrentLimitAmps;
+      }
+      double moduleTorque =
+          driveMotor.getTorque(
+              Math.max(
+                  currentDraw
+                      - MathUtil.interpolate(
+                          0, driveMotor.freeCurrentAmps, Math.abs(lastVelRadPerSec)),
+                  0));
 
       // Limit torque to prevent wheel slip
       moduleTorque = Math.min(moduleTorque, maxTorqueFriction);
@@ -473,8 +476,6 @@ public class SwerveSetpointGenerator {
         currentDraw = driveMotor.getCurrent(maxTorqueFriction);
       } else if (currentDraw == statorCurrentLimitAmps) {
         activeConstraints[i] = ActiveConstraint.STATOR_CURRENT;
-      } else if (currentDraw == supplyLimitedStatorCurrent) {
-        activeConstraints[i] = ActiveConstraint.SUPPLY_CURRENT;
       } else if (!epsilonEquals(0, currentDraw)) {
         activeConstraints[i] = ActiveConstraint.MOTOR_DYNAMICS;
       }
@@ -496,7 +497,6 @@ public class SwerveSetpointGenerator {
 
     Logger.recordOutput(
         "Swerve/Setpoint Generator/Internal State/Expected Duty Cycles/", dutyCycles);
-    Logger.recordOutput("Swerve/Setpoint Generator/Internal State/Current Limits/", currentLimits);
     Logger.recordOutput(
         "Swerve/Setpoint Generator/Internal State/Expected stator current/", expectedCurrentDraws);
     Logger.recordOutput("Swerve/Setpoint Generator/Internal State/Force Signs", forceSigns);
@@ -583,8 +583,8 @@ public class SwerveSetpointGenerator {
       var torqueCurrent =
           MathUtil.clamp(
               driveMotor.getCurrent(appliedForce * wheelRadiusMeters),
-              -currentLimits[i],
-              currentLimits[i]);
+              -statorCurrentLimitAmps,
+              statorCurrentLimitAmps);
 
       final var maybeOverride = overrideSteering.get(i);
       if (maybeOverride.isPresent()) {

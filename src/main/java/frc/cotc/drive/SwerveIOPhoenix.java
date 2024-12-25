@@ -58,7 +58,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.TRACK_LENGTH_METERS = Units.inchesToMeters(27.5);
     CONSTANTS.WHEEL_DIAMETER_METERS = Units.inchesToMeters(4);
     WHEEL_CIRCUMFERENCE_METERS = CONSTANTS.WHEEL_DIAMETER_METERS * PI;
-    CONSTANTS.WHEEL_COF = 1;
+    CONSTANTS.WHEEL_COF = 5;
 
     DRIVE_GEAR_RATIO = (50.0 / 16.0) * (17.0 / 27.0) * (45.0 / 15.0);
     CONSTANTS.DRIVE_MOTOR = DCMotor.getKrakenX60Foc(1).withReduction(DRIVE_GEAR_RATIO);
@@ -80,14 +80,15 @@ public class SwerveIOPhoenix implements SwerveIO {
 
     CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS =
         Math.min(
-            CONSTANTS.DRIVE_MOTOR.getCurrent(
-                    CONSTANTS.WHEEL_COF
-                        * ((CONSTANTS.MASS_KG / 4) * 9.81)
-                        * CONSTANTS.WHEEL_DIAMETER_METERS
-                        / 2)
-                + 10,
-            120);
-    CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS = 60;
+            (int)
+                Math.round(
+                    CONSTANTS.DRIVE_MOTOR.getCurrent(
+                            CONSTANTS.WHEEL_COF
+                                * ((CONSTANTS.MASS_KG / 4) * 9.81)
+                                * CONSTANTS.WHEEL_DIAMETER_METERS
+                                / 2)
+                        + 10),
+            100);
   }
 
   private final Module[] modules = new Module[4];
@@ -250,7 +251,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS;
-      driveConfig.CurrentLimits.SupplyCurrentLimit = CONSTANTS.DRIVE_SUPPLY_CURRENT_LIMIT_AMPS;
+      driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
       driveConfig.CurrentLimits.SupplyCurrentLowerLimit = 40;
       driveConfig.CurrentLimits.SupplyCurrentLowerTime = 1;
       driveConfig.Audio.AllowMusicDurDisable = true;
@@ -287,7 +288,7 @@ public class SwerveIOPhoenix implements SwerveIO {
 
         driveKpMultiplier = 1;
       } else {
-        driveKpMultiplier = 5;
+        driveKpMultiplier = 1;
 
         steerConfig.Slot0.kP = 600;
         steerConfig.Slot0.kD = 2.5;
