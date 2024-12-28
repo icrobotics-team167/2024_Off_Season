@@ -252,8 +252,6 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
       driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS;
       driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
-      driveConfig.CurrentLimits.SupplyCurrentLowerLimit = 40;
-      driveConfig.CurrentLimits.SupplyCurrentLowerTime = 1;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
       var steerConfig = new TalonFXConfiguration();
