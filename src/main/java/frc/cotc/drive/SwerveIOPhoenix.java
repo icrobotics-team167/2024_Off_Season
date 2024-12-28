@@ -240,7 +240,6 @@ public class SwerveIOPhoenix implements SwerveIO {
     final TalonFX steerMotor;
     final CANcoder encoder;
 
-    @SuppressWarnings("DuplicateBranchesInSwitch")
     public Module(int id) {
       driveMotor = new TalonFX(id * 3, Robot.CANIVORE_NAME);
       steerMotor = new TalonFX(id * 3 + 1, Robot.CANIVORE_NAME);
@@ -267,6 +266,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerConfig.CurrentLimits.SupplyCurrentLowerLimit = 10;
       steerConfig.CurrentLimits.SupplyCurrentLowerTime = .5;
       steerConfig.Audio.AllowMusicDurDisable = true;
+      steerConfig.Slot0.kV = 12 / Units.radiansToRotations(CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC);
 
       var encoderConfig = new CANcoderConfiguration();
 
@@ -274,14 +274,14 @@ public class SwerveIOPhoenix implements SwerveIO {
       if (Robot.isReal()) {
         driveConfig.Slot0.kV = 0;
 
-        steerConfig.Slot0.kP = 0;
+        steerConfig.Slot0.kP = 48;
         steerConfig.Slot0.kD = 0;
 
         switch (id) {
-          case 0 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
-          case 1 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
-          case 2 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
-          case 3 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
+          case 0 -> encoderConfig.MagnetSensor.MagnetOffset = 0.478271484375;
+          case 1 -> encoderConfig.MagnetSensor.MagnetOffset = -0.00634765625;
+          case 2 -> encoderConfig.MagnetSensor.MagnetOffset = -0.306884765625;
+          case 3 -> encoderConfig.MagnetSensor.MagnetOffset = -0.086181640625;
         }
 
         driveKpMultiplier = 1;
@@ -292,8 +292,6 @@ public class SwerveIOPhoenix implements SwerveIO {
         steerConfig.Slot0.kD = 2.5;
       }
       driveConfig.Slot0.kP = driveKpMultiplier * CONSTANTS.MASS_KG;
-
-      steerConfig.Slot0.kV = 12 / Units.radiansToRotations(CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC);
 
       driveMotor.getConfigurator().apply(driveConfig);
       steerMotor.getConfigurator().apply(steerConfig);
