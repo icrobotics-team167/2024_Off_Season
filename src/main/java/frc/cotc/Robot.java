@@ -8,14 +8,13 @@
 package frc.cotc;
 
 import com.ctre.phoenix6.SignalLogger;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
@@ -96,17 +95,20 @@ public class Robot extends LoggedRobot {
 
     Swerve swerve = getSwerve(mode);
 
-    var primaryLeft = new CommandJoystick(0);
-    var primaryRight = new CommandJoystick(1);
+    var primary = new CommandXboxController(0);
 
     // Robot wants +X fwd, +Y left
     // Sticks are +X right +Y back
     swerve.setDefaultCommand(
         swerve.teleopDrive(
-            () -> MathUtil.applyDeadband(-primaryLeft.getY(), .01),
-            () -> MathUtil.applyDeadband(-primaryLeft.getX(), .01),
-            () -> MathUtil.applyDeadband(-primaryRight.getX(), .01)));
-    RobotModeTriggers.disabled().or(primaryLeft.button(3)).whileTrue(swerve.stopInX());
+            () -> -primary.getLeftY(),
+            () -> -primary.getLeftX(),
+            .06,
+            2,
+            () -> -primary.getRightX(),
+            .05,
+            2));
+    RobotModeTriggers.disabled().or(primary.povDown()).whileTrue(swerve.stopInX());
     RobotModeTriggers.teleop().onTrue(swerve.resetGyro());
 
     autos = new Autos(swerve);

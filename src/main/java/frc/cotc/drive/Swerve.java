@@ -355,16 +355,42 @@ public class Swerve extends SubsystemBase {
   }
 
   public Command teleopDrive(
-      DoubleSupplier xSupplier, DoubleSupplier ySupplier, DoubleSupplier omegaSupplier) {
+      DoubleSupplier xSupplier,
+      DoubleSupplier ySupplier,
+      double translationDeadband,
+      double translationExponent,
+      DoubleSupplier omegaSupplier,
+      double omegaDeadband,
+      double omegaExponent) {
     return run(
-        () ->
-            teleopDrive(
-                ChassisSpeeds.fromFieldRelativeSpeeds(
-                    new ChassisSpeeds(
-                        xSupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
-                        ySupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
-                        omegaSupplier.getAsDouble() * maxAngularSpeedRadPerSec),
-                    swerveInputs.gyroYaw)));
+        () -> {
+          double xControl = xSupplier.getAsDouble();
+          double yControl = ySupplier.getAsDouble();
+          double magnitude = Math.hypot(xControl, yControl);
+          if (magnitude > 1) {
+            xControl /= magnitude;
+            yControl /= magnitude;
+          } else {
+            double scalar =
+                Math.pow(
+                    MathUtil.applyDeadband(magnitude, translationDeadband) / magnitude,
+                    translationExponent);
+            xControl *= scalar;
+            yControl *= scalar;
+          }
+
+          double omegaControl = MathUtil.applyDeadband(omegaSupplier.getAsDouble(), omegaDeadband);
+          omegaControl =
+              Math.pow(Math.abs(omegaControl), omegaExponent) * Math.signum(omegaControl);
+
+          teleopDrive(
+              ChassisSpeeds.fromFieldRelativeSpeeds(
+                  new ChassisSpeeds(
+                      xControl * maxLinearSpeedMetersPerSec,
+                      yControl * maxLinearSpeedMetersPerSec,
+                      omegaControl * maxAngularSpeedRadPerSec),
+                  swerveInputs.gyroYaw));
+        });
   }
 
   public Command stopInX() {
