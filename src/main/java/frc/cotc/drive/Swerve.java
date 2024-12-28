@@ -63,7 +63,7 @@ public class Swerve extends SubsystemBase {
 
   private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
     static final CameraTunings defaults =
-        new CameraTunings(new StdDevTunings(1, 1, 2, 3), new StdDevTunings(.2, 1, 1.5, 1));
+        new CameraTunings(new StdDevTunings(.5, 1, 2, 2), new StdDevTunings(.2, 1, 1.5, 1));
   }
 
   private final double wheelRadiusMeters;
@@ -318,11 +318,12 @@ public class Swerve extends SubsystemBase {
       ySquaredSum += yDelta * yDelta;
     }
 
+    // Sqrt of avg of squared deltas = standard deviation
+    // Rotate to convert to field relative
     var stdDevs =
         new Translation2d(Math.sqrt(xSquaredSum) / 4, Math.sqrt(ySquaredSum) / 4)
             .rotateBy(swerveInputs.gyroYaw);
 
-    // Sqrt of avg of squared deltas = standard deviation
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
     return new double[] {Math.abs(stdDevs.getX()) + .01, Math.abs(stdDevs.getY()) + .01, .0005};
   }
@@ -404,11 +405,13 @@ public class Swerve extends SubsystemBase {
   public Command resetGyro() {
     return runOnce(
         () -> {
-          swerveIO.resetGyro(poseEstimator.getEstimatedPosition().getRotation());
+          var gyroAngle =
+              Robot.isOnRed()
+                  ? poseEstimator.getEstimatedPosition().getRotation().rotateBy(Rotation2d.kPi)
+                  : poseEstimator.getEstimatedPosition().getRotation();
+          swerveIO.resetGyro(gyroAngle);
           poseEstimator.resetPosition(
-              poseEstimator.getEstimatedPosition().getRotation(),
-              getLatestModulePositions(),
-              poseEstimator.getEstimatedPosition());
+              gyroAngle, getLatestModulePositions(), poseEstimator.getEstimatedPosition());
         });
   }
 
@@ -582,7 +585,8 @@ public class Swerve extends SubsystemBase {
         && swerveIO instanceof SwerveIOPhoenix phoenix) {
       phoenix.resetGroundTruth(pose);
     }
-    swerveIO.resetGyro(pose.getRotation());
+    swerveIO.resetGyro(
+        Robot.isOnRed() ? pose.getRotation().rotateBy(Rotation2d.kPi) : pose.getRotation());
     xController.reset();
     yController.reset();
     yawController.reset();
