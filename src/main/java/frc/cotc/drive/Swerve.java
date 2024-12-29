@@ -59,11 +59,11 @@ public class Swerve extends SubsystemBase {
   private final PIDController xController, yController, yawController;
 
   private record StdDevTunings(
-      double distanceScalar, double heightScalar, double tagCountExponent, double velocityScalar) {}
+      double distanceScalar, double heightScalar, double tagCountExponent) {}
 
   private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
     static final CameraTunings defaults =
-        new CameraTunings(new StdDevTunings(.5, 1, 2, 2), new StdDevTunings(.2, 1, 1.5, 1));
+        new CameraTunings(new StdDevTunings(1.5, 1, 2), new StdDevTunings(.2, 1, 1.5));
   }
 
   private final double wheelRadiusMeters;
@@ -320,12 +320,26 @@ public class Swerve extends SubsystemBase {
 
     // Sqrt of avg of squared deltas = standard deviation
     // Rotate to convert to field relative
+    double scalar = 15;
     var stdDevs =
-        new Translation2d(Math.sqrt(xSquaredSum) / 4, Math.sqrt(ySquaredSum) / 4)
+        new Translation2d(
+                scalar * (Math.sqrt(xSquaredSum) / 4), scalar * (Math.sqrt(ySquaredSum) / 4))
             .rotateBy(swerveInputs.gyroYaw);
 
+    var scaledSpeed =
+        new Translation2d(
+                fieldRelativeSpeeds.vxMetersPerSecond / maxLinearSpeedMetersPerSec,
+                fieldRelativeSpeeds.vyMetersPerSecond / maxLinearSpeedMetersPerSec)
+            .rotateBy(Rotation2d.kCCW_90deg)
+            .times(
+                1 * Math.abs(fieldRelativeSpeeds.omegaRadiansPerSecond / maxAngularSpeedRadPerSec));
+
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {Math.abs(stdDevs.getX()) + .01, Math.abs(stdDevs.getY()) + .01, .0005};
+    return new double[] {
+      Math.abs(stdDevs.getX()) + Math.abs(scaledSpeed.getX()) + .1,
+      Math.abs(stdDevs.getY()) + Math.abs(scaledSpeed.getY()) + .1,
+      .0005
+    };
   }
 
   private double getVisionStdDevs(
@@ -339,20 +353,13 @@ public class Swerve extends SubsystemBase {
 
     var tagCountDivisor = Math.pow(poseEstimate.tagsUsed().length, tunings.tagCountExponent);
 
-    var velScalar =
-        MathUtil.interpolate(
-            1,
-            tunings.velocityScalar,
-            Math.hypot(fieldRelativeSpeeds.vxMetersPerSecond, fieldRelativeSpeeds.vyMetersPerSecond)
-                / maxLinearSpeedMetersPerSec);
-
     var translationalHeightScalar =
         1
             + tunings.heightScalar
                 * poseEstimate.estimatedPose().getZ()
                 * poseEstimate.estimatedPose().getZ();
 
-    return distanceScoreSum * velScalar * translationalHeightScalar / tagCountDivisor;
+    return (distanceScoreSum / tagCountDivisor) * translationalHeightScalar;
   }
 
   public Command teleopDrive(

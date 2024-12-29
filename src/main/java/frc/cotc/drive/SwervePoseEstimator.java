@@ -18,6 +18,10 @@ import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.TreeMap;
 
+/**
+ * A copy of {@link edu.wpi.first.math.estimator.SwerveDrivePoseEstimator} to allow for on-the-fly
+ * drive std dev tuning.
+ */
 public class SwervePoseEstimator {
   private final SwerveDriveOdometry odometry;
 
