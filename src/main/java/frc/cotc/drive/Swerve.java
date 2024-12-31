@@ -326,6 +326,10 @@ public class Swerve extends SubsystemBase {
                 scalar * (Math.sqrt(xSquaredSum) / 4), scalar * (Math.sqrt(ySquaredSum) / 4))
             .rotateBy(swerveInputs.gyroYaw);
 
+    // If translating and rotating at the same time, odometry drifts pretty badly in the
+    // direction perpendicular to the direction of translational travel.
+    // This factor massively distrusts odometry in that direction when translating and rotating
+    // at the same time.
     var scaledSpeed =
         new Translation2d(
                 fieldRelativeSpeeds.vxMetersPerSecond / maxLinearSpeedMetersPerSec,
