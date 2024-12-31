@@ -505,9 +505,9 @@ public class Swerve extends SubsystemBase {
     var sysId =
         new SysIdRoutine(
             new SysIdRoutine.Config(
-                Volts.of(1).per(Second),
+                Volts.of(2).per(Second),
                 Volts.of(6),
-                Seconds.of(12),
+                Seconds.of(6),
                 state -> SignalLogger.writeString("SysIDState", state.toString())),
             new SysIdRoutine.Mechanism(
                 voltage -> swerveIO.steerCharacterization(voltage.baseUnitMagnitude()),
@@ -551,7 +551,7 @@ public class Swerve extends SubsystemBase {
         new SysIdRoutine(
             new SysIdRoutine.Config(
                 Volts.of(10).per(Second),
-                Volts.of(25),
+                Volts.of(20),
                 Seconds.of(4),
                 state -> SignalLogger.writeString("SysIDState", state.toString())),
             new SysIdRoutine.Mechanism(
