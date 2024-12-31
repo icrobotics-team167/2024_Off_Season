@@ -382,7 +382,7 @@ public class Swerve extends SubsystemBase {
           if (magnitude > 1) {
             xControl /= magnitude;
             yControl /= magnitude;
-          } else {
+          } else if (magnitude > 1e-6) {
             double scalar =
                 Math.pow(
                     MathUtil.applyDeadband(magnitude, translationDeadband) / magnitude,
