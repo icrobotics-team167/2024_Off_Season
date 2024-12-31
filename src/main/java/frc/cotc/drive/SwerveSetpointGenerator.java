@@ -232,39 +232,42 @@ public class SwerveSetpointGenerator {
    *
    * @param prevSetpoint The previous setpoint motion. Normally, you'd pass in the previous
    *     iteration setpoint instead of the actual measured/estimated kinematic state.
-   * @param desiredState The desired state of motion, such as from the driver sticks or a path
-   *     following algorithm.
+   * @param desiredChassisSpeeds The desired state of motion, such as from the driver sticks or a
+   *     path following algorithm.
    * @param dt The loop time.
    * @return A setpoint that satisfies all the kinematic limits while converging to desiredState
    *     quickly.
    */
   public SwerveSetpoint generateSetpoint(
-      final SwerveSetpoint prevSetpoint, ChassisSpeeds desiredState, double voltage, double dt) {
+      final SwerveSetpoint prevSetpoint,
+      ChassisSpeeds desiredChassisSpeeds,
+      double voltage,
+      double dt) {
     if (voltage > 12) {
       voltage = 12;
     }
     double maxSpeed = maxDriveVelocity * Math.min(1, voltage / 12);
 
     // Some crimes against RAM right here. This wouldn't be a big deal if the RoboRIO wasn't crap.
-    SwerveModuleState[] desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
+    SwerveModuleState[] desiredModuleStates = kinematics.toSwerveModuleStates(desiredChassisSpeeds);
     // Make sure desiredState respects velocity limits.
-    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
-    desiredState = kinematics.toChassisSpeeds(desiredModuleState);
+    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleStates, maxSpeed);
+    desiredChassisSpeeds = kinematics.toChassisSpeeds(desiredModuleStates);
     // Discretize
-    desiredState = ChassisSpeeds.discretize(desiredState, dt);
-    desiredModuleState = kinematics.toSwerveModuleStates(desiredState);
+    desiredChassisSpeeds = ChassisSpeeds.discretize(desiredChassisSpeeds, dt);
+    desiredModuleStates = kinematics.toSwerveModuleStates(desiredChassisSpeeds);
     // Desaturate
-    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxSpeed);
-    desiredState = kinematics.toChassisSpeeds(desiredModuleState);
+    SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleStates, maxSpeed);
+    desiredChassisSpeeds = kinematics.toChassisSpeeds(desiredModuleStates);
 
     // Special case: desiredState is a complete stop. In this case, module angle is arbitrary, so
     // just use the previous angle.
     boolean need_to_steer = true;
-    if (chassisSpeedsNearZero(desiredState)) {
+    if (chassisSpeedsNearZero(desiredChassisSpeeds)) {
       need_to_steer = false;
       for (int i = 0; i < 4; ++i) {
-        desiredModuleState[i].angle = prevSetpoint.moduleStates()[i].angle;
-        desiredModuleState[i].speedMetersPerSecond = 0.0;
+        desiredModuleStates[i].angle = prevSetpoint.moduleStates()[i].angle;
+        desiredModuleStates[i].speedMetersPerSecond = 0.0;
       }
     }
 
@@ -288,11 +291,11 @@ public class SwerveSetpointGenerator {
         prev_heading[i] = prev_heading[i].rotateBy(Rotation2d.fromRadians(Math.PI));
       }
       desired_vx[i] =
-          desiredModuleState[i].angle.getCos() * desiredModuleState[i].speedMetersPerSecond;
+          desiredModuleStates[i].angle.getCos() * desiredModuleStates[i].speedMetersPerSecond;
       desired_vy[i] =
-          desiredModuleState[i].angle.getSin() * desiredModuleState[i].speedMetersPerSecond;
-      desired_heading[i] = desiredModuleState[i].angle;
-      if (desiredModuleState[i].speedMetersPerSecond < 0.0) {
+          desiredModuleStates[i].angle.getSin() * desiredModuleStates[i].speedMetersPerSecond;
+      desired_heading[i] = desiredModuleStates[i].angle;
+      if (desiredModuleStates[i].speedMetersPerSecond < 0.0) {
         desired_heading[i] = desired_heading[i].rotateBy(Rotation2d.kPi);
       }
       if (all_modules_should_flip) {
@@ -305,7 +308,7 @@ public class SwerveSetpointGenerator {
     }
     if (all_modules_should_flip
         && !chassisSpeedsNearZero(prevSetpoint.chassisSpeeds())
-        && !chassisSpeedsNearZero(desiredState)) {
+        && !chassisSpeedsNearZero(desiredChassisSpeeds)) {
       // It will (likely) be faster to stop the robot, rotate the modules in place to the complement
       // of the desired
       // angle, and accelerate again.
@@ -316,10 +319,13 @@ public class SwerveSetpointGenerator {
     // the goal state; then
     // find the amount we can move from start towards goal in this cycle such that no kinematic
     // limit is exceeded.
-    double dx = desiredState.vxMetersPerSecond - prevSetpoint.chassisSpeeds().vxMetersPerSecond;
-    double dy = desiredState.vyMetersPerSecond - prevSetpoint.chassisSpeeds().vyMetersPerSecond;
+    double dx =
+        desiredChassisSpeeds.vxMetersPerSecond - prevSetpoint.chassisSpeeds().vxMetersPerSecond;
+    double dy =
+        desiredChassisSpeeds.vyMetersPerSecond - prevSetpoint.chassisSpeeds().vyMetersPerSecond;
     double dtheta =
-        desiredState.omegaRadiansPerSecond - prevSetpoint.chassisSpeeds().omegaRadiansPerSecond;
+        desiredChassisSpeeds.omegaRadiansPerSecond
+            - prevSetpoint.chassisSpeeds().omegaRadiansPerSecond;
 
     ActiveConstraint[] activeConstraints = new ActiveConstraint[4];
 
@@ -347,14 +353,18 @@ public class SwerveSetpointGenerator {
         // If module is stopped, we know that we will need to move straight to the final steering
         // angle, so limit based
         // purely on rotation in place.
-        if (epsilonEquals(desiredModuleState[i].speedMetersPerSecond, 0.0)) {
+        if (epsilonEquals(desiredModuleStates[i].speedMetersPerSecond, 0.0)) {
           // Goal angle doesn't matter. Just leave module at its current angle.
           overrideSteering.set(i, Optional.of(prevSetpoint.moduleStates()[i].angle));
           continue;
         }
 
         var necessaryRotation =
-            prevSetpoint.moduleStates()[i].angle.unaryMinus().rotateBy(desiredModuleState[i].angle);
+            prevSetpoint
+                .moduleStates()[i]
+                .angle
+                .unaryMinus()
+                .rotateBy(desiredModuleStates[i].angle);
         if (flipHeading(necessaryRotation)) {
           necessaryRotation = necessaryRotation.rotateBy(Rotation2d.fromRadians(Math.PI));
         }
@@ -363,7 +373,7 @@ public class SwerveSetpointGenerator {
 
         if (numStepsNeeded <= 1.0) {
           // Steer directly to goal angle.
-          overrideSteering.set(i, Optional.of(desiredModuleState[i].angle));
+          overrideSteering.set(i, Optional.of(desiredModuleStates[i].angle));
           // Don't limit the global min_s;
         } else {
           // Adjust steering by max_theta_step.
@@ -419,8 +429,8 @@ public class SwerveSetpointGenerator {
     double[] lastVelMagnitudes = new double[4];
     for (int i = 0; i < 4; i++) {
       double prevSpeed = prevSetpoint.moduleStates()[i].speedMetersPerSecond;
-      desiredModuleState[i].optimize(prevSetpoint.moduleStates()[i].angle);
-      double desiredSpeed = desiredModuleState[i].speedMetersPerSecond;
+      desiredModuleStates[i].optimize(prevSetpoint.moduleStates()[i].angle);
+      double desiredSpeed = desiredModuleStates[i].speedMetersPerSecond;
 
       desiredSpeeds[i] = desiredSpeed;
 
