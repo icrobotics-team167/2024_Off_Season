@@ -596,12 +596,13 @@ public class Swerve extends SubsystemBase {
         && swerveIO instanceof SwerveIOPhoenix phoenix) {
       phoenix.resetGroundTruth(pose);
     }
-    swerveIO.resetGyro(
-        Robot.isOnRed() ? pose.getRotation().rotateBy(Rotation2d.kPi) : pose.getRotation());
+    var gyroAngle =
+        Robot.isOnRed() ? pose.getRotation().rotateBy(Rotation2d.kPi) : pose.getRotation();
+    swerveIO.resetGyro(gyroAngle);
     xController.reset();
     yController.reset();
     yawController.reset();
-    poseEstimator.resetPosition(pose.getRotation(), getLatestModulePositions(), pose);
+    poseEstimator.resetPosition(gyroAngle, getLatestModulePositions(), pose);
     swerveIO.updateInputs(swerveInputs);
     Logger.processInputs("Swerve", swerveInputs);
     poseReset = true;
