@@ -107,14 +107,16 @@ public class SwerveSetpointGenerator {
     }
   }
 
+  private final double EPSILON = 1e-6;
+
   private boolean chassisSpeedsNearZero(ChassisSpeeds speeds) {
-    return MathUtil.isNear(0, speeds.vxMetersPerSecond, 1e-9)
-        && MathUtil.isNear(0, speeds.vyMetersPerSecond, 1e-9)
-        && MathUtil.isNear(0, speeds.omegaRadiansPerSecond, 1e-9);
+    return MathUtil.isNear(0, speeds.vxMetersPerSecond, EPSILON)
+        && MathUtil.isNear(0, speeds.vyMetersPerSecond, EPSILON)
+        && MathUtil.isNear(0, speeds.omegaRadiansPerSecond, EPSILON);
   }
 
   private boolean epsilonEquals(double a, double b) {
-    return MathUtil.isNear(a, b, 1e-9);
+    return MathUtil.isNear(a, b, EPSILON);
   }
 
   @FunctionalInterface
@@ -577,7 +579,7 @@ public class SwerveSetpointGenerator {
           new Translation2d(forcesMatrix.get(i * 2, 0), forcesMatrix.get(i * 2 + 1, 0));
       var wheelForceMagnitude = wheelForce.getNorm();
       var appliedForce =
-          wheelForceMagnitude > 1e-6
+          wheelForceMagnitude > EPSILON
               ? wheelForceMagnitude * wheelForce.getAngle().minus(retStates[i].angle).getCos()
               : 0;
       var torqueCurrent =
