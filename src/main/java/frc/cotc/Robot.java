@@ -8,14 +8,13 @@
 package frc.cotc;
 
 import com.ctre.phoenix6.SignalLogger;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.button.CommandJoystick;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.cotc.drive.Swerve;
 import frc.cotc.drive.SwerveIO;
@@ -37,6 +36,13 @@ public class Robot extends LoggedRobot {
 
   private final Autos autos;
 
+  @SuppressWarnings("unused")
+  private enum Mode {
+    REAL,
+    SIM,
+    REPLAY
+  }
+
   @SuppressWarnings({"DataFlowIssue", "UnreachableCode"})
   public Robot() {
     // If this is erroring, hit build
@@ -49,23 +55,23 @@ public class Robot extends LoggedRobot {
     Logger.recordMetadata("Uncommited changes", BuildConstants.DIRTY == 1 ? "True" : "False");
     Logger.recordMetadata("Compile date", BuildConstants.BUILD_DATE);
 
-    String mode = Robot.isReal() ? "REAL" : "SIM";
-    //    String mode = "REPLAY";
+    Mode mode = Robot.isReal() ? Mode.REAL : Mode.SIM;
+    //    Mode mode = Robot.isReal() ? Mode.REAL : Mode.REPLAY;
 
     switch (mode) {
-      case "REAL" -> {
+      case REAL -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
         LoggedPowerDistribution.getInstance(); // Enables power distribution logging
         SignalLogger.start(); // Start logging Phoenix CAN signals
       }
-      case "SIM" -> {
+      case SIM -> {
         Logger.addDataReceiver(new WPILOGWriter()); // Log to the project's logs folder
         Logger.addDataReceiver(new NT4Publisher()); // Publish data to NetworkTables
 
         SignalLogger.start(); // Start logging Phoenix CAN signals
       }
-      case "REPLAY" -> {
+      case REPLAY -> {
         setUseTiming(false); // Run as fast as possible
         String logPath;
         try {
@@ -89,23 +95,26 @@ public class Robot extends LoggedRobot {
 
     Swerve swerve = getSwerve(mode);
 
-    CommandJoystick primaryLeft = new CommandJoystick(0);
-    CommandJoystick primaryRight = new CommandJoystick(1);
+    var primary = new CommandXboxController(0);
 
     // Robot wants +X fwd, +Y left
     // Sticks are +X right +Y back
     swerve.setDefaultCommand(
         swerve.teleopDrive(
-            () -> MathUtil.applyDeadband(-primaryLeft.getY(), .01),
-            () -> MathUtil.applyDeadband(-primaryLeft.getX(), .01),
-            () -> MathUtil.applyDeadband(-primaryRight.getX(), .01)));
-    RobotModeTriggers.disabled().or(primaryLeft.button(3)).whileTrue(swerve.stopInX());
+            () -> -primary.getLeftY(),
+            () -> -primary.getLeftX(),
+            .06,
+            2,
+            () -> -primary.getRightX(),
+            .05,
+            2));
+    RobotModeTriggers.disabled().or(primary.povDown()).whileTrue(swerve.stopInX());
     RobotModeTriggers.teleop().onTrue(swerve.resetGyro());
 
     autos = new Autos(swerve);
   }
 
-  private Swerve getSwerve(String mode) {
+  private Swerve getSwerve(Mode mode) {
     SwerveIO swerveIO;
     FiducialPoseEstimatorIO[] visionIOs;
 
@@ -125,7 +134,7 @@ public class Robot extends LoggedRobot {
         };
 
     switch (mode) {
-      case "REAL", "SIM" -> {
+      case REAL, SIM -> {
         swerveIO = new SwerveIOPhoenix();
         visionIOs =
             new FiducialPoseEstimatorIO[] {
@@ -153,7 +162,7 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void autonomousInit() {
-    autoCommand = autos.getAuto();
+    autoCommand = autos.getSelectedCommand();
     autoCommand.schedule();
   }
 

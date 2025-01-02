@@ -107,19 +107,14 @@ public class FiducialPoseEstimatorIOPhoton implements FiducialPoseEstimatorIO {
               (estimate) -> {
                 inputs.hasNewData = true;
 
-                var tagDistances = new double[estimate.targetsUsed.size()];
                 var tagAbsolutePoses = new Pose3d[estimate.targetsUsed.size()];
                 for (int i = 0; i < tagAbsolutePoses.length; i++) {
                   var tagRelativePos = estimate.targetsUsed.get(i).getBestCameraToTarget();
-                  tagDistances[i] = tagRelativePos.getTranslation().getNorm();
                   tagAbsolutePoses[i] = estimate.estimatedPose.plus(cameraPos.plus(tagRelativePos));
                 }
                 estimateList.add(
                     new PoseEstimate(
-                        estimate.estimatedPose,
-                        estimate.timestampSeconds,
-                        tagAbsolutePoses,
-                        tagDistances));
+                        estimate.estimatedPose, estimate.timestampSeconds, tagAbsolutePoses));
               });
     }
 

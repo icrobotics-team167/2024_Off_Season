@@ -11,6 +11,7 @@ import static frc.cotc.drive.SwerveSetpointGenerator.SwerveSetpoint;
 import static java.lang.Math.PI;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
@@ -57,7 +58,7 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.TRACK_LENGTH_METERS = Units.inchesToMeters(27.5);
     CONSTANTS.WHEEL_DIAMETER_METERS = Units.inchesToMeters(4);
     WHEEL_CIRCUMFERENCE_METERS = CONSTANTS.WHEEL_DIAMETER_METERS * PI;
-    CONSTANTS.WHEEL_COF = 1.5;
+    CONSTANTS.WHEEL_COF = 1;
 
     DRIVE_GEAR_RATIO = (50.0 / 16.0) * (17.0 / 27.0) * (45.0 / 15.0);
     CONSTANTS.DRIVE_MOTOR = DCMotor.getKrakenX60Foc(1).withReduction(DRIVE_GEAR_RATIO);
@@ -66,25 +67,27 @@ public class SwerveIOPhoenix implements SwerveIO {
     CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC =
         Units.rotationsPerMinuteToRadiansPerSecond(6000) / STEER_GEAR_RATIO;
 
-    CONSTANTS.MASS_KG = Units.lbsToKilograms(40);
+    CONSTANTS.MASS_KG = Units.lbsToKilograms(58);
 
     double linearKa = 1;
     double angularKa = 1;
     CONSTANTS.MOI_KG_METERS_SQUARED =
         CONSTANTS.MASS_KG
             * Math.hypot(CONSTANTS.TRACK_LENGTH_METERS / 2, CONSTANTS.TRACK_WIDTH_METERS / 2)
-            * (angularKa / linearKa);
+            * (Robot.isReal() ? angularKa / linearKa : 1);
 
     CONSTANTS.ANGULAR_SPEED_FUDGING = .45;
 
-    CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS =
+    CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS =
         Math.min(
-            CONSTANTS.DRIVE_MOTOR.getCurrent(
-                    CONSTANTS.WHEEL_COF
-                        * ((CONSTANTS.MASS_KG / 4) * 9.81)
-                        * CONSTANTS.WHEEL_DIAMETER_METERS
-                        / 2)
-                + 10,
+            (int)
+                Math.round(
+                    CONSTANTS.DRIVE_MOTOR.getCurrent(
+                            CONSTANTS.WHEEL_COF
+                                * ((CONSTANTS.MASS_KG / 4) * 9.81)
+                                * CONSTANTS.WHEEL_DIAMETER_METERS
+                                / 2)
+                        + 10),
             100);
   }
 
@@ -237,7 +240,6 @@ public class SwerveIOPhoenix implements SwerveIO {
     final TalonFX steerMotor;
     final CANcoder encoder;
 
-    @SuppressWarnings("DuplicateBranchesInSwitch")
     public Module(int id) {
       driveMotor = new TalonFX(id * 3, Robot.CANIVORE_NAME);
       steerMotor = new TalonFX(id * 3 + 1, Robot.CANIVORE_NAME);
@@ -247,7 +249,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       driveConfig.Feedback.SensorToMechanismRatio = DRIVE_GEAR_RATIO;
       driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
       driveConfig.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
-      driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS;
+      driveConfig.CurrentLimits.StatorCurrentLimit = CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS;
       driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
       driveConfig.Audio.AllowMusicDurDisable = true;
 
@@ -264,6 +266,7 @@ public class SwerveIOPhoenix implements SwerveIO {
       steerConfig.CurrentLimits.SupplyCurrentLowerLimit = 10;
       steerConfig.CurrentLimits.SupplyCurrentLowerTime = .5;
       steerConfig.Audio.AllowMusicDurDisable = true;
+      steerConfig.Slot0.kV = 12 / Units.radiansToRotations(CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC);
 
       var encoderConfig = new CANcoderConfiguration();
 
@@ -271,14 +274,14 @@ public class SwerveIOPhoenix implements SwerveIO {
       if (Robot.isReal()) {
         driveConfig.Slot0.kV = 0;
 
-        steerConfig.Slot0.kP = 0;
+        steerConfig.Slot0.kP = 48;
         steerConfig.Slot0.kD = 0;
 
         switch (id) {
-          case 0 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
-          case 1 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
-          case 2 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
-          case 3 -> encoderConfig.MagnetSensor.MagnetOffset = 0;
+          case 0 -> encoderConfig.MagnetSensor.MagnetOffset = 0.478271484375;
+          case 1 -> encoderConfig.MagnetSensor.MagnetOffset = -0.00634765625;
+          case 2 -> encoderConfig.MagnetSensor.MagnetOffset = -0.306884765625;
+          case 3 -> encoderConfig.MagnetSensor.MagnetOffset = -0.086181640625;
         }
 
         driveKpMultiplier = 1;
@@ -289,8 +292,6 @@ public class SwerveIOPhoenix implements SwerveIO {
         steerConfig.Slot0.kD = 2.5;
       }
       driveConfig.Slot0.kP = driveKpMultiplier * CONSTANTS.MASS_KG;
-
-      steerConfig.Slot0.kV = 12 / Units.radiansToRotations(CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC);
 
       driveMotor.getConfigurator().apply(driveConfig);
       steerMotor.getConfigurator().apply(steerConfig);
@@ -383,7 +384,14 @@ public class SwerveIOPhoenix implements SwerveIO {
     public void run() {
       //noinspection InfiniteLoopStatement
       while (true) {
-        BaseStatusSignal.waitForAll(2.0 / FREQUENCY, signals);
+        if (BaseStatusSignal.waitForAll(2.0 / FREQUENCY, signals) != StatusCode.OK) {
+          continue;
+        }
+
+        double latencySum = 0;
+        for (var signal : signals) {
+          latencySum += signal.getTimestamp().getLatency();
+        }
         var frame =
             new OdometryFrame(
                 new SwerveModulePosition[] {
@@ -394,7 +402,7 @@ public class SwerveIOPhoenix implements SwerveIO {
                 },
                 Rotation2d.fromDegrees(
                     BaseStatusSignal.getLatencyCompensatedValueAsDouble(signals[16], signals[17])),
-                RobotController.getFPGATime() / 1e6);
+                (RobotController.getFPGATime() / 1e6) - (latencySum / signals.length));
         synchronized (frameBuffer) {
           frameBuffer.addLast(frame);
         }

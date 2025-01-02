@@ -25,6 +25,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
@@ -58,11 +59,11 @@ public class Swerve extends SubsystemBase {
   private final PIDController xController, yController, yawController;
 
   private record StdDevTunings(
-      double distanceScalar, double tagCountExponent, double velocityScalar) {}
+      double distanceScalar, double heightScalar, double tagCountExponent) {}
 
   private record CameraTunings(StdDevTunings translational, StdDevTunings angular) {
     static final CameraTunings defaults =
-        new CameraTunings(new StdDevTunings(.5, 1.5, 2), new StdDevTunings(.2, 1.5, 1.5));
+        new CameraTunings(new StdDevTunings(1.5, 1, 2), new StdDevTunings(.2, 1, 1.5));
   }
 
   private final double wheelRadiusMeters;
@@ -102,7 +103,7 @@ public class Swerve extends SubsystemBase {
                   -CONSTANTS.TRACK_LENGTH_METERS / 2, -CONSTANTS.TRACK_WIDTH_METERS / 2)
             },
             CONSTANTS.DRIVE_MOTOR,
-            CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS,
+            CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS,
             CONSTANTS.MAX_STEER_SPEED_RAD_PER_SEC,
             CONSTANTS.MASS_KG,
             CONSTANTS.MOI_KG_METERS_SQUARED,
@@ -142,7 +143,7 @@ public class Swerve extends SubsystemBase {
     wheelRadiusMeters = CONSTANTS.WHEEL_DIAMETER_METERS / 2;
     kTNewtonMetersPerAmp = CONSTANTS.DRIVE_MOTOR.KtNMPerAmp;
     currentVisualizationScalar =
-        CONSTANTS.DRIVE_MOTOR_CURRENT_LIMIT_AMPS / maxLinearSpeedMetersPerSec;
+        CONSTANTS.DRIVE_STATOR_CURRENT_LIMIT_AMPS / maxLinearSpeedMetersPerSec;
     Logger.recordOutput(
         "Swerve/Setpoint Generator/Setpoint/Current Visualization Scalar",
         currentVisualizationScalar);
@@ -183,9 +184,8 @@ public class Swerve extends SubsystemBase {
           "Swerve: Odometry data was out of order! Expected latest data last.",
           Alert.AlertType.kWarning);
 
-  private ArrayList<Pose3d> tagPoses;
-  private ArrayList<Pose3d> poseEstimates;
-  private ArrayList<Rotation2d> poseEstimateYaws;
+  private final ArrayList<Pose3d> tagPoses = new ArrayList<>();
+  private final ArrayList<Pose3d> poseEstimates = new ArrayList<>();
 
   boolean visionLoggingEnabled = true;
 
@@ -201,7 +201,7 @@ public class Swerve extends SubsystemBase {
     for (int i = 0; i < 4; i++) {
       lastDriveFeedforwards[i].angle = lastSetpoint.moduleStates()[i].angle;
       lastDriveFeedforwards[i].speedMetersPerSecond =
-          lastSetpoint.driveFeedforwardsAmps()[i] * currentVisualizationScalar;
+          lastSetpoint.driveFeedforwardsAmps()[i] / currentVisualizationScalar;
     }
     Logger.recordOutput(
         "Swerve/Setpoint Generator/Setpoint/Drive feedforwards", lastDriveFeedforwards);
@@ -214,80 +214,73 @@ public class Swerve extends SubsystemBase {
     fieldRelativeSpeeds =
         ChassisSpeeds.fromRobotRelativeSpeeds(robotRelativeSpeeds, swerveInputs.gyroYaw);
 
-    var driveStdDevs = getDriveStdDevs();
-    Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
-    poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
+    if (!poseReset) {
+      var driveStdDevs = getDriveStdDevs();
+      Logger.recordOutput("Swerve/Odometry/Drive Std Devs", driveStdDevs);
+      poseEstimator.setDriveMeasurementStdDevs(driveStdDevs);
 
-    double lastTimestamp = -1;
-    for (var frame : swerveInputs.odometryFrames) {
-      if (frame.timestamp() < 0) {
-        invalidOdometryWarning.set(true);
-        break;
-      }
-      invalidOdometryWarning.set(false);
-      if (frame.timestamp() < lastTimestamp) {
-        outOfOrderOdometryWarning.set(true);
-        break;
-      }
-      outOfOrderOdometryWarning.set(false);
-      poseEstimator.updateWithTime(frame.timestamp(), frame.gyroYaw(), frame.positions());
-      lastTimestamp = frame.timestamp();
-    }
-
-    if (Robot.isSimulation() && !Logger.hasReplaySource()) {
-      FiducialPoseEstimatorIOPhoton.VisionSim.getInstance().update();
-    }
-
-    if (visionLoggingEnabled && tagPoses == null) {
-      tagPoses = new ArrayList<>();
-      poseEstimates = new ArrayList<>();
-      poseEstimateYaws = new ArrayList<>();
-    }
-    for (int i = 0; i < visionIOs.length; i++) {
-      visionIOs[i].updateInputs(visionInputs[i]);
-      Logger.processInputs("Vision/" + i, visionInputs[i]);
-
-      if (!visionInputs[i].hasNewData) {
-        // If there's no new data, save some CPU
-        continue;
+      double lastTimestamp = -1;
+      for (var frame : swerveInputs.odometryFrames) {
+        if (frame.timestamp() < 0) {
+          invalidOdometryWarning.set(true);
+          break;
+        }
+        invalidOdometryWarning.set(false);
+        if (frame.timestamp() < lastTimestamp) {
+          outOfOrderOdometryWarning.set(true);
+          break;
+        }
+        outOfOrderOdometryWarning.set(false);
+        poseEstimator.updateWithTime(frame.timestamp(), frame.gyroYaw(), frame.positions());
+        lastTimestamp = frame.timestamp();
       }
 
-      CameraTunings tunings;
-      if (i >= cameraTunings.length) {
-        tunings = CameraTunings.defaults;
-      } else {
-        tunings = cameraTunings[i];
+      if (Robot.isSimulation() && !Logger.hasReplaySource()) {
+        FiducialPoseEstimatorIOPhoton.VisionSim.getInstance().update();
       }
 
-      for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
-        var poseEstimate = visionInputs[i].poseEstimates[j];
+      for (int i = 0; i < visionIOs.length; i++) {
+        visionIOs[i].updateInputs(visionInputs[i]);
+        Logger.processInputs("Vision/" + i, visionInputs[i]);
 
-        // Discard if the pose is too far above/below the ground
-        if (!MathUtil.isNear(0, poseEstimate.estimatedPose().getZ(), .05)) {
+        if (!visionInputs[i].hasNewData) {
+          // If there's no new data, save some CPU
           continue;
         }
 
-        var stdDevs = getVisionStdDevs(poseEstimate, tunings);
-        Logger.recordOutput("Vision/Std Devs/" + i + "/" + j, stdDevs);
+        CameraTunings tunings;
+        if (i >= cameraTunings.length) {
+          tunings = CameraTunings.defaults;
+        } else {
+          tunings = cameraTunings[i];
+        }
 
-        poseEstimator.addVisionMeasurement(
-            poseEstimate.estimatedPose().toPose2d(), poseEstimate.timestamp(), stdDevs);
+        for (int j = 0; j < visionInputs[i].poseEstimates.length; j++) {
+          var poseEstimate = visionInputs[i].poseEstimates[j];
 
-        if (visionLoggingEnabled) {
-          poseEstimates.add(poseEstimate.estimatedPose());
-          poseEstimateYaws.add(new Rotation2d(poseEstimate.estimatedPose().getRotation().getZ()));
-          tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
+          var translationalStdDevs = getVisionStdDevs(poseEstimate, tunings.translational);
+          var angularStdDevs = getVisionStdDevs(poseEstimate, tunings.angular);
+          Logger.recordOutput(
+              "Vision/Std Devs/" + i + "/" + j + "/Translational", translationalStdDevs);
+          Logger.recordOutput("Vision/Std Devs/" + i + "/" + j + "/Angular", angularStdDevs);
+
+          poseEstimator.addVisionMeasurement(
+              poseEstimate.estimatedPose().toPose2d(),
+              poseEstimate.timestamp(),
+              new double[] {translationalStdDevs, translationalStdDevs, angularStdDevs});
+
+          if (visionLoggingEnabled) {
+            poseEstimates.add(poseEstimate.estimatedPose());
+            tagPoses.addAll(Arrays.asList(poseEstimate.tagsUsed()));
+          }
         }
       }
-    }
-    if (visionLoggingEnabled) {
       Logger.recordOutput("Vision/All pose estimates", poseEstimates.toArray(new Pose3d[0]));
-      Logger.recordOutput(
-          "Vision/All pose estimates/yaws", poseEstimateYaws.toArray(new Rotation2d[0]));
       Logger.recordOutput("Vision/All tags used", tagPoses.toArray(new Pose3d[0]));
       poseEstimates.clear();
-      poseEstimateYaws.clear();
       tagPoses.clear();
+    } else {
+      poseReset = false;
     }
 
     Logger.recordOutput("Swerve/Odometry/Final Position", poseEstimator.getEstimatedPosition());
@@ -325,59 +318,91 @@ public class Swerve extends SubsystemBase {
       ySquaredSum += yDelta * yDelta;
     }
 
+    // Sqrt of avg of squared deltas = standard deviation
+    // Rotate to convert to field relative
+    double scalar = 15;
     var stdDevs =
-        new Translation2d(Math.sqrt(xSquaredSum) / 4, Math.sqrt(ySquaredSum) / 4)
+        new Translation2d(
+                scalar * (Math.sqrt(xSquaredSum) / 4), scalar * (Math.sqrt(ySquaredSum) / 4))
             .rotateBy(swerveInputs.gyroYaw);
 
-    // Sqrt of avg of squared deltas = standard deviation
+    // If translating and rotating at the same time, odometry drifts pretty badly in the
+    // direction perpendicular to the direction of translational travel.
+    // This factor massively distrusts odometry in that direction when translating and rotating
+    // at the same time.
+    var scaledSpeed =
+        new Translation2d(
+                fieldRelativeSpeeds.vxMetersPerSecond / maxLinearSpeedMetersPerSec,
+                fieldRelativeSpeeds.vyMetersPerSecond / maxLinearSpeedMetersPerSec)
+            .rotateBy(Rotation2d.kCCW_90deg)
+            .times(
+                1 * Math.abs(fieldRelativeSpeeds.omegaRadiansPerSecond / maxAngularSpeedRadPerSec));
+
     // Add a minimum to account for mechanical slop and to prevent divide by 0 errors
-    return new double[] {Math.abs(stdDevs.getX()) + .005, Math.abs(stdDevs.getY()) + .005, .001};
-  }
-
-  private double[] getVisionStdDevs(
-      FiducialPoseEstimatorIO.PoseEstimate poseEstimate, CameraTunings tunings) {
-    double translationalScoreSum = 0;
-    double rotationalScoreSum = 0;
-    for (var distanceMeters : poseEstimate.tagDistances()) {
-      translationalScoreSum +=
-          tunings.translational.distanceScalar * distanceMeters * distanceMeters;
-      rotationalScoreSum += tunings.angular.distanceScalar * distanceMeters * distanceMeters;
-    }
-
-    var translationalDivisor =
-        Math.pow(poseEstimate.tagDistances().length, tunings.translational.tagCountExponent);
-    var rotationalDivisor =
-        Math.pow(poseEstimate.tagDistances().length, tunings.angular.tagCountExponent);
-
-    var translationalVelMagnitude =
-        Math.hypot(fieldRelativeSpeeds.vxMetersPerSecond, fieldRelativeSpeeds.vyMetersPerSecond)
-            / maxLinearSpeedMetersPerSec;
-    var angularVelMagnitude =
-        Math.abs(fieldRelativeSpeeds.omegaRadiansPerSecond) / maxAngularSpeedRadPerSec;
-
-    var translationalScalar =
-        MathUtil.interpolate(1, tunings.translational.velocityScalar, translationalVelMagnitude);
-    var rotationalScalar =
-        MathUtil.interpolate(1, tunings.angular.velocityScalar, angularVelMagnitude);
-
     return new double[] {
-      translationalScoreSum * translationalScalar / translationalDivisor,
-      translationalScoreSum * translationalScalar / translationalDivisor,
-      rotationalScoreSum * rotationalScalar / rotationalDivisor
+      Math.abs(stdDevs.getX()) + Math.abs(scaledSpeed.getX()) + .1,
+      Math.abs(stdDevs.getY()) + Math.abs(scaledSpeed.getY()) + .1,
+      .0005
     };
   }
 
+  private double getVisionStdDevs(
+      FiducialPoseEstimatorIO.PoseEstimate poseEstimate, StdDevTunings tunings) {
+    double distanceScoreSum = 0;
+    for (var tagPose : poseEstimate.tagsUsed()) {
+      var distanceMeters =
+          tagPose.getTranslation().getDistance(poseEstimate.estimatedPose().getTranslation());
+      distanceScoreSum += tunings.distanceScalar * distanceMeters * distanceMeters;
+    }
+
+    var tagCountDivisor = Math.pow(poseEstimate.tagsUsed().length, tunings.tagCountExponent);
+
+    var translationalHeightScalar =
+        1
+            + tunings.heightScalar
+                * poseEstimate.estimatedPose().getZ()
+                * poseEstimate.estimatedPose().getZ();
+
+    return (distanceScoreSum / tagCountDivisor) * translationalHeightScalar;
+  }
+
   public Command teleopDrive(
-      DoubleSupplier xSupplier, DoubleSupplier ySupplier, DoubleSupplier omegaSupplier) {
+      DoubleSupplier xSupplier,
+      DoubleSupplier ySupplier,
+      double translationDeadband,
+      double translationExponent,
+      DoubleSupplier omegaSupplier,
+      double omegaDeadband,
+      double omegaExponent) {
     return run(
-        () ->
-            teleopDrive(
-                ChassisSpeeds.fromFieldRelativeSpeeds(
-                    new ChassisSpeeds(
-                        xSupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
-                        ySupplier.getAsDouble() * maxLinearSpeedMetersPerSec,
-                        omegaSupplier.getAsDouble() * maxAngularSpeedRadPerSec),
-                    swerveInputs.gyroYaw)));
+        () -> {
+          double xControl = xSupplier.getAsDouble();
+          double yControl = ySupplier.getAsDouble();
+          double magnitude = Math.hypot(xControl, yControl);
+          if (magnitude > 1) {
+            xControl /= magnitude;
+            yControl /= magnitude;
+          } else if (magnitude > 1e-6) {
+            double scalar =
+                Math.pow(
+                    MathUtil.applyDeadband(magnitude, translationDeadband) / magnitude,
+                    translationExponent);
+            xControl *= scalar;
+            yControl *= scalar;
+          }
+
+          double omegaControl = MathUtil.applyDeadband(omegaSupplier.getAsDouble(), omegaDeadband);
+          omegaControl =
+              Math.pow(Math.abs(omegaControl), omegaExponent) * Math.signum(omegaControl);
+
+          teleopDrive(
+              ChassisSpeeds.fromFieldRelativeSpeeds(
+                  new ChassisSpeeds(
+                      xControl * maxLinearSpeedMetersPerSec,
+                      yControl * maxLinearSpeedMetersPerSec,
+                      omegaControl * maxAngularSpeedRadPerSec),
+                  swerveInputs.gyroYaw));
+        });
   }
 
   public Command stopInX() {
@@ -391,11 +416,13 @@ public class Swerve extends SubsystemBase {
   public Command resetGyro() {
     return runOnce(
         () -> {
-          swerveIO.resetGyro(poseEstimator.getEstimatedPosition().getRotation());
+          var gyroAngle =
+              Robot.isOnRed()
+                  ? poseEstimator.getEstimatedPosition().getRotation().rotateBy(Rotation2d.kPi)
+                  : poseEstimator.getEstimatedPosition().getRotation();
+          swerveIO.resetGyro(gyroAngle);
           poseEstimator.resetPosition(
-              poseEstimator.getEstimatedPosition().getRotation(),
-              getLatestModulePositions(),
-              poseEstimator.getEstimatedPosition());
+              gyroAngle, getLatestModulePositions(), poseEstimator.getEstimatedPosition());
         });
   }
 
@@ -478,9 +505,9 @@ public class Swerve extends SubsystemBase {
     var sysId =
         new SysIdRoutine(
             new SysIdRoutine.Config(
-                Volts.of(1).per(Second),
+                Volts.of(2).per(Second),
                 Volts.of(6),
-                Seconds.of(12),
+                Seconds.of(6),
                 state -> SignalLogger.writeString("SysIDState", state.toString())),
             new SysIdRoutine.Mechanism(
                 voltage -> swerveIO.steerCharacterization(voltage.baseUnitMagnitude()),
@@ -524,7 +551,7 @@ public class Swerve extends SubsystemBase {
         new SysIdRoutine(
             new SysIdRoutine.Config(
                 Volts.of(10).per(Second),
-                Volts.of(25),
+                Volts.of(20),
                 Seconds.of(4),
                 state -> SignalLogger.writeString("SysIDState", state.toString())),
             new SysIdRoutine.Mechanism(
@@ -560,16 +587,24 @@ public class Swerve extends SubsystemBase {
     return poseEstimator.getEstimatedPosition();
   }
 
+  private boolean poseReset = false;
+
   public void resetForAuto(Pose2d pose) {
+    DriverStation.reportWarning("Reset For Auto run", true);
     if (Robot.isSimulation()
         && !Logger.hasReplaySource()
         && swerveIO instanceof SwerveIOPhoenix phoenix) {
       phoenix.resetGroundTruth(pose);
     }
-    swerveIO.resetGyro(pose.getRotation());
+    var gyroAngle =
+        Robot.isOnRed() ? pose.getRotation().rotateBy(Rotation2d.kPi) : pose.getRotation();
+    swerveIO.resetGyro(gyroAngle);
     xController.reset();
     yController.reset();
     yawController.reset();
-    poseEstimator.resetPosition(pose.getRotation(), getLatestModulePositions(), pose);
+    poseEstimator.resetPosition(gyroAngle, getLatestModulePositions(), pose);
+    swerveIO.updateInputs(swerveInputs);
+    Logger.processInputs("Swerve", swerveInputs);
+    poseReset = true;
   }
 }
